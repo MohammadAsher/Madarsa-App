@@ -15,7 +15,10 @@ import {
   Play, 
   Settings2,
   Check,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
+  Layers,
+  BookmarkCheck
 } from 'lucide-react';
 import { 
   MadrasaState, 
@@ -38,6 +41,9 @@ interface UstaadDashboardProps {
   ustaad: UstaadProfile;
   onUpdateState: (updater: (prev: MadrasaState) => MadrasaState) => void;
   onJumpToMushafWord?: (page: number, wordId: string) => void;
+  activeMarkingSession?: { student: StudentProfile; part: PartType } | null;
+  onStartMarking?: (student: StudentProfile, part: PartType) => void;
+  onCloseMarking?: () => void;
 }
 
 export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
@@ -45,14 +51,34 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
   ustaad,
   onUpdateState,
   onJumpToMushafWord,
+  activeMarkingSession,
+  onStartMarking,
+  onCloseMarking,
 }) => {
   const t = translations[state.language];
 
   // Active sub-views & modals
-  const [markingStudent, setMarkingStudent] = useState<{
+  const [internalMarkingStudent, setInternalMarkingStudent] = useState<{
     student: StudentProfile;
     part: PartType;
   } | null>(null);
+
+  const currentMarking = activeMarkingSession !== undefined ? activeMarkingSession : internalMarkingStudent;
+
+  const handleStartMarkingStudent = (student: StudentProfile, part: PartType) => {
+    if (onStartMarking) {
+      onStartMarking(student, part);
+    } else {
+      setInternalMarkingStudent({ student, part });
+    }
+  };
+
+  const handleCloseMarkingScreen = () => {
+    if (onCloseMarking) {
+      onCloseMarking();
+    }
+    setInternalMarkingStudent(null);
+  };
 
   const [assigningStudent, setAssigningStudent] = useState<StudentProfile | null>(null);
   const [limitsStudent, setLimitsStudent] = useState<StudentProfile | null>(null);
@@ -104,7 +130,7 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
     });
 
     // Close marking screen
-    setMarkingStudent(null);
+    handleCloseMarkingScreen();
   };
 
   // Handle saving assignments
@@ -199,13 +225,13 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
   };
 
   // If currently in the dedicated Marking screen, render that view
-  if (markingStudent) {
+  if (currentMarking) {
     return (
       <UstaadMarkingScreen
         state={state}
-        student={markingStudent.student}
-        initialPart={markingStudent.part}
-        onBack={() => setMarkingStudent(null)}
+        student={currentMarking.student}
+        initialPart={currentMarking.part}
+        onBack={handleCloseMarkingScreen}
         onSaveSession={handleSaveSession}
       />
     );
@@ -213,63 +239,69 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-      {/* Halqa Banner & Rule Controls */}
-      <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-lg md:text-xl text-stone-900">
-              {state.language === 'ur' ? ustaad.urduName : ustaad.name}
-            </span>
-            <span className="text-stone-300">·</span>
-            <span className="text-emerald-800 font-semibold text-sm">
-              {ustaad.halqaName}
-            </span>
+      {/* Halqa Banner & Rule Controls with Islamic arch styling */}
+      <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-5 shadow-xs relative overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#C5A059] to-transparent" />
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-lg md:text-xl text-[#241811]">
+                {state.language === 'ur' ? ustaad.urduName : ustaad.name}
+              </span>
+              <span className="text-[#C5A059]">۞</span>
+              <span className="text-[#8F6E2B] font-semibold text-xs md:text-sm bg-[#F5EFEB] px-2.5 py-1 rounded-lg border border-[#DFCFA8]">
+                {ustaad.halqaName}
+              </span>
+            </div>
+            <p className="text-xs text-[#7A6C60] mt-1.5 flex items-center gap-1.5">
+              <span>{halqaStudents.length} {state.language === 'ur' ? 'طلبہ زیرِ نگرانی' : 'Students enrolled'}</span>
+              <span>·</span>
+              <span className="font-mono text-[#5A4333]">{state.currentDate} ({t.dayCounter} {state.dayCount})</span>
+            </p>
           </div>
-          <p className="text-xs text-stone-500 mt-1">
-            {halqaStudents.length} {state.language === 'ur' ? 'طلبہ زیرِ نگرانی' : 'Students enrolled in this halqa'} · {state.currentDate} ({t.dayCounter} {state.dayCount})
-          </p>
-        </div>
 
-        {/* Ustaad Rule Toggle: Freeze new Sabaq if Sabqi or Manzil fails */}
-        <div className="flex items-center gap-4 bg-stone-50 border border-stone-200 p-3 rounded-xl">
-          <div className="text-right">
-            <div className="text-xs font-bold text-stone-900">
-              {t.freezeRuleLabel}
+          {/* Ustaad Rule Toggle: Freeze new Sabaq if Sabqi or Manzil fails */}
+          <div className="flex items-center gap-4 bg-[#F8F4EC] border border-[#DFCFA8] p-3 rounded-xl">
+            <div className="text-right">
+              <div className="text-xs font-bold text-[#241811]">
+                {t.freezeRuleLabel}
+              </div>
+              <div className="text-[11px] text-[#7A6C60] max-w-xs">
+                {t.freezeRuleDescription}
+              </div>
             </div>
-            <div className="text-[11px] text-stone-500 max-w-xs">
-              {t.freezeRuleDescription}
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                onUpdateState(prev => ({
+                  ...prev,
+                  settings: {
+                    ...prev.settings,
+                    freezeSabaqOnSabqiOrManzilFail: !prev.settings.freezeSabaqOnSabqiOrManzilFail,
+                  },
+                }));
+              }}
+              className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer shrink-0 ${
+                state.settings.freezeSabaqOnSabqiOrManzilFail
+                  ? 'bg-[#1F4E3D] justify-end'
+                  : 'bg-[#CDBE9F] justify-start'
+              }`}
+            >
+              <div className="w-4 h-4 rounded-full bg-[#FCFAF6] shadow-md" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              onUpdateState(prev => ({
-                ...prev,
-                settings: {
-                  ...prev.settings,
-                  freezeSabaqOnSabqiOrManzilFail: !prev.settings.freezeSabaqOnSabqiOrManzilFail,
-                },
-              }));
-            }}
-            className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer shrink-0 ${
-              state.settings.freezeSabaqOnSabqiOrManzilFail
-                ? 'bg-emerald-600 justify-end'
-                : 'bg-stone-300 justify-start'
-            }`}
-          >
-            <div className="w-4 h-4 rounded-full bg-white shadow-md" />
-          </button>
         </div>
       </div>
 
       {/* Halqa Students List */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-stone-900 flex items-center gap-2">
-            <Users className="w-4 h-4 text-emerald-700" />
+          <h2 className="text-base font-bold text-[#241811] flex items-center gap-2">
+            <Users className="w-4 h-4 text-[#8F6E2B]" />
             <span>{t.halqaTitle}</span>
           </h2>
-          <span className="text-xs text-stone-500">
+          <span className="text-xs text-[#7A6C60]">
             {t.halqaSubtitle}
           </span>
         </div>
@@ -282,27 +314,30 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
             return (
               <div
                 key={student.id}
-                className="bg-white rounded-2xl border border-stone-200 shadow-2xs hover:shadow-sm transition-shadow p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-5"
+                className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] shadow-xs hover:shadow-md hover:border-[#C5A059]/60 transition-all p-4 md:p-5 flex flex-col md:flex-row md:items-center justify-between gap-5 relative overflow-hidden"
               >
+                {/* Subtle top arch indicator */}
+                <div className="absolute top-0 left-6 right-6 h-0.5 bg-gradient-to-r from-transparent via-[#C5A059]/30 to-transparent" />
+
                 {/* Student Info */}
                 <div className="md:w-1/4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-sm shrink-0 border border-emerald-200">
+                    <div className="w-10 h-10 rounded-full bg-[#2A1D15] text-[#DFCFA8] font-bold flex items-center justify-center text-sm shrink-0 border border-[#C5A059] shadow-2xs">
                       {student.name.charAt(0)}
                     </div>
                     <div>
-                      <h3 className="font-bold text-stone-900 text-sm md:text-base">
+                      <h3 className="font-bold text-[#241811] text-sm md:text-base">
                         {state.language === 'ur' ? student.urduName : student.name}
                       </h3>
-                      <div className="text-xs text-stone-500 flex flex-wrap items-center gap-1">
-                        <span>{state.language === 'ur' ? `پارہ ${student.currentJuz}` : `Current: Para ${student.currentJuz}`}</span>
-                        <span className="text-stone-300">·</span>
-                        <span className="text-emerald-800 font-semibold">
+                      <div className="text-xs text-[#7A6C60] flex flex-wrap items-center gap-1.5 mt-0.5">
+                        <span className="text-[#3E2B20] font-medium">{state.language === 'ur' ? `پارہ ${student.currentJuz}` : `Current: Para ${student.currentJuz}`}</span>
+                        <span className="text-[#C5A059]">·</span>
+                        <span className="text-[#1F4E3D] font-bold bg-[#E8F0EC] px-1.5 py-0.5 rounded text-[11px]">
                           {student.completedParas?.length || 0} {state.language === 'ur' ? 'پارے مکمل' : 'Paras Done'}
                         </span>
                         {hasOverriddenLimits && (
-                          <span className="text-[10px] text-amber-700 font-medium">
-                            · Custom Limits
+                          <span className="text-[10px] text-[#8F6E2B] font-semibold bg-[#F5EFEB] px-1.5 py-0.5 rounded">
+                            Custom Limits
                           </span>
                         )}
                       </div>
@@ -317,30 +352,30 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                     const status = plan?.status || 'pending';
 
                     let statusBadge = (
-                      <span className="text-[11px] font-medium text-stone-500 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
+                      <span className="text-[11px] font-medium text-[#7A6C60] flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-[#7A6C60]" />
                         {t.status.pending}
                       </span>
                     );
 
                     if (status === 'passed') {
                       statusBadge = (
-                        <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span className="text-[11px] font-bold text-[#1F4E3D] flex items-center gap-1 bg-[#E8F0EC] px-1.5 py-0.5 rounded">
+                          <CheckCircle2 className="w-3 h-3 text-[#1F4E3D]" />
                           {t.status.passed}
                         </span>
                       );
                     } else if (status === 'repeat') {
                       statusBadge = (
-                        <span className="text-[11px] font-bold text-rose-700 flex items-center gap-1">
-                          <XCircle className="w-3 h-3 text-rose-600" />
+                        <span className="text-[11px] font-bold text-[#991B1B] flex items-center gap-1 bg-[#FEE2E2] px-1.5 py-0.5 rounded">
+                          <XCircle className="w-3 h-3 text-[#991B1B]" />
                           {t.status.repeat}
                         </span>
                       );
                     } else if (status === 'in_progress') {
                       statusBadge = (
-                        <span className="text-[11px] font-bold text-amber-700 flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-amber-600" />
+                        <span className="text-[11px] font-bold text-[#B45309] flex items-center gap-1 bg-[#FEF3C7] px-1.5 py-0.5 rounded">
+                          <Clock className="w-3 h-3 text-[#B45309]" />
                           {t.status.in_progress}
                         </span>
                       );
@@ -363,29 +398,32 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                     return (
                       <div
                         key={partKey}
-                        className="bg-stone-50 border border-stone-200/80 rounded-xl p-2.5 flex flex-col justify-between"
+                        className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 flex flex-col justify-between hover:bg-[#F3ECE1] transition-colors"
                       >
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-bold text-stone-800 capitalize">
-                            {t.parts[partKey]}
+                          <span className="text-xs font-bold text-[#241811] capitalize flex items-center gap-1">
+                            {partKey === 'sabaq' && <Sparkles className="w-3 h-3 text-[#C5A059]" />}
+                            {partKey === 'sabqi' && <Layers className="w-3 h-3 text-[#8F6E2B]" />}
+                            {partKey === 'manzil' && <BookmarkCheck className="w-3 h-3 text-[#1F4E3D]" />}
+                            <span>{t.parts[partKey]}</span>
                           </span>
                           {statusBadge}
                         </div>
 
                         {plan ? (
-                          <div className="text-[11px] font-mono text-stone-700 truncate font-medium">
+                          <div className="text-[11px] font-mono text-[#42362E] truncate font-medium mt-1">
                             {subtitle}
                           </div>
                         ) : (
-                          <div className="text-[11px] text-stone-400 italic">Not set</div>
+                          <div className="text-[11px] text-[#A69888] italic mt-1">Not set</div>
                         )}
 
                         <button
                           type="button"
-                          onClick={() => setMarkingStudent({ student, part: partKey })}
-                          className="mt-2 text-xs font-semibold text-emerald-800 hover:text-emerald-950 flex items-center gap-1 cursor-pointer pt-1 border-t border-stone-200/60"
+                          onClick={() => handleStartMarkingStudent(student, partKey)}
+                          className="mt-2.5 text-xs font-bold text-[#241811] hover:text-[#8F6E2B] flex items-center gap-1 cursor-pointer pt-1.5 border-t border-[#DFCFA8]/80 transition-colors"
                         >
-                          <Play className="w-3 h-3 fill-current" />
+                          <Play className="w-3 h-3 fill-current text-[#C5A059]" />
                           <span>{t.listenAndMark}</span>
                         </button>
                       </div>
@@ -394,33 +432,33 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                 </div>
 
                 {/* Action Buttons for Student */}
-                <div className="flex items-center gap-2 md:w-auto shrink-0 justify-end pt-2 md:pt-0 border-t md:border-t-0 border-stone-100">
+                <div className="flex items-center gap-2 md:w-auto shrink-0 justify-end pt-2 md:pt-0 border-t md:border-t-0 border-[#E8DCC4]">
                   <button
                     type="button"
                     onClick={() => setAssigningStudent(student)}
-                    className="flex items-center gap-1 px-3 py-2 rounded-xl border border-stone-300 bg-white hover:bg-stone-50 text-stone-800 text-xs font-medium transition-colors cursor-pointer shadow-2xs min-h-[38px]"
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#C5A059]/80 bg-[#2A1D15] hover:bg-[#38271D] text-[#FCFAF6] text-xs font-semibold transition-colors cursor-pointer shadow-xs min-h-[38px]"
                     title={t.assignWork}
                   >
-                    <BookOpen className="w-3.5 h-3.5 text-stone-600" />
+                    <BookOpen className="w-3.5 h-3.5 text-[#DFCFA8]" />
                     <span>{t.assignWork}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setLimitsStudent(student)}
-                    className="p-2 rounded-xl border border-stone-300 bg-white hover:bg-stone-50 text-stone-700 transition-colors cursor-pointer shadow-2xs min-h-[38px]"
+                    className="p-2 rounded-xl border border-[#DFCFA8] bg-[#FAF6EF] hover:bg-[#F3ECE1] text-[#42362E] transition-colors cursor-pointer shadow-2xs min-h-[38px]"
                     title={t.limitsSettings}
                   >
-                    <Sliders className="w-4 h-4 text-stone-600" />
+                    <Sliders className="w-4 h-4 text-[#8F6E2B]" />
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setHistoryStudent(student)}
-                    className="p-2 rounded-xl border border-stone-300 bg-white hover:bg-stone-50 text-stone-700 transition-colors cursor-pointer shadow-2xs min-h-[38px]"
+                    className="p-2 rounded-xl border border-[#DFCFA8] bg-[#FAF6EF] hover:bg-[#F3ECE1] text-[#42362E] transition-colors cursor-pointer shadow-2xs min-h-[38px]"
                     title={t.studentHistory}
                   >
-                    <History className="w-4 h-4 text-stone-600" />
+                    <History className="w-4 h-4 text-[#8F6E2B]" />
                   </button>
                 </div>
               </div>

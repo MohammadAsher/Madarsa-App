@@ -97,34 +97,34 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
 
   return (
     <div className="flex flex-col items-center w-full select-none">
-      {/* Navigation Controls Bar */}
-      <div className="w-full max-w-4xl flex items-center justify-between px-4 py-2.5 bg-stone-100 border border-stone-200 rounded-t-2xl text-stone-700 text-sm font-medium">
+      {/* Navigation Controls Bar with Islamic-inspired palette */}
+      <div className="w-full max-w-4xl flex items-center justify-between px-4 py-2.5 bg-[#F8F4EC] border-2 border-b-0 border-[#C5A059] rounded-t-2xl text-[#241811] text-sm font-medium shadow-xs">
         <button
           type="button"
           onClick={() => onPageChange(Math.max(1, pageNumber - 1))}
           disabled={pageNumber <= 1}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 disabled:opacity-40 transition-colors shadow-2xs cursor-pointer min-h-[38px]"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FAF6EF] border border-[#DFCFA8] text-[#241811] hover:bg-[#F3ECE1] disabled:opacity-40 transition-colors shadow-2xs cursor-pointer min-h-[38px] font-semibold"
         >
-          <ChevronLeft className="w-4 h-4" />
+          <ChevronLeft className="w-4 h-4 text-[#C5A059]" />
           <span>{language === 'ur' ? 'پچھلا صفحہ' : 'Previous'}</span>
         </button>
 
         <div className="flex items-center gap-3 text-xs md:text-sm">
-          <span className="font-bold text-stone-900 font-serif">
+          <span className="font-bold text-[#8F6E2B] font-serif">
             {language === 'ur' ? `الجزء ${toArabicNumerals(page.juzNumber)}` : `Juz ${page.juzNumber}`}
           </span>
-          <span className="text-stone-300">·</span>
-          <span className="font-bold text-emerald-900 font-serif text-sm md:text-base">
+          <span className="text-[#C5A059]">۞</span>
+          <span className="font-bold text-[#241811] font-serif text-sm md:text-base">
             {page.surahName}
           </span>
           {page.startAyah && page.endAyah && (
-            <span className="text-stone-500 font-mono text-xs hidden sm:inline">
-              (آیات {page.startAyah} - {page.endAyah})
+            <span className="text-[#7A6C60] font-mono text-xs hidden sm:inline">
+              (آیات {toArabicNumerals(page.startAyah)} - {toArabicNumerals(page.endAyah)})
             </span>
           )}
-          <span className="text-stone-300">·</span>
-          <div className="flex items-center gap-1">
-            <span className="text-stone-500">{language === 'ur' ? 'صفحہ' : 'Page'}</span>
+          <span className="text-[#C5A059]">۞</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[#7A6C60]">{language === 'ur' ? 'صفحہ' : 'Page'}</span>
             <input
               type="number"
               min={1}
@@ -136,9 +136,9 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
                   onPageChange(val);
                 }
               }}
-              className="w-14 text-center py-1 px-1 border border-stone-300 rounded bg-white font-mono text-xs font-bold text-stone-800"
+              className="w-14 text-center py-1 px-1 border border-[#DFCFA8] rounded-md bg-[#FAF6EF] font-mono text-xs font-bold text-[#241811] focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
             />
-            <span className="text-stone-400">/ 604</span>
+            <span className="text-[#7A6C60] font-mono">/ 604</span>
           </div>
         </div>
 
@@ -146,34 +146,38 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
           type="button"
           onClick={() => onPageChange(Math.min(604, pageNumber + 1))}
           disabled={pageNumber >= 604}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 disabled:opacity-40 transition-colors shadow-2xs cursor-pointer min-h-[38px]"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FAF6EF] border border-[#DFCFA8] text-[#241811] hover:bg-[#F3ECE1] disabled:opacity-40 transition-colors shadow-2xs cursor-pointer min-h-[38px] font-semibold"
         >
           <span>{language === 'ur' ? 'اگلا صفحہ' : 'Next'}</span>
-          <ChevronRight className="w-4 h-4" />
+          <ChevronRight className="w-4 h-4 text-[#C5A059]" />
         </button>
       </div>
 
       {/* Real Mushaf Page: Continuous Arabic Text with 15 Lines */}
       <div 
         dir="rtl"
-        className="w-full max-w-4xl bg-[#FFFDF7] border-4 border-[#C9B387] p-4 md:p-8 shadow-xl transition-all duration-150 relative"
+        className="w-full max-w-4xl bg-[#FFFDF8] border-4 border-[#C5A059] p-4 md:p-8 shadow-2xl transition-all duration-150 relative rounded-b-2xl"
         style={{
-          boxShadow: '0 10px 30px -4px rgba(60, 45, 25, 0.12), 0 4px 10px -2px rgba(60, 45, 25, 0.08)',
+          boxShadow: '0 12px 35px -5px rgba(42, 29, 21, 0.15), 0 4px 12px -2px rgba(42, 29, 21, 0.08)',
         }}
       >
         {/* Inner Ornate Gold Border Line */}
-        <div className="border border-[#DFCFA8] p-3 md:p-5 bg-[#FFFDF7]">
+        <div className="border-2 border-[#DFCFA8] p-3 md:p-6 bg-[#FFFDF8] rounded-lg relative">
           
           {/* Header Margin (Surah name, Juz name) */}
-          <div className="border-b-2 border-[#D4C3A3] pb-2 mb-4 flex items-center justify-between text-xs md:text-sm font-serif text-[#6D5838]">
-            <div className="font-bold">
-              الجزء {toArabicNumerals(page.juzNumber)}
+          <div className="border-b-2 border-[#DFCFA8] pb-2 mb-4 flex items-center justify-between text-xs md:text-sm font-serif text-[#8F6E2B]">
+            <div className="font-bold flex items-center gap-1">
+              <span>الجزء</span>
+              <span>{toArabicNumerals(page.juzNumber)}</span>
             </div>
-            <div className="font-bold text-stone-800 text-sm md:text-base">
-              {page.surahName}
+            <div className="font-bold text-[#241811] text-sm md:text-base flex items-center gap-2">
+              <span className="text-[#C5A059]">✦</span>
+              <span>{page.surahName}</span>
+              <span className="text-[#C5A059]">✦</span>
             </div>
-            <div className="font-bold">
-              صفحة {toArabicNumerals(page.pageNumber)}
+            <div className="font-bold flex items-center gap-1">
+              <span>صفحة</span>
+              <span>{toArabicNumerals(page.pageNumber)}</span>
             </div>
           </div>
 
@@ -181,20 +185,21 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
           <div className="flex flex-col space-y-1">
             {page.lines.map(line => {
               const isLineRevealed = revealedLines.has(line.lineNumber);
-              const isFullLineHidden = hideAndRevealActive && !isLineRevealed;
 
               // If this is the Surah Header Line (e.g. Page 1 or Page 2)
               if (line.isHeaderLine) {
                 return (
                   <div 
                     key={`p${page.pageNumber}_l${line.lineNumber}`}
-                    className="my-2 py-2 px-4 rounded border-2 border-[#C2AE88] bg-[#F7F1E4] text-center shadow-2xs"
+                    className="my-3 py-2.5 px-4 rounded-lg border-2 border-[#C5A059] bg-gradient-to-r from-[#F8F4EC] via-[#F1E8D5] to-[#F8F4EC] text-center shadow-xs relative overflow-hidden"
                   >
-                    <div className="font-serif font-bold text-base md:text-lg text-[#554021]">
-                      {page.surahName}
+                    <div className="font-serif font-bold text-base md:text-xl text-[#241811] flex items-center justify-center gap-3">
+                      <span className="text-[#C5A059]">۞</span>
+                      <span>{page.surahName}</span>
+                      <span className="text-[#C5A059]">۞</span>
                     </div>
-                    <div className="text-[11px] text-[#7C6647] font-serif mt-0.5">
-                      {page.pageNumber === 1 ? 'مكية - آياتها ٧' : 'مدنية - آياتها ٢٨٦'}
+                    <div className="text-[11px] text-[#7A6C60] font-serif mt-0.5">
+                      {page.pageNumber === 1 ? 'مَكِّيَّةٌ · آيَاتُهَا ٧' : 'مَدَنِيَّةٌ · آيَاتُهَا ٢٨٦'}
                     </div>
                   </div>
                 );
@@ -205,7 +210,10 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
                 return (
                   <div 
                     key={`p${page.pageNumber}_l${line.lineNumber}`}
-                    className="my-1 py-1 text-center font-serif text-lg md:text-2xl text-[#2C2416] font-bold tracking-wide select-none"
+                    className="my-2 py-1.5 text-center font-serif text-xl md:text-3xl text-[#241811] font-bold tracking-wide select-none"
+                    style={{
+                      fontFamily: "'Amiri', 'Traditional Arabic', serif",
+                    }}
                   >
                     بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ
                   </div>
@@ -215,11 +223,11 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
               return (
                 <div
                   key={`p${page.pageNumber}_l${line.lineNumber}`}
-                  className="flex items-center min-h-[38px] md:min-h-[44px] relative group hover:bg-[#F9F6EE] rounded px-1 transition-colors"
+                  className="flex items-center min-h-[38px] md:min-h-[44px] relative group hover:bg-[#FAF6EF] rounded px-1 transition-colors"
                 >
                   {/* Subtle Line Margin Indicator */}
                   <div 
-                    className="w-5 shrink-0 text-[10px] font-mono text-[#A8987E] select-none text-left pl-0.5 opacity-60 group-hover:opacity-100"
+                    className="w-5 shrink-0 text-[10px] font-mono text-[#A69888] select-none text-left pl-0.5 opacity-60 group-hover:opacity-100"
                     title={`Line ${line.lineNumber}`}
                   >
                     {line.lineNumber}
@@ -230,16 +238,16 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
                     <button
                       type="button"
                       onClick={() => toggleRevealLine(line.lineNumber)}
-                      className="p-1 text-[#8F7956] hover:text-[#463820] hover:bg-[#EFE8D8] rounded transition-colors mr-1 cursor-pointer"
+                      className="p-1 text-[#8F6E2B] hover:text-[#241811] hover:bg-[#F3ECE1] rounded transition-colors mr-1 cursor-pointer"
                       title={isLineRevealed ? 'Hide line' : 'Reveal line'}
                     >
-                      {isLineRevealed ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5 text-amber-700" />}
+                      {isLineRevealed ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5 text-[#B45309]" />}
                     </button>
                   )}
 
                   {/* Continuous Text Line Container */}
                   <div 
-                    className="flex-1 flex flex-wrap items-baseline justify-between text-right font-serif text-lg md:text-[22px] leading-[2.6rem] text-[#1F1911] tracking-normal px-2"
+                    className="flex-1 flex flex-wrap items-baseline justify-between text-right font-serif text-lg md:text-[22px] leading-[2.6rem] text-[#241811] tracking-normal px-2"
                     style={{
                       fontFamily: "'Amiri', 'Traditional Arabic', serif",
                       textRendering: 'optimizeLegibility',
@@ -261,43 +269,43 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
                       if (mark?.type === 'ghalti') {
                         wordAnnotationClasses = 'bg-rose-200/90 text-rose-950 underline decoration-rose-600 decoration-2 font-bold px-1 rounded-xs';
                         markTag = (
-                          <span className="text-[10px] font-sans font-bold bg-rose-600 text-white rounded-full px-1 mx-0.5 align-super">
+                          <span className="text-[10px] font-sans font-bold bg-[#B91C1C] text-white rounded-full px-1 mx-0.5 align-super">
                             {language === 'ur' ? 'غ' : 'G'}
                           </span>
                         );
                       } else if (mark?.type === 'atkan') {
                         wordAnnotationClasses = 'bg-amber-200/90 text-amber-950 underline decoration-amber-600 decoration-2 font-bold px-1 rounded-xs';
                         markTag = (
-                          <span className="text-[10px] font-sans font-bold bg-amber-600 text-white rounded-full px-1 mx-0.5 align-super">
+                          <span className="text-[10px] font-sans font-bold bg-[#D97706] text-white rounded-full px-1 mx-0.5 align-super">
                             {language === 'ur' ? 'ا' : 'A'}
                           </span>
                         );
                       } else if (isStartWord || isEndWord) {
-                        wordAnnotationClasses = 'bg-emerald-600 text-white px-1.5 py-0.5 rounded shadow-2xs font-bold';
+                        wordAnnotationClasses = 'bg-[#1F4E3D] text-[#FCFAF6] px-1.5 py-0.5 rounded shadow-2xs font-bold border border-[#C5A059]';
                       } else if (inRange) {
-                        wordAnnotationClasses = 'bg-emerald-100/90 text-emerald-950 px-1 rounded-xs font-semibold ring-1 ring-emerald-300/60 shadow-2xs';
+                        wordAnnotationClasses = 'bg-[#EBF3EE] text-[#143429] px-1 rounded-xs font-semibold border-b-2 border-[#2E6A54]';
                       } else if (highlightRange || interactiveMode === 'marking' || interactiveMode === 'assigning') {
                         // Dim unassigned lines so only the teacher assigned lesson stands out
-                        wordAnnotationClasses = 'opacity-35 text-stone-400 hover:opacity-80 transition-opacity';
+                        wordAnnotationClasses = 'opacity-35 text-[#8A7C70] hover:opacity-80 transition-opacity';
                       }
 
                       // Pulsing animation
-                      const pulseClass = isPulsing ? 'animate-bounce ring-4 ring-rose-500 scale-110 z-20 bg-rose-100' : '';
+                      const pulseClass = isPulsing ? 'animate-bounce ring-4 ring-[#B91C1C] scale-110 z-20 bg-rose-100' : '';
 
                       // Hide mask
-                      const hiddenClass = isWordHidden ? 'blur-xs text-transparent select-none bg-stone-300 rounded px-1' : '';
+                      const hiddenClass = isWordHidden ? 'blur-xs text-transparent select-none bg-[#CDBE9F] rounded px-1' : '';
 
                       return (
                         <span
                           key={word.id}
                           onClick={() => handleWordTap(word)}
-                          className={`inline-block relative cursor-pointer px-0.5 py-0.5 mx-0.5 transition-all duration-150 hover:bg-[#EFE8D8] rounded-xs ${wordAnnotationClasses} ${pulseClass} ${hiddenClass}`}
+                          className={`inline-block relative cursor-pointer px-0.5 py-0.5 mx-0.5 transition-all duration-150 hover:bg-[#F3ECE1] rounded-xs ${wordAnnotationClasses} ${pulseClass} ${hiddenClass}`}
                           title={`${word.text} (P${page.pageNumber}:L${line.lineNumber}:W${word.wordIndex})`}
                         >
                           <span>{word.text}</span>
                           {markTag}
                           {word.isAyahEnd && word.ayahMarker && (
-                            <span className="text-emerald-800 font-serif font-normal text-base md:text-lg mx-1 inline-block select-none">
+                            <span className="text-[#8F6E2B] font-serif font-normal text-base md:text-lg mx-1 inline-block select-none">
                               {word.ayahMarker}
                             </span>
                           )}
@@ -311,12 +319,14 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
           </div>
 
           {/* Footer Margin: Page Number */}
-          <div className="border-t-2 border-[#D4C3A3] pt-2 mt-4 flex items-center justify-between text-xs text-[#7A6746] font-serif">
+          <div className="border-t-2 border-[#DFCFA8] pt-2 mt-4 flex items-center justify-between text-xs text-[#8F6E2B] font-serif">
             <div>
               الجزء {toArabicNumerals(page.juzNumber)}
             </div>
-            <div className="font-bold text-sm md:text-base font-serif text-stone-800">
-              - {toArabicNumerals(page.pageNumber)} -
+            <div className="font-bold text-sm md:text-base font-serif text-[#241811] flex items-center gap-1">
+              <span>-</span>
+              <span>{toArabicNumerals(page.pageNumber)}</span>
+              <span>-</span>
             </div>
             <div>
               {page.surahName}

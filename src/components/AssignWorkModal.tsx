@@ -94,13 +94,13 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
   const [completedParasState, setCompletedParasState] = useState<number[]>(
     student.completedParas && student.completedParas.length > 0
       ? student.completedParas
-      : [1] // Default at least Para 1 completed if empty
+      : [1]
   );
 
   const [assignedManzilParas, setAssignedManzilParas] = useState<number[]>(
     currentPlan?.assignedParas && currentPlan.assignedParas.length > 0
       ? currentPlan.assignedParas
-      : completedParasState.slice(0, 1) // Default to first completed Para
+      : completedParasState.slice(0, 1)
   );
 
   const [isEditingCompletedParas, setIsEditingCompletedParas] = useState<boolean>(false);
@@ -178,13 +178,12 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
     setAssignedManzilParas(prev => {
       let next: number[];
       if (prev.includes(paraNum)) {
-        if (prev.length === 1) return prev; // Keep at least one selected
+        if (prev.length === 1) return prev;
         next = prev.filter(p => p !== paraNum);
       } else {
         next = [...prev, paraNum].sort((a, b) => a - b);
       }
 
-      // Automatically sync page range to the selected Paras
       if (next.length > 0) {
         const minPara = Math.min(...next);
         const maxPara = Math.max(...next);
@@ -226,13 +225,11 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
       } else {
         next = [...prev, paraNum].sort((a, b) => a - b);
       }
-      // If currently assigned manzil paras contain a removed para, remove it
       setAssignedManzilParas(currAssigned => currAssigned.filter(p => next.includes(p)));
       return next;
     });
   };
 
-  // Compute calculated range summary
   const hasValidRange = Boolean(selectionStart && selectionEnd);
   const metadata = hasValidRange
     ? getRangeMetadata(selectionStart!, selectionEnd!)
@@ -274,19 +271,20 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 md:p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-stone-200 w-full max-w-5xl max-h-[94vh] flex flex-col overflow-hidden">
-        {/* Modal Header */}
-        <div className="px-5 py-4 border-b border-stone-200 flex items-center justify-between bg-stone-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-2 md:p-4 overflow-y-auto">
+      <div className="bg-[#FCFAF6] rounded-2xl shadow-2xl border-2 border-[#C5A059] w-full max-w-5xl max-h-[94vh] flex flex-col overflow-hidden">
+        {/* Modal Header with Islamic dark coffee identity */}
+        <div className="px-5 py-3.5 border-b-2 border-[#C5A059] flex items-center justify-between bg-[#241811] text-[#FCFAF6]">
           <div>
-            <h2 className="text-lg font-bold text-stone-900 flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-emerald-700" />
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-[#C5A059]" />
               <span>{t.assignModalTitle}</span>
+              <span className="text-[#C5A059] text-xs">۞</span>
             </h2>
-            <div className="text-xs text-stone-500 mt-0.5">
+            <div className="text-xs text-[#DFCFA8] mt-0.5">
               {state.language === 'ur' ? student.urduName : student.name} · {student.halqaName}
               {student.memorizedPortionDesc && (
-                <span className="text-emerald-800 font-semibold ml-2">
+                <span className="text-[#DFCFA8] font-bold ml-2">
                   · {student.memorizedPortionDesc}
                 </span>
               )}
@@ -296,14 +294,14 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-stone-400 hover:text-stone-700 hover:bg-stone-200 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 text-[#DFCFA8] hover:text-[#FCFAF6] hover:bg-[#3E2B20] rounded-xl transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Dedicated Part Control Tabs: Sabaq | Sabqi | Manzil */}
-        <div className="px-5 py-2.5 border-b border-stone-200 bg-stone-100 flex items-center gap-2">
+        <div className="px-5 py-2.5 border-b border-[#DFCFA8] bg-[#F8F4EC] flex items-center gap-2.5">
           {(['sabaq', 'sabqi', 'manzil'] as PartType[]).map(partKey => {
             const isSelected = selectedPart === partKey;
             return (
@@ -321,13 +319,13 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
                 }}
                 className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs md:text-sm transition-all cursor-pointer flex items-center justify-center gap-2 ${
                   isSelected
-                    ? 'bg-emerald-700 text-white shadow-xs scale-[1.01]'
-                    : 'bg-white text-stone-700 hover:bg-stone-50 border border-stone-200'
+                    ? 'bg-[#241811] text-[#FCFAF6] border border-[#C5A059] shadow-xs scale-[1.01]'
+                    : 'bg-[#FCFAF6] text-[#42362E] hover:bg-[#F3ECE1] border border-[#DFCFA8]'
                 }`}
               >
-                {partKey === 'sabaq' && <Sparkles className="w-4 h-4" />}
-                {partKey === 'sabqi' && <Layers className="w-4 h-4" />}
-                {partKey === 'manzil' && <BookmarkCheck className="w-4 h-4" />}
+                {partKey === 'sabaq' && <Sparkles className="w-4 h-4 text-[#C5A059]" />}
+                {partKey === 'sabqi' && <Layers className="w-4 h-4 text-[#8F6E2B]" />}
+                {partKey === 'manzil' && <BookmarkCheck className="w-4 h-4 text-[#1F4E3D]" />}
                 <span>{t.parts[partKey]} ({t.parts[`${partKey}Desc` as keyof typeof t.parts]})</span>
               </button>
             );
@@ -335,7 +333,7 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
         </div>
 
         {/* Section 1: Distinct Controls based on Selected Part */}
-        <div className="px-5 py-3 border-b border-stone-200 bg-white">
+        <div className="px-5 py-3 border-b border-[#DFCFA8] bg-[#FCFAF6]">
           {/* A. SABAQ CONTROLS: Exact lines assignment */}
           {selectedPart === 'sabaq' && (
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -343,25 +341,25 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
                 <button
                   type="button"
                   onClick={handleStartFromLastSabaqEnd}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#C5A059] bg-[#F8F4EC] hover:bg-[#F3ECE1] text-[#241811] text-xs font-bold transition-colors cursor-pointer"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                  <Sparkles className="w-3.5 h-3.5 text-[#8F6E2B]" />
                   <span>{t.startFromLastSabaqEnd}</span>
                 </button>
-                <span className="text-xs text-stone-500">
+                <span className="text-xs text-[#7A6C60]">
                   Tap first word, then tap last word on the Mushaf.
                 </span>
               </div>
 
               {metadata && (
-                <div className="bg-emerald-50 border border-emerald-300 px-3 py-1.5 rounded-lg text-xs font-mono text-emerald-950 flex items-center gap-2">
+                <div className="bg-[#EBF3EE] border border-[#2E6A54] px-3 py-1.5 rounded-lg text-xs font-mono text-[#143429] flex items-center gap-2 font-medium">
                   <span className="font-bold">{metadata.surahName}</span>
                   <span>·</span>
                   <span>Para {metadata.juzNumber}</span>
                   <span>·</span>
                   <span>P{metadata.startPage}:L{metadata.startLine} to P{metadata.endPage}:L{metadata.endLine}</span>
                   <span>·</span>
-                  <span className="font-bold bg-emerald-200 px-1 rounded">{metadata.linesCount} Lines</span>
+                  <span className="font-bold bg-[#1F4E3D] text-[#FCFAF6] px-1.5 py-0.5 rounded text-[10px]">{metadata.linesCount} Lines</span>
                 </div>
               )}
             </div>
@@ -371,10 +369,10 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
           {selectedPart === 'sabqi' && (
             <div className="space-y-2.5">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-stone-800">
+                <span className="font-bold text-[#241811]">
                   {t.sabqiPortionTitle}:
                 </span>
-                <span className="text-stone-500 font-medium">
+                <span className="text-[#7A6C60] font-medium">
                   {student.memorizedPortionDesc || 'Memorized portion'}
                 </span>
               </div>
@@ -383,10 +381,10 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
                 <button
                   type="button"
                   onClick={() => applySabqiPreset('quarter_para', sabqiTargetPara)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                     sabqiMode === 'quarter_para'
-                      ? 'bg-emerald-700 text-white shadow-2xs'
-                      : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                      ? 'bg-[#C5A059] text-[#241811] shadow-2xs'
+                      : 'bg-[#F8F4EC] text-[#42362E] hover:bg-[#F3ECE1] border border-[#DFCFA8]'
                   }`}
                 >
                   {t.quarterPara}
@@ -395,10 +393,10 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
                 <button
                   type="button"
                   onClick={() => applySabqiPreset('half_para', sabqiTargetPara)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                     sabqiMode === 'half_para'
-                      ? 'bg-emerald-700 text-white shadow-2xs'
-                      : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                      ? 'bg-[#C5A059] text-[#241811] shadow-2xs'
+                      : 'bg-[#F8F4EC] text-[#42362E] hover:bg-[#F3ECE1] border border-[#DFCFA8]'
                   }`}
                 >
                   {t.halfPara}
@@ -407,10 +405,10 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
                 <button
                   type="button"
                   onClick={() => applySabqiPreset('full_para', sabqiTargetPara)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                     sabqiMode === 'full_para'
-                      ? 'bg-emerald-700 text-white shadow-2xs'
-                      : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                      ? 'bg-[#C5A059] text-[#241811] shadow-2xs'
+                      : 'bg-[#F8F4EC] text-[#42362E] hover:bg-[#F3ECE1] border border-[#DFCFA8]'
                   }`}
                 >
                   {t.fullPara}
@@ -419,10 +417,10 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setSabqiMode('custom')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                     sabqiMode === 'custom'
-                      ? 'bg-emerald-700 text-white shadow-2xs'
-                      : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                      ? 'bg-[#C5A059] text-[#241811] shadow-2xs'
+                      : 'bg-[#F8F4EC] text-[#42362E] hover:bg-[#F3ECE1] border border-[#DFCFA8]'
                   }`}
                 >
                   {t.customRange}
@@ -430,14 +428,14 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
 
                 {/* Target Para selector for Sabqi */}
                 <div className="ml-auto flex items-center gap-1.5 text-xs">
-                  <span className="text-stone-500">Target Para:</span>
+                  <span className="text-[#7A6C60]">Target Para:</span>
                   <select
                     value={sabqiTargetPara}
                     onChange={e => {
                       const p = parseInt(e.target.value, 10);
                       applySabqiPreset(sabqiMode === 'custom' ? 'half_para' : sabqiMode, p);
                     }}
-                    className="border border-stone-300 rounded px-2 py-1 bg-white text-xs font-bold text-stone-800"
+                    className="border border-[#DFCFA8] rounded-md px-2 py-1 bg-[#FAF6EF] text-xs font-bold text-[#241811]"
                   >
                     {Array.from({ length: 30 }, (_, i) => i + 1).map(pNum => (
                       <option key={pNum} value={pNum}>
@@ -455,27 +453,27 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-stone-900">
+                  <h4 className="text-xs font-bold text-[#241811]">
                     {t.selectParasForManzil}
                   </h4>
-                  <p className="text-[11px] text-stone-500">
-                    The student has completed {completedParasState.length} Para(s). Choose the specific Para(s) due for tomorrow's recitation.
+                  <p className="text-[11px] text-[#7A6C60]">
+                    The student has completed {completedParasState.length} Para(s). Choose the specific Para(s) due for recitation.
                   </p>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => setIsEditingCompletedParas(prev => !prev)}
-                  className="text-xs text-emerald-800 hover:text-emerald-950 font-bold underline cursor-pointer"
+                  className="text-xs text-[#8F6E2B] hover:text-[#241811] font-bold underline cursor-pointer"
                 >
                   {isEditingCompletedParas ? 'Done Managing' : t.manageCompletedParas}
                 </button>
               </div>
 
-              {/* Completed Paras Management Mode (if teacher wants to check off newly completed Paras) */}
+              {/* Completed Paras Management Mode */}
               {isEditingCompletedParas ? (
-                <div className="p-3 bg-stone-50 border border-stone-300 rounded-xl space-y-2">
-                  <div className="text-xs font-semibold text-stone-700">
+                <div className="p-3 bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl space-y-2">
+                  <div className="text-xs font-semibold text-[#42362E]">
                     Check all Paras that {student.name} has memorized/completed:
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -488,8 +486,8 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
                           onClick={() => toggleStudentCompletedPara(paraNum)}
                           className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-colors cursor-pointer ${
                             isCompleted
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-white border border-stone-300 text-stone-600 hover:bg-stone-100'
+                              ? 'bg-[#1F4E3D] text-white border border-[#C5A059]'
+                              : 'bg-[#FCFAF6] border border-[#DFCFA8] text-[#5A4333] hover:bg-[#F3ECE1]'
                           }`}
                         >
                           Para {paraNum} {isCompleted ? '✓' : ''}
@@ -502,7 +500,7 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
                 /* Select which completed Para is assigned for Manzil */
                 <div className="flex flex-wrap items-center gap-2">
                   {completedParasState.length === 0 ? (
-                    <div className="text-xs text-stone-500 italic">
+                    <div className="text-xs text-[#7A6C60] italic">
                       {t.noParasCompleted}. Click "Manage Completed Paras" above to record completed Paras.
                     </div>
                   ) : (
@@ -515,11 +513,11 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
                           onClick={() => toggleManzilParaSelection(paraNum)}
                           className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                             isAssigned
-                              ? 'bg-emerald-700 text-white ring-2 ring-emerald-400 shadow-xs scale-105'
-                              : 'bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300'
+                              ? 'bg-[#1F4E3D] text-white ring-2 ring-[#C5A059] shadow-xs scale-105 border border-[#C5A059]'
+                              : 'bg-[#F8F4EC] hover:bg-[#F3ECE1] text-[#241811] border border-[#DFCFA8]'
                           }`}
                         >
-                          {isAssigned ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4 text-stone-400" />}
+                          {isAssigned ? <CheckSquare className="w-4 h-4 text-[#DFCFA8]" /> : <Square className="w-4 h-4 text-[#A69888]" />}
                           <span>Para {paraNum}</span>
                           <span className="text-[10px] opacity-80 font-normal">
                             ({getParaSurahName(paraNum)})
@@ -533,11 +531,11 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
 
               {/* Manzil Assigned summary */}
               {assignedManzilParas.length > 0 && metadata && (
-                <div className="text-xs font-mono bg-emerald-50 border border-emerald-200 p-2 rounded-lg text-emerald-950 flex items-center justify-between">
+                <div className="text-xs font-mono bg-[#EBF3EE] border border-[#2E6A54] p-2.5 rounded-lg text-[#143429] flex items-center justify-between">
                   <span>
                     <strong>Manzil Target:</strong> Para {assignedManzilParas.join(', ')} ({metadata.surahName}, Pages {metadata.startPage} - {metadata.endPage})
                   </span>
-                  <span className="font-bold">
+                  <span className="font-bold text-[#1F4E3D]">
                     {metadata.linesCount} lines total
                   </span>
                 </div>
@@ -546,8 +544,8 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
           )}
         </div>
 
-        {/* Mushaf Page Picker Canvas */}
-        <div className="flex-1 overflow-y-auto p-3 bg-stone-100 flex justify-center">
+        {/* Mushaf Page Picker Canvas with warm pattern */}
+        <div className="flex-1 overflow-y-auto p-3 bg-[#FAF6EF] bg-islamic-pattern flex justify-center">
           <MushafViewer
             pageNumber={pageNumber}
             onPageChange={setPageNumber}
@@ -560,11 +558,11 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-5 py-3 border-t border-stone-200 bg-white flex flex-wrap items-center justify-between gap-3">
+        <div className="px-5 py-3 border-t border-[#DFCFA8] bg-[#FCFAF6] flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 border border-stone-300 rounded-xl text-stone-700 hover:bg-stone-50 text-xs md:text-sm font-medium transition-colors cursor-pointer"
+            className="px-4 py-2 border border-[#DFCFA8] rounded-xl text-[#42362E] hover:bg-[#F3ECE1] text-xs md:text-sm font-semibold transition-colors cursor-pointer"
           >
             {t.close}
           </button>
@@ -574,10 +572,10 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
               type="button"
               disabled={!hasValidRange}
               onClick={() => handleSave(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-stone-300 bg-stone-100 hover:bg-stone-200 text-stone-800 disabled:opacity-40 text-xs md:text-sm font-medium transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#DFCFA8] bg-[#F8F4EC] hover:bg-[#F3ECE1] text-[#241811] disabled:opacity-40 text-xs md:text-sm font-semibold transition-colors cursor-pointer"
               title="Apply this exact range to all students in this Ustaad's Halqa"
             >
-              <Users className="w-4 h-4 text-stone-600" />
+              <Users className="w-4 h-4 text-[#8F6E2B]" />
               <span>{t.sameForAllStudents}</span>
             </button>
 
@@ -585,9 +583,9 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
               type="button"
               disabled={!hasValidRange}
               onClick={() => handleSave(false)}
-              className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white disabled:opacity-40 text-xs md:text-sm font-bold shadow-xs transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#241811] hover:bg-[#38271D] text-[#FCFAF6] border border-[#C5A059] disabled:opacity-40 text-xs md:text-sm font-bold shadow-xs transition-colors cursor-pointer"
             >
-              <Check className="w-4 h-4" />
+              <Check className="w-4 h-4 text-[#C5A059]" />
               <span>{t.applyChanges} for {student.name.split(' ')[0]}</span>
             </button>
           </div>

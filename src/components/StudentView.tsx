@@ -72,7 +72,6 @@ export const StudentView: React.FC<StudentViewProps> = ({
   const handleJumpToMistake = (page: number, wordId: string) => {
     setCurrentPage(page);
     setPulsingWordId(wordId);
-    // Auto-clear pulse after 5 seconds
     setTimeout(() => {
       setPulsingWordId(null);
       if (onClearTargetJumpWord) onClearTargetJumpWord();
@@ -146,37 +145,40 @@ export const StudentView: React.FC<StudentViewProps> = ({
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-      {/* Student Profile Banner */}
-      <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-emerald-700 text-white font-bold flex items-center justify-center text-lg shadow-2xs">
+      {/* Student Profile Banner with Islamic styling */}
+      <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#C5A059] to-transparent" />
+        
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#3E2B20] to-[#241811] text-[#DFCFA8] font-bold flex items-center justify-center text-lg shadow-xs border border-[#C5A059]">
             {student.name.charAt(0)}
           </div>
           <div>
-            <h1 className="text-lg md:text-xl font-bold text-stone-900">
-              {state.language === 'ur' ? student.urduName : student.name}
+            <h1 className="text-lg md:text-xl font-bold text-[#241811] flex items-center gap-2">
+              <span>{state.language === 'ur' ? student.urduName : student.name}</span>
+              <span className="text-[#C5A059] text-xs">۞</span>
             </h1>
-            <div className="text-xs text-stone-500">
-              {student.halqaName} · {state.language === 'ur' ? `پارہ ${student.currentJuz}` : `Juz ${student.currentJuz}`}
+            <div className="text-xs text-[#7A6C60] mt-0.5">
+              {student.halqaName} · {state.language === 'ur' ? `پارہ ${student.currentJuz}` : `Juz ${student.currentJuz}`} · <span className="text-[#1F4E3D] font-bold">{student.completedParas?.length || 0} Paras Done</span>
             </div>
           </div>
         </div>
 
-        <div className="text-xs text-stone-500 sm:text-right">
-          <div>{t.roleLabel} <strong className="text-stone-800">{state.language === 'ur' ? student.urduName : student.name}</strong></div>
-          <div className="font-mono text-stone-400">{state.currentDate} ({t.dayCounter} {state.dayCount})</div>
+        <div className="text-xs text-[#7A6C60] sm:text-right">
+          <div>{t.roleLabel} <strong className="text-[#241811]">{state.language === 'ur' ? student.urduName : student.name}</strong></div>
+          <div className="font-mono text-[#8F6E2B] mt-0.5">{state.currentDate} ({t.dayCounter} {state.dayCount})</div>
         </div>
       </div>
 
       {/* Sabaq Frozen Notice Banner (if revision failed yesterday) */}
       {todayPlan?.sabaqFrozenDueToRevisionFail && (
-        <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+        <div className="bg-[#FEF3C7] border-2 border-[#D97706] rounded-2xl p-4 flex items-start gap-3 shadow-xs">
+          <AlertTriangle className="w-5 h-5 text-[#B45309] shrink-0 mt-0.5" />
           <div>
-            <h4 className="text-sm font-bold text-amber-900">
+            <h4 className="text-sm font-bold text-[#78350F]">
               {t.sabaqFrozenAlert}
             </h4>
-            <p className="text-xs text-amber-800 mt-0.5">
+            <p className="text-xs text-[#92400E] mt-0.5">
               Focus today on perfecting your Sabqi and Manzil revision before advancing with new lines.
             </p>
           </div>
@@ -186,11 +188,11 @@ export const StudentView: React.FC<StudentViewProps> = ({
       {/* 1. "Today's Plan" Cards: Sabaq, Sabqi, Manzil */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-bold text-stone-900 flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-emerald-700" />
+          <h2 className="text-base font-bold text-[#241811] flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-[#8F6E2B]" />
             <span>{t.todayPlan}</span>
           </h2>
-          <span className="text-xs text-stone-500">
+          <span className="text-xs text-[#7A6C60]">
             Tap a plan to open and practice its lines
           </span>
         </div>
@@ -202,7 +204,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
             const status = plan?.status || 'pending';
 
             let statusBadge = (
-              <span className="text-xs font-medium text-stone-500 flex items-center gap-1">
+              <span className="text-xs font-medium text-[#7A6C60] flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5" />
                 {t.status.pending}
               </span>
@@ -210,15 +212,15 @@ export const StudentView: React.FC<StudentViewProps> = ({
 
             if (status === 'passed') {
               statusBadge = (
-                <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-xs font-bold text-[#1F4E3D] flex items-center gap-1 bg-[#E8F0EC] px-2 py-0.5 rounded">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#1F4E3D]" />
                   {t.status.passed}
                 </span>
               );
             } else if (status === 'repeat') {
               statusBadge = (
-                <span className="text-xs font-bold text-rose-700 flex items-center gap-1">
-                  <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                <span className="text-xs font-bold text-[#991B1B] flex items-center gap-1 bg-[#FEE2E2] px-2 py-0.5 rounded">
+                  <XCircle className="w-3.5 h-3.5 text-[#991B1B]" />
                   {t.status.repeat}
                 </span>
               );
@@ -234,24 +236,28 @@ export const StudentView: React.FC<StudentViewProps> = ({
                     setCurrentPage(plan.range.start.page);
                   }
                 }}
-                className={`p-5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                className={`p-5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden ${
                   isSelected
-                    ? 'bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-300 shadow-sm'
-                    : 'bg-white border-stone-200 hover:border-stone-300 shadow-2xs'
+                    ? 'bg-[#FDFCF9] border-[#C5A059] ring-2 ring-[#C5A059]/40 shadow-md'
+                    : 'bg-[#FCFAF6] border-[#E8DCC4] hover:border-[#C5A059]/60 shadow-xs'
                 }`}
               >
+                {isSelected && (
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-[#C5A059]" />
+                )}
+
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-base font-bold text-stone-900 flex items-center gap-1.5">
-                      {partKey === 'sabaq' && <Sparkles className="w-4 h-4 text-emerald-700" />}
-                      {partKey === 'sabqi' && <Layers className="w-4 h-4 text-amber-700" />}
-                      {partKey === 'manzil' && <BookmarkCheck className="w-4 h-4 text-emerald-800" />}
+                    <span className="text-base font-bold text-[#241811] flex items-center gap-1.5">
+                      {partKey === 'sabaq' && <Sparkles className="w-4 h-4 text-[#C5A059]" />}
+                      {partKey === 'sabqi' && <Layers className="w-4 h-4 text-[#8F6E2B]" />}
+                      {partKey === 'manzil' && <BookmarkCheck className="w-4 h-4 text-[#1F4E3D]" />}
                       <span>{t.parts[partKey]}</span>
                     </span>
                     {statusBadge}
                   </div>
 
-                  <div className="text-xs text-stone-500 mb-3">
+                  <div className="text-xs text-[#7A6C60] mb-3">
                     {t.parts[`${partKey}Desc` as keyof typeof t.parts]}
                   </div>
 
@@ -259,22 +265,22 @@ export const StudentView: React.FC<StudentViewProps> = ({
                     <div className="space-y-2">
                       {/* 1. SABAQ CARD DETAILS: Exact Lines Assigned */}
                       {partKey === 'sabaq' && (
-                        <div className="bg-stone-50 border border-stone-200 rounded-xl p-3 text-xs space-y-1.5">
-                          <div className="flex items-center justify-between font-semibold text-stone-900">
+                        <div className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 text-xs space-y-1.5">
+                          <div className="flex items-center justify-between font-semibold text-[#241811]">
                             <span>Surah: <strong>{plan.range.surahName || plan.surahName || 'Al-Baqarah'}</strong></span>
-                            <span className="text-emerald-800 font-bold bg-emerald-100/70 px-1.5 py-0.5 rounded">
+                            <span className="text-[#1F4E3D] font-bold bg-[#E8F0EC] px-2 py-0.5 rounded">
                               Para {plan.range.juzNumber || plan.juzNumber || 1}
                             </span>
                           </div>
 
-                          <div className="text-stone-700 font-mono text-[11px] pt-1 border-t border-stone-200/80">
+                          <div className="text-[#42362E] font-mono text-[11px] pt-1.5 border-t border-[#DFCFA8]">
                             <div>
                               Pages: <strong>{plan.range.startPage || plan.range.start.page}</strong> {plan.range.start.page !== plan.range.end.page ? `to ${plan.range.endPage || plan.range.end.page}` : ''}
                             </div>
-                            <div className="text-emerald-900 font-bold mt-0.5">
+                            <div className="text-[#1F4E3D] font-bold mt-0.5">
                               Start: Line {plan.range.startLine || plan.range.start.line} · End: Line {plan.range.endLine || plan.range.end.line}
                             </div>
-                            <div className="text-stone-500 text-[10px] mt-0.5">
+                            <div className="text-[#7A6C60] text-[10px] mt-0.5">
                               Exact Length: <strong>{plan.range.linesCount} lines assigned</strong>
                             </div>
                           </div>
@@ -283,16 +289,16 @@ export const StudentView: React.FC<StudentViewProps> = ({
 
                       {/* 2. SABQI CARD DETAILS: Revision based on memorized Quran */}
                       {partKey === 'sabqi' && (
-                        <div className="bg-stone-50 border border-stone-200 rounded-xl p-3 text-xs space-y-1.5">
-                          <div className="text-[11px] text-stone-500">
-                            Student Progress: <strong className="text-stone-800">{student.memorizedPortionDesc || 'Memorized Quran'}</strong>
+                        <div className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 text-xs space-y-1.5">
+                          <div className="text-[11px] text-[#7A6C60]">
+                            Student Progress: <strong className="text-[#241811]">{student.memorizedPortionDesc || 'Memorized Quran'}</strong>
                           </div>
 
-                          <div className="font-semibold text-stone-900 pt-1 border-t border-stone-200/80">
-                            Portion: <strong className="text-amber-800">{plan.portionLabel || 'Teacher Assigned Revision'}</strong>
+                          <div className="font-semibold text-[#241811] pt-1.5 border-t border-[#DFCFA8]">
+                            Portion: <strong className="text-[#8F6E2B]">{plan.portionLabel || 'Teacher Assigned Revision'}</strong>
                           </div>
 
-                          <div className="text-stone-700 font-mono text-[11px]">
+                          <div className="text-[#42362E] font-mono text-[11px]">
                             Pages {plan.range.start.page} to {plan.range.end.page} ({plan.range.linesCount} lines)
                           </div>
                         </div>
@@ -300,35 +306,35 @@ export const StudentView: React.FC<StudentViewProps> = ({
 
                       {/* 3. MANZIL CARD DETAILS: Specifically assigned completed Paras */}
                       {partKey === 'manzil' && (
-                        <div className="bg-stone-50 border border-stone-200 rounded-xl p-3 text-xs space-y-1.5">
-                          <div className="flex items-center justify-between text-[11px] text-stone-500">
+                        <div className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 text-xs space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px] text-[#7A6C60]">
                             <span>Total Completed:</span>
-                            <span className="font-bold text-stone-800">{student.completedParas?.length || 0} Paras</span>
+                            <span className="font-bold text-[#241811]">{student.completedParas?.length || 0} Paras</span>
                           </div>
 
-                          <div className="pt-1 border-t border-stone-200/80">
-                            <div className="text-[10px] text-stone-500 uppercase tracking-wide font-semibold">
+                          <div className="pt-1.5 border-t border-[#DFCFA8]">
+                            <div className="text-[10px] text-[#7A6C60] uppercase tracking-wide font-semibold">
                               Assigned for Today's Manzil:
                             </div>
-                            <div className="text-sm font-bold text-emerald-900 mt-0.5">
+                            <div className="text-sm font-bold text-[#1F4E3D] mt-0.5">
                               {plan.assignedParas && plan.assignedParas.length > 0
                                 ? `Para ${plan.assignedParas.join(', ')}`
                                 : `Pages ${plan.range.start.page} - ${plan.range.end.page}`}
                             </div>
                           </div>
 
-                          <div className="text-[11px] font-mono text-stone-600">
+                          <div className="text-[11px] font-mono text-[#5A4333]">
                             Pages {plan.range.start.page} - {plan.range.end.page} ({plan.range.linesCount} lines)
                           </div>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="text-xs text-stone-400 italic">No assignment set</div>
+                    <div className="text-xs text-[#A69888] italic">No assignment set</div>
                   )}
                 </div>
 
-                <div className="mt-4 pt-2.5 border-t border-stone-100 flex items-center justify-between text-xs text-emerald-800 font-semibold">
+                <div className="mt-4 pt-2.5 border-t border-[#DFCFA8] flex items-center justify-between text-xs text-[#8F6E2B] font-bold">
                   <span>{isSelected ? 'Currently Viewing on Mushaf' : 'Tap to Open on Mushaf'}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </div>
@@ -339,34 +345,34 @@ export const StudentView: React.FC<StudentViewProps> = ({
       </div>
 
       {/* 2. Practice Toolbar: Repeat Counter & Hide-and-Reveal Mode */}
-      <div className="bg-white rounded-2xl border border-stone-200 p-4 shadow-2xs flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-4 shadow-xs flex flex-wrap items-center justify-between gap-4">
         {/* Repeat Practice Counter (+1 Button) */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleIncrementRepeat}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold shadow-xs active:scale-95 transition-all cursor-pointer min-h-[46px]"
+              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[#241811] hover:bg-[#38271D] text-[#FCFAF6] text-sm font-bold shadow-xs active:scale-95 transition-all cursor-pointer min-h-[46px] border border-[#C5A059]"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-5 h-5 text-[#C5A059]" />
               <span>{t.practiceIncrement}</span>
             </button>
 
             <button
               type="button"
               onClick={handleResetRepeat}
-              className="p-2.5 rounded-xl border border-stone-200 text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors cursor-pointer min-h-[46px]"
+              className="p-2.5 rounded-xl border border-[#DFCFA8] text-[#7A6C60] hover:text-[#241811] hover:bg-[#F3ECE1] transition-colors cursor-pointer min-h-[46px]"
               title={t.resetCounter}
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className="w-4 h-4 text-[#8F6E2B]" />
             </button>
           </div>
 
           <div className="text-xs">
-            <div className="font-mono text-base font-bold text-stone-900">
-              {repeatCount} <span className="text-stone-400 text-xs font-normal">/ {targetRepeats} target</span>
+            <div className="font-mono text-base font-bold text-[#241811]">
+              {repeatCount} <span className="text-[#7A6C60] text-xs font-normal">/ {targetRepeats} target</span>
             </div>
-            <div className="text-stone-500 text-[11px]">
+            <div className="text-[#7A6C60] text-[11px]">
               {t.practiceCounter} for {t.parts[activePart]}
             </div>
           </div>
@@ -379,19 +385,19 @@ export const StudentView: React.FC<StudentViewProps> = ({
             onClick={() => setHideAndRevealActive(prev => !prev)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs md:text-sm font-bold transition-all cursor-pointer min-h-[44px] ${
               hideAndRevealActive
-                ? 'bg-amber-600 text-white shadow-xs ring-2 ring-amber-300'
-                : 'bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300'
+                ? 'bg-[#C5A059] text-[#241811] shadow-xs ring-2 ring-[#DFCFA8]'
+                : 'bg-[#F8F4EC] hover:bg-[#F3ECE1] text-[#241811] border border-[#DFCFA8]'
             }`}
           >
-            {hideAndRevealActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            {hideAndRevealActive ? <EyeOff className="w-4 h-4 text-[#241811]" /> : <Eye className="w-4 h-4 text-[#8F6E2B]" />}
             <span>{hideAndRevealActive ? 'Hide Mode Active' : t.hideAndRevealTitle}</span>
           </button>
         </div>
       </div>
 
       {hideAndRevealActive && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 flex items-center gap-2">
-          <Info className="w-4 h-4 text-amber-700 shrink-0" />
+        <div className="bg-[#FEF3C7] border border-[#F59E0B] rounded-xl p-3 text-xs text-[#92400E] flex items-center gap-2 shadow-2xs">
+          <Info className="w-4 h-4 text-[#B45309] shrink-0" />
           <span>{t.hideRevealHelp}</span>
         </div>
       )}
@@ -399,9 +405,9 @@ export const StudentView: React.FC<StudentViewProps> = ({
       {/* 3. Interactive Mushaf Viewer with Assigned Range Highlighted */}
       <div className="flex flex-col items-center gap-2 w-full">
         {currentPartPlan && (
-          <div className="w-full max-w-4xl bg-emerald-900 text-white px-4 py-2 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs">
+          <div className="w-full max-w-4xl bg-[#241811] text-[#FCFAF6] border-2 border-[#C5A059] px-4 py-2.5 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs">
             <div className="flex items-center gap-2">
-              <span className="font-bold uppercase tracking-wider bg-emerald-800 px-2 py-0.5 rounded text-[10px]">
+              <span className="font-bold uppercase tracking-wider bg-[#C5A059] text-[#241811] px-2 py-0.5 rounded text-[10px]">
                 {t.parts[activePart]}
               </span>
               <span>
@@ -422,7 +428,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
                 )}
               </span>
             </div>
-            <span className="text-emerald-200 text-[11px] font-mono">
+            <span className="text-[#DFCFA8] text-[11px] font-mono">
               {currentPartPlan.range.linesCount} {t.linesCount} assigned
             </span>
           </div>
@@ -440,26 +446,26 @@ export const StudentView: React.FC<StudentViewProps> = ({
             language={state.language}
           />
         ) : (
-          <div className="p-8 bg-white border border-stone-200 rounded-xl text-center text-stone-500">
+          <div className="p-8 bg-[#FCFAF6] border border-[#DFCFA8] rounded-2xl text-center text-[#7A6C60] shadow-xs">
             No assignment for this part yet.
           </div>
         )}
       </div>
 
       {/* 4. Assessment Result Card (after Ustaad finishes grading) */}
-      <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-2xs space-y-4">
+      <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-5 shadow-xs space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-stone-900 flex items-center gap-2">
-            <Award className="w-5 h-5 text-emerald-700" />
+          <h3 className="text-base font-bold text-[#241811] flex items-center gap-2">
+            <Award className="w-5 h-5 text-[#8F6E2B]" />
             <span>{t.resultCardTitle}</span>
           </h3>
-          <span className="text-xs text-stone-500">
+          <span className="text-xs text-[#7A6C60] font-mono">
             {state.currentDate}
           </span>
         </div>
 
         {todayResults.length === 0 ? (
-          <div className="p-4 bg-stone-50 rounded-xl border border-stone-200 text-xs text-stone-500 text-center">
+          <div className="p-4 bg-[#F8F4EC] rounded-xl border border-[#DFCFA8] text-xs text-[#7A6C60] text-center">
             {t.noResultsYet}
           </div>
         ) : (
@@ -471,17 +477,17 @@ export const StudentView: React.FC<StudentViewProps> = ({
                   key={result.id}
                   className={`p-4 rounded-xl border transition-all ${
                     isPassed
-                      ? 'bg-emerald-50/60 border-emerald-200'
-                      : 'bg-rose-50/60 border-rose-200'
+                      ? 'bg-[#EBF3EE] border-[#2E6A54]'
+                      : 'bg-[#FDF2F2] border-[#B91C1C]'
                   }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-stone-900 capitalize">
+                      <span className="font-bold text-sm text-[#241811] capitalize">
                         {t.parts[result.part]} ({t.parts[`${result.part}Desc` as keyof typeof t.parts]})
                       </span>
                       {result.isOverridden && (
-                        <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded font-medium">
+                        <span className="text-[10px] bg-[#FEF3C7] text-[#92400E] border border-[#F59E0B] px-1.5 py-0.5 rounded font-medium">
                           {t.overriddenBadge}
                         </span>
                       )}
@@ -490,8 +496,8 @@ export const StudentView: React.FC<StudentViewProps> = ({
                     <div
                       className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold ${
                         isPassed
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-rose-600 text-white'
+                          ? 'bg-[#1F4E3D] text-white'
+                          : 'bg-[#B91C1C] text-white'
                       }`}
                     >
                       {isPassed ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
@@ -500,11 +506,11 @@ export const StudentView: React.FC<StudentViewProps> = ({
                   </div>
 
                   {/* Mistakes vs Limit breakdown */}
-                  <div className="text-xs font-mono text-stone-800 mb-3 flex items-center gap-4">
+                  <div className="text-xs font-mono text-[#241811] mb-3 flex items-center gap-4">
                     <span>
                       {t.ghaltiShort}: <strong>{result.ghaltiCount}</strong> (limit {result.ghaltiLimit})
                     </span>
-                    <span className="text-stone-300">·</span>
+                    <span className="text-[#C5A059]">·</span>
                     <span>
                       {t.atkanShort}: <strong>{result.atkanCount}</strong> (limit {result.atkanLimit})
                     </span>
@@ -513,7 +519,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
                   {/* Marked words list with click-to-jump */}
                   {result.marks.length > 0 ? (
                     <div>
-                      <div className="text-[11px] font-semibold text-stone-600 uppercase mb-1.5">
+                      <div className="text-[11px] font-semibold text-[#5A4333] uppercase mb-1.5">
                         Marked Mistakes (tap to jump to page and inspect):
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -532,14 +538,15 @@ export const StudentView: React.FC<StudentViewProps> = ({
                               {mark.type === 'ghalti' ? t.ghaltiShort : t.atkanShort}
                             </span>
                             <span>P{mark.page} : L{mark.line} : W{mark.wordIndex}</span>
-                            <ArrowRight className="w-3 h-3 text-stone-500" />
+                            <ArrowRight className="w-3 h-3 text-[#5A4333]" />
                           </button>
                         ))}
                       </div>
                     </div>
                   ) : (
-                    <div className="text-xs text-emerald-800 font-medium">
-                      No mistakes recorded! Excellent recitation.
+                    <div className="text-xs text-[#1F4E3D] font-bold flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-[#C5A059]" />
+                      <span>No mistakes recorded! Excellent recitation.</span>
                     </div>
                   )}
                 </div>

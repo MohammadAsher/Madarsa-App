@@ -10,9 +10,7 @@ import {
   CheckCircle2, 
   XCircle, 
   AlertTriangle, 
-  Sparkles,
-  BookOpen,
-  Info
+  BookOpen
 } from 'lucide-react';
 import { 
   MadrasaState, 
@@ -63,7 +61,6 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
   }, [activePart]);
 
   // Session marks created during this grading session
-  // Filter existing marks for this student, date, and part if any already exist
   const existingMarks = state.marksHistory.filter(
     m => m.studentId === student.id && m.date === state.currentDate && m.part === activePart
   );
@@ -91,7 +88,6 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
 
   // Toggle word mark
   const handleWordClick = (word: MushafWord) => {
-    // Check if word already marked
     const existingIndex = sessionMarks.findIndex(m => m.wordId === word.id);
 
     if (existingIndex >= 0) {
@@ -154,59 +150,56 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-stone-50 pb-24">
-      {/* Top Header Bar */}
-      <header className="sticky top-0 z-30 bg-white border-b border-stone-200 px-4 py-2.5 shadow-2xs">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+    <div className="flex flex-col min-h-screen bg-[#FAF6EF] bg-islamic-pattern pb-14 sm:pb-16">
+      {/* Top Navigation & Student Header Bar - Slim, non-intrusive */}
+      <header className="sticky top-0 z-30 bg-[#241811] text-[#FCFAF6] border-b border-[#C5A059] px-3 sm:px-4 py-2 shadow-sm">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Direct Back to Halqa button */}
             <button
               type="button"
               onClick={onBack}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-200 bg-stone-50 hover:bg-stone-100 text-stone-700 text-xs md:text-sm font-medium transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#C5A059]/40 bg-[#2E2017] hover:bg-[#3A291E] active:scale-95 text-[#FCFAF6] text-xs font-semibold transition-colors cursor-pointer shadow-xs min-h-[34px]"
+              title={t.backToDashboard}
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4 text-[#C5A059] shrink-0" />
               <span>{t.backToDashboard}</span>
             </button>
 
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-stone-900 text-base md:text-lg">
-                  {state.language === 'ur' ? student.urduName : student.name}
-                </span>
-                <span className="text-stone-400 text-xs hidden md:inline">·</span>
-                <span className="text-stone-500 text-xs hidden md:inline">
-                  {student.halqaName}
-                </span>
-              </div>
-              <div className="text-xs text-stone-500">
-                {state.currentDate} · {t.dayCounter} {state.dayCount}
-              </div>
+            <div className="flex items-center gap-1.5 truncate">
+              <span className="font-bold text-[#FCFAF6] text-sm sm:text-base truncate">
+                {state.language === 'ur' ? student.urduName : student.name}
+              </span>
+              <span className="text-[#C5A059] hidden sm:inline">۞</span>
+              <span className="text-[#DFCFA8] text-xs hidden sm:inline truncate">
+                {student.halqaName}
+              </span>
             </div>
           </div>
 
           {/* Part Switcher Tabs */}
-          <div className="flex items-center p-1 bg-stone-100 rounded-lg border border-stone-200">
+          <div className="flex items-center p-0.5 bg-[#2E2017] rounded-lg border border-[#C5A059]/40">
             {(['sabaq', 'sabqi', 'manzil'] as PartType[]).map(partKey => {
               const isActive = activePart === partKey;
               const partStatus = todayPlan ? todayPlan[partKey]?.status : 'pending';
               
-              let statusIndicatorColor = 'bg-stone-300';
-              if (partStatus === 'passed') statusIndicatorColor = 'bg-emerald-500';
-              if (partStatus === 'repeat') statusIndicatorColor = 'bg-rose-500';
+              let statusIndicatorColor = 'bg-[#7A6C60]';
+              if (partStatus === 'passed') statusIndicatorColor = 'bg-[#2E6A54]';
+              if (partStatus === 'repeat') statusIndicatorColor = 'bg-[#B91C1C]';
 
               return (
                 <button
                   key={partKey}
                   type="button"
                   onClick={() => setActivePart(partKey)}
-                  className={`px-3 py-1.5 text-xs md:text-sm font-medium rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
                     isActive
-                      ? 'bg-white text-stone-900 shadow-xs font-semibold'
-                      : 'text-stone-600 hover:text-stone-900'
+                      ? 'bg-[#FCFAF6] text-[#241811] shadow-xs'
+                      : 'text-[#DFCFA8] hover:text-[#FCFAF6]'
                   }`}
                 >
                   <span className={`w-2 h-2 rounded-full ${statusIndicatorColor}`} />
-                  <span>{t.parts[partKey]}</span>
+                  <span className="capitalize">{t.parts[partKey]}</span>
                 </button>
               );
             })}
@@ -214,56 +207,56 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
         </div>
       </header>
 
-      {/* Subheader: Assignment Range & Live Counter */}
-      <div className="bg-stone-100 border-b border-stone-200 px-4 py-2">
-        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      {/* Subheader: Assignment Range & Live Counter - Compact height */}
+      <div className="bg-[#F8F4EC] border-b border-[#DFCFA8] px-3 sm:px-4 py-1.5 shadow-2xs">
+        <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
           {/* Assigned Range summary */}
           {currentPartPlan ? (
-            <div className="flex items-center gap-2 text-xs md:text-sm text-stone-700">
-              <span className="font-semibold text-stone-900">{t.assignedRange}:</span>
-              <span className="font-mono text-stone-800">
+            <div className="flex items-center gap-1.5 sm:gap-2 text-xs text-[#42362E] truncate">
+              <span className="font-bold text-[#241811]">{t.assignedRange}:</span>
+              <span className="font-mono text-[#241811]">
                 {t.page} {currentPartPlan.range.start.page} {t.line} {currentPartPlan.range.start.line} {t.to} {t.page} {currentPartPlan.range.end.page} {t.line} {currentPartPlan.range.end.line}
               </span>
-              <span className="text-stone-400">·</span>
-              <span className="font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+              <span className="text-[#C5A059]">·</span>
+              <span className="font-bold text-[#1F4E3D] bg-[#E8F0EC] px-1.5 py-0.2 rounded border border-[#1F4E3D]/30 text-[11px]">
                 {currentPartPlan.range.linesCount} {t.linesCount}
               </span>
             </div>
           ) : (
-            <div className="text-xs text-stone-500 italic">No plan set for {t.parts[activePart]} today</div>
+            <div className="text-xs text-[#7A6C60] italic">No plan set for {t.parts[activePart]} today</div>
           )}
 
           {/* Live Counter & Limit Indicator */}
           <div
-            className={`flex items-center gap-3 px-3 py-1.5 rounded-lg border text-xs md:text-sm transition-colors ${
+            className={`flex items-center gap-2 sm:gap-2.5 px-2.5 py-1 rounded-lg border text-xs transition-colors shadow-2xs ${
               isLimitReached
-                ? 'bg-rose-100 border-rose-300 text-rose-950 font-bold animate-pulse'
-                : 'bg-white border-stone-200 text-stone-800'
+                ? 'bg-rose-100 border-rose-400 text-rose-950 font-bold animate-pulse'
+                : 'bg-[#FCFAF6] border-[#DFCFA8] text-[#241811]'
             }`}
           >
-            <div className="flex items-center gap-2 font-mono">
-              <span className={ghaltiCount >= ghaltiLimit ? 'text-rose-700 font-extrabold' : 'text-stone-700'}>
-                {t.ghaltiShort}: <strong className="text-sm">{ghaltiCount}</strong>/{ghaltiLimit}
+            <div className="flex items-center gap-2 font-mono text-[11px] sm:text-xs">
+              <span className={ghaltiCount >= ghaltiLimit ? 'text-[#B91C1C] font-extrabold' : 'text-[#241811]'}>
+                {t.ghaltiShort}: <strong className="text-xs sm:text-sm">{ghaltiCount}</strong>/{ghaltiLimit}
               </span>
-              <span className="text-stone-300">|</span>
-              <span className={atkanCount >= atkanLimit ? 'text-amber-700 font-extrabold' : 'text-stone-700'}>
-                {t.atkanShort}: <strong className="text-sm">{atkanCount}</strong>/{atkanLimit}
+              <span className="text-[#C5A059]">|</span>
+              <span className={atkanCount >= atkanLimit ? 'text-[#D97706] font-extrabold' : 'text-[#241811]'}>
+                {t.atkanShort}: <strong className="text-xs sm:text-sm">{atkanCount}</strong>/{atkanLimit}
               </span>
             </div>
 
-            <span className="text-stone-300">·</span>
+            <span className="text-[#C5A059] text-[10px]">۞</span>
 
             {/* Suggested Result Notice */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 text-[11px]">
               {isLimitReached ? (
-                <span className="flex items-center gap-1 text-rose-700 font-bold">
-                  <AlertTriangle className="w-4 h-4 text-rose-600" />
-                  {t.limitReachedWarning}
+                <span className="flex items-center gap-1 text-[#B91C1C] font-bold">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#B91C1C]" />
+                  <span>{t.limitReachedWarning}</span>
                 </span>
               ) : (
-                <span className="flex items-center gap-1 text-emerald-700">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  {t.withinLimitNotice}
+                <span className="flex items-center gap-1 text-[#1F4E3D] font-bold">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#1F4E3D]" />
+                  <span>{t.withinLimitNotice}</span>
                 </span>
               )}
             </div>
@@ -272,7 +265,7 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
       </div>
 
       {/* Main Mushaf Listening Workspace */}
-      <main className="flex-1 max-w-5xl w-full mx-auto p-2 md:p-4 flex flex-col items-center">
+      <main className="flex-1 max-w-5xl w-full mx-auto p-2 sm:p-3 flex flex-col items-center">
         {currentPartPlan ? (
           <MushafViewer
             pageNumber={currentPage}
@@ -285,20 +278,21 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
             language={state.language}
           />
         ) : (
-          <div className="p-12 text-center text-stone-500 bg-white rounded-xl border border-stone-200 my-8">
-            <BookOpen className="w-12 h-12 text-stone-400 mx-auto mb-3" />
-            <p className="text-base font-medium">Please assign work for this student first.</p>
+          <div className="p-8 text-center text-[#7A6C60] bg-[#FCFAF6] rounded-2xl border border-[#DFCFA8] my-8 shadow-xs">
+            <BookOpen className="w-10 h-10 text-[#C5A059] mx-auto mb-2" />
+            <p className="text-sm font-semibold text-[#241811]">Please assign work for this student first.</p>
           </div>
         )}
 
         {/* List of Marked Words in this session */}
         {sessionMarks.length > 0 && (
-          <div className="w-full max-w-4xl mt-4 bg-white border border-stone-200 rounded-xl p-3 shadow-2xs">
+          <div className="w-full max-w-4xl mt-3 bg-[#FCFAF6] border border-[#DFCFA8] rounded-xl p-3 shadow-xs">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-stone-700 uppercase tracking-wide">
-                {t.markedWordsList} ({sessionMarks.length})
+              <span className="text-xs font-bold text-[#241811] uppercase tracking-wide flex items-center gap-1.5">
+                <span className="text-[#C5A059]">✦</span>
+                <span>{t.markedWordsList} ({sessionMarks.length})</span>
               </span>
-              <span className="text-[11px] text-stone-500">
+              <span className="text-[11px] text-[#7A6C60]">
                 {t.tapWordToMarkHelp}
               </span>
             </div>
@@ -307,14 +301,11 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
                 <button
                   key={m.id}
                   type="button"
-                  onClick={() => {
-                    // Navigate to this page and select
-                    setCurrentPage(m.page);
-                  }}
-                  className={`px-2 py-1 rounded text-xs border font-mono flex items-center gap-1.5 cursor-pointer transition-colors ${
+                  onClick={() => setCurrentPage(m.page)}
+                  className={`px-2 py-1 rounded text-xs border font-mono flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs ${
                     m.type === 'ghalti'
-                      ? 'bg-rose-50 border-rose-300 text-rose-800 hover:bg-rose-100'
-                      : 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100'
+                      ? 'bg-rose-50 border-rose-300 text-rose-900 hover:bg-rose-100'
+                      : 'bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100'
                   }`}
                 >
                   <span className="font-bold">
@@ -326,7 +317,7 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
                       e.stopPropagation();
                       setSessionMarks(prev => prev.filter((_, i) => i !== idx));
                     }}
-                    className="ml-1 text-stone-400 hover:text-stone-700 font-bold"
+                    className="ml-0.5 text-stone-400 hover:text-stone-900 font-bold px-1"
                     title="Remove mark"
                   >
                     ×
@@ -338,84 +329,103 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
         )}
       </main>
 
-      {/* Floating Bottom Marking Workbench (Large Touch Targets for Tablet & Phone) */}
-      <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-stone-300 shadow-xl px-4 py-3 z-40">
-        <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-3">
-          {/* Active Tool Selector Buttons: Ghalti (Red) & Atkan (Orange) */}
-          <div className="flex items-center gap-2">
+      {/* Compact Sticky Bottom Marking Toolbar - Sleek single-row layout that does not cover the Mushaf */}
+      <div className="fixed bottom-0 inset-x-0 bg-[#241811]/95 backdrop-blur-md border-t border-[#C5A059] shadow-xl px-2.5 sm:px-4 py-1.5 sm:py-2 z-40">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-1.5 sm:gap-3">
+          {/* Left Group: Marking Tools (Ghalti, Atkan, Undo) */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Ghalti Button */}
             <button
               type="button"
               onClick={() => setActiveTool('ghalti')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer shadow-xs min-h-[44px] ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer shadow-2xs min-h-[34px] sm:min-h-[36px] ${
                 activeTool === 'ghalti'
-                  ? 'bg-rose-600 text-white ring-3 ring-rose-300 scale-105'
-                  : 'bg-rose-50 text-rose-700 border border-rose-300 hover:bg-rose-100'
+                  ? 'bg-[#B91C1C] text-white ring-2 ring-rose-400 scale-[1.02]'
+                  : 'bg-[#3E2B20] text-rose-200 border border-rose-800 hover:bg-rose-950/80'
               }`}
+              title="Mark Ghalti (Mistake)"
             >
-              <div className="w-3 h-3 rounded-full bg-current" />
-              <span>{t.ghaltiButton}</span>
-              <span className="text-xs opacity-80 font-mono">({ghaltiCount})</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-current shrink-0" />
+              <span className="whitespace-nowrap">{t.ghaltiButton}</span>
+              <span className="text-[11px] font-mono px-1.5 py-0.2 rounded bg-black/35 font-extrabold text-white">
+                {ghaltiCount}
+              </span>
             </button>
 
+            {/* Atkan Button */}
             <button
               type="button"
               onClick={() => setActiveTool('atkan')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer shadow-xs min-h-[44px] ${
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer shadow-2xs min-h-[34px] sm:min-h-[36px] ${
                 activeTool === 'atkan'
-                  ? 'bg-amber-500 text-white ring-3 ring-amber-300 scale-105'
-                  : 'bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100'
+                  ? 'bg-[#D97706] text-white ring-2 ring-amber-400 scale-[1.02]'
+                  : 'bg-[#3E2B20] text-amber-200 border border-amber-800 hover:bg-amber-950/80'
               }`}
+              title="Mark Atkan (Hesitation)"
             >
-              <div className="w-3 h-3 rounded-full bg-current" />
-              <span>{t.atkanButton}</span>
-              <span className="text-xs opacity-80 font-mono">({atkanCount})</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-current shrink-0" />
+              <span className="whitespace-nowrap">{t.atkanButton}</span>
+              <span className="text-[11px] font-mono px-1.5 py-0.2 rounded bg-black/35 font-extrabold text-white">
+                {atkanCount}
+              </span>
             </button>
 
-            {/* Undo Button */}
+            {/* Undo Last Mark Button */}
             <button
               type="button"
               onClick={handleUndo}
               disabled={sessionMarks.length === 0}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-stone-300 bg-white text-stone-700 hover:bg-stone-100 disabled:opacity-40 transition-colors cursor-pointer text-xs md:text-sm font-medium min-h-[44px]"
+              className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg border border-[#C5A059]/40 bg-[#2E2017] text-[#DFCFA8] hover:bg-[#3A291E] hover:text-[#FCFAF6] disabled:opacity-30 transition-colors cursor-pointer text-xs font-semibold min-h-[34px] sm:min-h-[36px]"
               title={t.undo}
             >
-              <RotateCcw className="w-4 h-4" />
-              <span className="hidden sm:inline">{t.undo}</span>
+              <RotateCcw className="w-3.5 h-3.5 text-[#C5A059] shrink-0" />
+              <span className="hidden sm:inline whitespace-nowrap">{t.undo}</span>
             </button>
           </div>
 
-          {/* Finalize Action Buttons: Pass & Repeat */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-stone-500 hidden md:inline">
-              {t.systemSuggested}: <strong>{suggestedResult === 'passed' ? t.passButton : t.repeatButton}</strong>
-            </span>
+          {/* Center divider */}
+          <div className="h-5 w-px bg-[#C5A059]/30 hidden xs:block" />
 
-            {/* Repeat Button */}
+          {/* Right Group: Finalize Actions (Repeat, Passed) */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Mark Repeat Button */}
             <button
               type="button"
               onClick={() => handleFinalize('repeat')}
-              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs md:text-sm font-bold transition-all cursor-pointer shadow-xs min-h-[44px] ${
+              className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs min-h-[34px] sm:min-h-[36px] ${
                 suggestedResult === 'repeat'
-                  ? 'bg-rose-600 text-white hover:bg-rose-700 ring-2 ring-rose-400'
-                  : 'bg-white border border-rose-300 text-rose-700 hover:bg-rose-50'
+                  ? 'bg-[#B91C1C] text-white hover:bg-[#991B1B] ring-2 ring-rose-400'
+                  : 'bg-[#2E2017] border border-rose-700/80 text-rose-300 hover:bg-rose-950/60'
               }`}
+              title="Mark Repeat"
             >
-              <XCircle className="w-4 h-4" />
-              <span>{t.repeatButton}</span>
+              <XCircle className="w-3.5 h-3.5 shrink-0" />
+              <span className="whitespace-nowrap">{t.repeatButton}</span>
+              {suggestedResult === 'repeat' && (
+                <span className="hidden md:inline text-[10px] text-rose-200 font-normal">
+                  (Suggested)
+                </span>
+              )}
             </button>
 
-            {/* Pass Button */}
+            {/* Mark Passed Button */}
             <button
               type="button"
               onClick={() => handleFinalize('passed')}
-              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs md:text-sm font-bold transition-all cursor-pointer shadow-xs min-h-[44px] ${
+              className={`flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs min-h-[34px] sm:min-h-[36px] ${
                 suggestedResult === 'passed'
-                  ? 'bg-emerald-600 text-white hover:bg-emerald-700 ring-2 ring-emerald-400'
-                  : 'bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-50'
+                  ? 'bg-[#1F4E3D] text-white hover:bg-[#16382C] ring-2 ring-emerald-400 border border-[#C5A059]'
+                  : 'bg-[#2E2017] border border-[#2E6A54] text-emerald-300 hover:bg-emerald-950/60'
               }`}
+              title="Mark Passed"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{t.passButton}</span>
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#DFCFA8] shrink-0" />
+              <span className="whitespace-nowrap">{t.passButton}</span>
+              {suggestedResult === 'passed' && (
+                <span className="hidden md:inline text-[10px] text-emerald-200 font-normal">
+                  (Suggested)
+                </span>
+              )}
             </button>
           </div>
         </div>

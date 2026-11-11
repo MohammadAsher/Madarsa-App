@@ -19,6 +19,8 @@ export const translations = {
     selectDate: 'Select Date',
     viewingHistoricalNotice: 'Viewing Historical Records',
     dayCounter: 'Day',
+    back: 'Back',
+    backTooltip: 'Return to previous screen',
 
     // Roles
     roles: {
@@ -165,6 +167,8 @@ export const translations = {
     selectDate: 'تاریخ منتخب کریں',
     viewingHistoricalNotice: 'سابقہ ریکارڈز کا معائنہ',
     dayCounter: 'دن',
+    back: 'واپس',
+    backTooltip: 'پچھلی اسکرین پر واپس جائیں',
 
     // Roles
     roles: {

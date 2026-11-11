@@ -1,11 +1,28 @@
 @import "tailwindcss";
 
 @layer base {
+  :root {
+    --color-coffee-dark: #241811;
+    --color-coffee-deep: #2A1D15;
+    --color-coffee-medium: #3E2B20;
+    --color-coffee-light: #5A4333;
+    --color-cream-bg: #FAF6EF;
+    --color-cream-card: #FCFAF6;
+    --color-ivory: #F8F4EC;
+    --color-gold-accent: #C5A059;
+    --color-gold-light: #DFCFA8;
+    --color-gold-border: #E8DCC4;
+    --color-text-heading: #241811;
+    --color-text-body: #42362E;
+    --color-text-muted: #7A6C60;
+  }
+
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    background-color: #fdfcf9;
-    color: #1c1917;
+    background-color: var(--color-cream-bg);
+    color: var(--color-text-body);
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   [dir="rtl"] {
@@ -17,18 +34,46 @@
   font-family: 'Amiri', 'Noto Nastaliq Urdu', serif;
 }
 
+.font-quran {
+  font-family: 'Amiri', 'Traditional Arabic', serif;
+}
+
+/* Subtle, sophisticated Islamic geometric pattern background */
+.bg-islamic-pattern {
+  background-color: #FAF6EF;
+  background-image: radial-gradient(#C5A059 0.75px, transparent 0.75px), radial-gradient(#3E2B20 0.5px, #FAF6EF 0.5px);
+  background-size: 30px 30px;
+  background-position: 0 0, 15px 15px;
+}
+
+/* Subtle arabesque arch styling for card tops */
+.islamic-arch-top {
+  position: relative;
+}
+.islamic-arch-top::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #C5A059, transparent);
+  border-radius: 9999px;
+}
+
 /* Custom scrollbars for clean Mushaf and drawer reading */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #f5f0e6;
+  background: #F3ECE1;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d6c7af;
+  background: #CDBE9F;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #b5a285;
+  background: #B3A17E;
 }
