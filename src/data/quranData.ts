@@ -292,7 +292,18 @@ export function getParaSurahName(paraNumber: number): string {
 export function getRangeMetadata(start: WordLocation, end: WordLocation) {
   const [from, to] = compareWordLocations(start, end) <= 0 ? [start, end] : [end, start];
   const startPageData = getPage(from.page);
+  const endPageData = getPage(to.page);
   const linesCount = calculateRangeLines(from, to);
+
+  const startWord = getWordById(from.wordId) || 
+    startPageData.lines.find(l => l.lineNumber === from.line)?.words.find(w => w.wordIndex === from.wordIndex);
+  
+  const endWord = getWordById(to.wordId) || 
+    endPageData.lines.find(l => l.lineNumber === to.line)?.words.find(w => w.wordIndex === to.wordIndex);
+
+  const startAyah = startWord?.ayahNumber;
+  const endAyah = endWord?.ayahNumber;
+
   return {
     surahName: startPageData.surahName,
     juzNumber: startPageData.juzNumber,
@@ -301,6 +312,8 @@ export function getRangeMetadata(start: WordLocation, end: WordLocation) {
     startLine: from.line,
     endLine: to.line,
     linesCount,
+    startAyah,
+    endAyah,
   };
 }
 

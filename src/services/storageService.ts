@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { MadrasaState, StudentLimits, DayPlan, DailyPartPlan, MistakeMark, SessionResult } from '../types/hifz';
+import { MadrasaState, StudentLimits, DayPlan, DailyPartPlan, MistakeMark, SessionResult, AssignmentRange } from '../types/hifz';
 import { advanceLocationByLines, calculateRangeLines, getRangeMetadata, getParaPageRange } from '../data/quranData';
 
 const STORAGE_KEY = 'hifz_madrasa_prototype_state_v4'; // bumped key to ensure clean load of new assignment logic
@@ -135,6 +135,8 @@ export function createInitialDemoState(): MadrasaState {
       endPage: meta.endPage,
       startLine: meta.startLine,
       endLine: meta.endLine,
+      startAyah: meta.startAyah,
+      endAyah: meta.endAyah,
     };
   };
 
@@ -779,7 +781,7 @@ export function advanceToNextDay(currentState: MadrasaState): MadrasaState {
     const revisionFailed = sabqiStatus === 'repeat' || manzilStatus === 'repeat';
     const shouldFreezeNewSabaq = currentState.settings.freezeSabaqOnSabqiOrManzilFail && revisionFailed;
 
-    let nextSabaqRange = { ...todayPlan.sabaq.range };
+    let nextSabaqRange: AssignmentRange = { ...todayPlan.sabaq.range };
     let sabaqFrozenFlag = false;
 
     if (shouldFreezeNewSabaq) {
@@ -791,32 +793,59 @@ export function advanceToNextDay(currentState: MadrasaState): MadrasaState {
       const linesLength = todayPlan.sabaq.range.linesCount || 8;
       const newStart = { ...lastEnd };
       const newEnd = advanceLocationByLines(newStart, linesLength);
+      const meta = getRangeMetadata(newStart, newEnd);
       nextSabaqRange = {
         start: newStart,
         end: newEnd,
-        linesCount: calculateRangeLines(newStart, newEnd),
+        linesCount: meta.linesCount,
+        surahName: meta.surahName,
+        juzNumber: meta.juzNumber,
+        startPage: meta.startPage,
+        endPage: meta.endPage,
+        startLine: meta.startLine,
+        endLine: meta.endLine,
+        startAyah: meta.startAyah,
+        endAyah: meta.endAyah,
       };
     }
 
-    let nextSabqiRange = { ...todayPlan.sabqi.range };
+    let nextSabqiRange: AssignmentRange = { ...todayPlan.sabqi.range };
     if (sabqiStatus === 'passed') {
       const nextSabqiStart = advanceLocationByLines(todayPlan.sabqi.range.start, 15);
       const nextSabqiEnd = advanceLocationByLines(todayPlan.sabqi.range.end, 15);
+      const meta = getRangeMetadata(nextSabqiStart, nextSabqiEnd);
       nextSabqiRange = {
         start: nextSabqiStart,
         end: nextSabqiEnd,
-        linesCount: calculateRangeLines(nextSabqiStart, nextSabqiEnd),
+        linesCount: meta.linesCount,
+        surahName: meta.surahName,
+        juzNumber: meta.juzNumber,
+        startPage: meta.startPage,
+        endPage: meta.endPage,
+        startLine: meta.startLine,
+        endLine: meta.endLine,
+        startAyah: meta.startAyah,
+        endAyah: meta.endAyah,
       };
     }
 
-    let nextManzilRange = { ...todayPlan.manzil.range };
+    let nextManzilRange: AssignmentRange = { ...todayPlan.manzil.range };
     if (manzilStatus === 'passed') {
       const nextManzilStart = advanceLocationByLines(todayPlan.manzil.range.start, 75);
       const nextManzilEnd = advanceLocationByLines(todayPlan.manzil.range.end, 75);
+      const meta = getRangeMetadata(nextManzilStart, nextManzilEnd);
       nextManzilRange = {
         start: nextManzilStart,
         end: nextManzilEnd,
-        linesCount: calculateRangeLines(nextManzilStart, nextManzilEnd),
+        linesCount: meta.linesCount,
+        surahName: meta.surahName,
+        juzNumber: meta.juzNumber,
+        startPage: meta.startPage,
+        endPage: meta.endPage,
+        startLine: meta.startLine,
+        endLine: meta.endLine,
+        startAyah: meta.startAyah,
+        endAyah: meta.endAyah,
       };
     }
 
@@ -829,6 +858,14 @@ export function advanceToNextDay(currentState: MadrasaState): MadrasaState {
         status: 'pending',
         repeatPracticeCount: 0,
         targetRepeats: 10,
+        surahName: nextSabaqRange.surahName,
+        juzNumber: nextSabaqRange.juzNumber,
+        startPage: nextSabaqRange.startPage,
+        endPage: nextSabaqRange.endPage,
+        startLine: nextSabaqRange.startLine,
+        endLine: nextSabaqRange.endLine,
+        startAyah: nextSabaqRange.startAyah,
+        endAyah: nextSabaqRange.endAyah,
       },
       sabqi: {
         part: 'sabqi',
@@ -836,6 +873,16 @@ export function advanceToNextDay(currentState: MadrasaState): MadrasaState {
         status: 'pending',
         repeatPracticeCount: 0,
         targetRepeats: 7,
+        surahName: nextSabqiRange.surahName,
+        juzNumber: nextSabqiRange.juzNumber,
+        startPage: nextSabqiRange.startPage,
+        endPage: nextSabqiRange.endPage,
+        startLine: nextSabqiRange.startLine,
+        endLine: nextSabqiRange.endLine,
+        startAyah: nextSabqiRange.startAyah,
+        endAyah: nextSabqiRange.endAyah,
+        portionType: todayPlan.sabqi.portionType,
+        portionLabel: todayPlan.sabqi.portionLabel,
       },
       manzil: {
         part: 'manzil',
@@ -843,6 +890,15 @@ export function advanceToNextDay(currentState: MadrasaState): MadrasaState {
         status: 'pending',
         repeatPracticeCount: 0,
         targetRepeats: 5,
+        surahName: nextManzilRange.surahName,
+        juzNumber: nextManzilRange.juzNumber,
+        startPage: nextManzilRange.startPage,
+        endPage: nextManzilRange.endPage,
+        startLine: nextManzilRange.startLine,
+        endLine: nextManzilRange.endLine,
+        startAyah: nextManzilRange.startAyah,
+        endAyah: nextManzilRange.endAyah,
+        assignedParas: todayPlan.manzil.assignedParas,
       },
       sabaqFrozenDueToRevisionFail: sabaqFrozenFlag,
     };

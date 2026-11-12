@@ -166,6 +166,8 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
             endPage: range.endPage,
             startLine: range.startLine,
             endLine: range.endLine,
+            startAyah: range.startAyah,
+            endAyah: range.endAyah,
             assignedParas: extraMetadata?.assignedParas,
             portionType: extraMetadata?.portionType,
             portionLabel: extraMetadata?.portionLabel,

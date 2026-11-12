@@ -144,12 +144,20 @@ export const translations = {
     useHalqaDefaults: 'Revert to Halqa Defaults',
 
     // History Modal
-    historyModalTitle: 'Student History & Weak Words',
-    recentSessions: 'Recent Listening Sessions',
+    historyModalTitle: 'Student History & Lesson Records',
+    recentSessions: 'Listening & Exam Sessions',
     frequentMistakes: 'Recurring Weak Words',
     timesMarked: 'times marked',
     noWeakWordsYet: 'No recurring weak words recorded yet. Excellent progress!',
     noSessionsYet: 'No listening sessions completed yet.',
+    dailyLessonHistory: 'Daily Lessons & Revision Log',
+    allLessonsTab: 'Daily Lessons Log',
+    weakWordsTab: 'Weak Words',
+    sessionsTab: 'Exam Sessions',
+    viewOnMushaf: 'View on Mushaf',
+    ayahRange: 'Ayat Range',
+    viewLessonHistory: 'View Lesson History',
+    noLessonRecordsYet: 'No historical lessons recorded yet.',
   },
 
   ur: {
@@ -292,11 +300,19 @@ export const translations = {
     useHalqaDefaults: 'حلقہ کی بنیادی حدوں پر بحال کریں',
 
     // History Modal
-    historyModalTitle: 'طالب علم کا سابقہ ریکارڈ اور کمزور کلمات',
+    historyModalTitle: 'طالب علم کا سابقہ ریکارڈ اور اسباق کی تاریخ',
     recentSessions: 'حالیہ سنانے کی نشستیں',
     frequentMistakes: 'بار بار غلط ہونے والے کلمات',
     timesMarked: 'بار نشان زدہ ہوا',
     noWeakWordsYet: 'ماشاءاللہ، ابھی تک کوئی کمزور کلمہ درج نہیں ہے۔',
     noSessionsYet: 'ابھی تک کوئی نشست مکمل نہیں ہوئی۔',
+    dailyLessonHistory: 'روزانہ اسباق و دہرائی کی تاریخ',
+    allLessonsTab: 'روزانہ اسباق کا ریکارڈ',
+    weakWordsTab: 'کمزور کلمات',
+    sessionsTab: 'امتحانات',
+    viewOnMushaf: 'قرآن پر دیکھیں',
+    ayahRange: 'آیات کا دائرہ',
+    viewLessonHistory: 'سابقہ اسباق کی تاریخ',
+    noLessonRecordsYet: 'ابھی تک کوئی سابقہ سبق درج نہیں ہے۔',
   },
 };

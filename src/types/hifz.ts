@@ -55,6 +55,8 @@ export interface AssignmentRange {
   endLine?: number;
   startPage?: number;
   endPage?: number;
+  startAyah?: number;
+  endAyah?: number;
 }
 
 export type PartStatus = 'pending' | 'in_progress' | 'passed' | 'repeat';
@@ -75,6 +77,8 @@ export interface DailyPartPlan {
   endLine?: number;
   startPage?: number;
   endPage?: number;
+  startAyah?: number;
+  endAyah?: number;
   assignedParas?: number[]; // For Manzil: only the Paras specifically selected by teacher
   portionType?: 'custom' | 'quarter_para' | 'half_para' | 'full_para'; // For Sabqi
   portionLabel?: string; // e.g. "Half Para (Pages 2-11)"

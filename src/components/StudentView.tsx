@@ -19,7 +19,8 @@ import {
   Sparkles,
   Info,
   Layers,
-  BookmarkCheck
+  BookmarkCheck,
+  History
 } from 'lucide-react';
 import { 
   MadrasaState, 
@@ -29,6 +30,7 @@ import {
   MistakeMark 
 } from '../types/hifz';
 import { MushafViewer } from './MushafViewer';
+import { StudentHistoryModal } from './StudentHistoryModal';
 import { translations } from '../i18n/translations';
 
 interface StudentViewProps {
@@ -67,6 +69,9 @@ export const StudentView: React.FC<StudentViewProps> = ({
   const [pulsingWordId, setPulsingWordId] = useState<string | null>(
     targetJumpWord?.wordId || null
   );
+
+  // Lesson history modal state
+  const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
 
   // Jump to word helper
   const handleJumpToMistake = (page: number, wordId: string) => {
@@ -164,9 +169,17 @@ export const StudentView: React.FC<StudentViewProps> = ({
           </div>
         </div>
 
-        <div className="text-xs text-[#7A6C60] sm:text-right">
+        <div className="flex flex-col sm:items-end gap-1.5 text-xs text-[#7A6C60]">
           <div>{t.roleLabel} <strong className="text-[#241811]">{state.language === 'ur' ? student.urduName : student.name}</strong></div>
-          <div className="font-mono text-[#8F6E2B] mt-0.5">{state.currentDate} ({t.dayCounter} {state.dayCount})</div>
+          <div className="font-mono text-[#8F6E2B]">{state.currentDate} ({t.dayCounter} {state.dayCount})</div>
+          <button
+            type="button"
+            onClick={() => setShowHistoryModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F8F4EC] hover:bg-[#F3ECE1] border border-[#DFCFA8] hover:border-[#C5A059] text-[#241811] text-xs font-bold transition-all shadow-2xs cursor-pointer mt-1"
+          >
+            <History className="w-3.5 h-3.5 text-[#8F6E2B]" />
+            <span>{t.viewLessonHistory}</span>
+          </button>
         </div>
       </div>
 
@@ -273,6 +286,14 @@ export const StudentView: React.FC<StudentViewProps> = ({
                             </span>
                           </div>
 
+                          {(plan.range.startAyah || plan.startAyah) && (
+                            <div className="text-xs font-mono text-[#1F4E3D] bg-[#EBF3EE] px-2 py-0.5 rounded font-bold inline-block">
+                              {(plan.range.startAyah || plan.startAyah) === (plan.range.endAyah || plan.endAyah)
+                                ? `Ayah ${plan.range.startAyah || plan.startAyah}`
+                                : `Ayat ${plan.range.startAyah || plan.startAyah} – ${plan.range.endAyah || plan.endAyah}`}
+                            </div>
+                          )}
+
                           <div className="text-[#42362E] font-mono text-[11px] pt-1.5 border-t border-[#DFCFA8]">
                             <div>
                               Pages: <strong>{plan.range.startPage || plan.range.start.page}</strong> {plan.range.start.page !== plan.range.end.page ? `to ${plan.range.endPage || plan.range.end.page}` : ''}
@@ -297,6 +318,14 @@ export const StudentView: React.FC<StudentViewProps> = ({
                           <div className="font-semibold text-[#241811] pt-1.5 border-t border-[#DFCFA8]">
                             Portion: <strong className="text-[#8F6E2B]">{plan.portionLabel || 'Teacher Assigned Revision'}</strong>
                           </div>
+
+                          {(plan.range.startAyah || plan.startAyah) && (
+                            <div className="text-xs font-mono text-[#1F4E3D] bg-[#EBF3EE] px-2 py-0.5 rounded font-bold inline-block">
+                              {(plan.range.startAyah || plan.startAyah) === (plan.range.endAyah || plan.endAyah)
+                                ? `Ayah ${plan.range.startAyah || plan.startAyah}`
+                                : `Ayat ${plan.range.startAyah || plan.startAyah} – ${plan.range.endAyah || plan.endAyah}`}
+                            </div>
+                          )}
 
                           <div className="text-[#42362E] font-mono text-[11px]">
                             Pages {plan.range.start.page} to {plan.range.end.page} ({plan.range.linesCount} lines)
@@ -555,6 +584,16 @@ export const StudentView: React.FC<StudentViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Student Historical Lessons & Mistakes Modal */}
+      {showHistoryModal && (
+        <StudentHistoryModal
+          state={state}
+          student={student}
+          onClose={() => setShowHistoryModal(false)}
+          onJumpToWord={(page, wordId) => handleJumpToMistake(page, wordId)}
+        />
+      )}
     </div>
   );
 };

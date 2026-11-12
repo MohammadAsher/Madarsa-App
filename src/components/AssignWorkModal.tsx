@@ -258,6 +258,8 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
       endLine: metadata.endLine,
       startPage: metadata.startPage,
       endPage: metadata.endPage,
+      startAyah: metadata.startAyah,
+      endAyah: metadata.endAyah,
     };
 
     onSave(student.id, selectedPart, range, applyToAll, {
