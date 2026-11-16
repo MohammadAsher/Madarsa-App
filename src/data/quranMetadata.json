@@ -1,0 +1,2175 @@
+{
+  "source": "Quran Foundation / Quran.com API v4 (Madinah 15-Line Layout + IndoPak & Uthmani Scripts)",
+  "fetchedAt": "2026-11-13T02:32:25.935Z",
+  "totalSurahs": 114,
+  "totalAyahs": 6236,
+  "totalJuzs": 30,
+  "totalPages": 604,
+  "chapters": [
+    {
+      "id": 1,
+      "nameSimple": "Al-Fatihah",
+      "nameArabic": "الفاتحة",
+      "revelationPlace": "makkah",
+      "versesCount": 7,
+      "bismillahPre": false,
+      "pages": [
+        1,
+        1
+      ]
+    },
+    {
+      "id": 2,
+      "nameSimple": "Al-Baqarah",
+      "nameArabic": "البقرة",
+      "revelationPlace": "madinah",
+      "versesCount": 286,
+      "bismillahPre": true,
+      "pages": [
+        2,
+        49
+      ]
+    },
+    {
+      "id": 3,
+      "nameSimple": "Ali 'Imran",
+      "nameArabic": "آل عمران",
+      "revelationPlace": "madinah",
+      "versesCount": 200,
+      "bismillahPre": true,
+      "pages": [
+        50,
+        76
+      ]
+    },
+    {
+      "id": 4,
+      "nameSimple": "An-Nisa",
+      "nameArabic": "النساء",
+      "revelationPlace": "madinah",
+      "versesCount": 176,
+      "bismillahPre": true,
+      "pages": [
+        77,
+        106
+      ]
+    },
+    {
+      "id": 5,
+      "nameSimple": "Al-Ma'idah",
+      "nameArabic": "المائدة",
+      "revelationPlace": "madinah",
+      "versesCount": 120,
+      "bismillahPre": true,
+      "pages": [
+        106,
+        127
+      ]
+    },
+    {
+      "id": 6,
+      "nameSimple": "Al-An'am",
+      "nameArabic": "الأنعام",
+      "revelationPlace": "makkah",
+      "versesCount": 165,
+      "bismillahPre": true,
+      "pages": [
+        128,
+        150
+      ]
+    },
+    {
+      "id": 7,
+      "nameSimple": "Al-A'raf",
+      "nameArabic": "الأعراف",
+      "revelationPlace": "makkah",
+      "versesCount": 206,
+      "bismillahPre": true,
+      "pages": [
+        151,
+        176
+      ]
+    },
+    {
+      "id": 8,
+      "nameSimple": "Al-Anfal",
+      "nameArabic": "الأنفال",
+      "revelationPlace": "madinah",
+      "versesCount": 75,
+      "bismillahPre": true,
+      "pages": [
+        177,
+        186
+      ]
+    },
+    {
+      "id": 9,
+      "nameSimple": "At-Tawbah",
+      "nameArabic": "التوبة",
+      "revelationPlace": "madinah",
+      "versesCount": 129,
+      "bismillahPre": false,
+      "pages": [
+        187,
+        207
+      ]
+    },
+    {
+      "id": 10,
+      "nameSimple": "Yunus",
+      "nameArabic": "يونس",
+      "revelationPlace": "makkah",
+      "versesCount": 109,
+      "bismillahPre": true,
+      "pages": [
+        208,
+        221
+      ]
+    },
+    {
+      "id": 11,
+      "nameSimple": "Hud",
+      "nameArabic": "هود",
+      "revelationPlace": "makkah",
+      "versesCount": 123,
+      "bismillahPre": true,
+      "pages": [
+        221,
+        235
+      ]
+    },
+    {
+      "id": 12,
+      "nameSimple": "Yusuf",
+      "nameArabic": "يوسف",
+      "revelationPlace": "makkah",
+      "versesCount": 111,
+      "bismillahPre": true,
+      "pages": [
+        235,
+        248
+      ]
+    },
+    {
+      "id": 13,
+      "nameSimple": "Ar-Ra'd",
+      "nameArabic": "الرعد",
+      "revelationPlace": "madinah",
+      "versesCount": 43,
+      "bismillahPre": true,
+      "pages": [
+        249,
+        255
+      ]
+    },
+    {
+      "id": 14,
+      "nameSimple": "Ibrahim",
+      "nameArabic": "ابراهيم",
+      "revelationPlace": "makkah",
+      "versesCount": 52,
+      "bismillahPre": true,
+      "pages": [
+        255,
+        261
+      ]
+    },
+    {
+      "id": 15,
+      "nameSimple": "Al-Hijr",
+      "nameArabic": "الحجر",
+      "revelationPlace": "makkah",
+      "versesCount": 99,
+      "bismillahPre": true,
+      "pages": [
+        262,
+        267
+      ]
+    },
+    {
+      "id": 16,
+      "nameSimple": "An-Nahl",
+      "nameArabic": "النحل",
+      "revelationPlace": "makkah",
+      "versesCount": 128,
+      "bismillahPre": true,
+      "pages": [
+        267,
+        281
+      ]
+    },
+    {
+      "id": 17,
+      "nameSimple": "Al-Isra",
+      "nameArabic": "الإسراء",
+      "revelationPlace": "makkah",
+      "versesCount": 111,
+      "bismillahPre": true,
+      "pages": [
+        282,
+        293
+      ]
+    },
+    {
+      "id": 18,
+      "nameSimple": "Al-Kahf",
+      "nameArabic": "الكهف",
+      "revelationPlace": "makkah",
+      "versesCount": 110,
+      "bismillahPre": true,
+      "pages": [
+        293,
+        304
+      ]
+    },
+    {
+      "id": 19,
+      "nameSimple": "Maryam",
+      "nameArabic": "مريم",
+      "revelationPlace": "makkah",
+      "versesCount": 98,
+      "bismillahPre": true,
+      "pages": [
+        305,
+        312
+      ]
+    },
+    {
+      "id": 20,
+      "nameSimple": "Taha",
+      "nameArabic": "طه",
+      "revelationPlace": "makkah",
+      "versesCount": 135,
+      "bismillahPre": true,
+      "pages": [
+        312,
+        321
+      ]
+    },
+    {
+      "id": 21,
+      "nameSimple": "Al-Anbya",
+      "nameArabic": "الأنبياء",
+      "revelationPlace": "makkah",
+      "versesCount": 112,
+      "bismillahPre": true,
+      "pages": [
+        322,
+        331
+      ]
+    },
+    {
+      "id": 22,
+      "nameSimple": "Al-Hajj",
+      "nameArabic": "الحج",
+      "revelationPlace": "madinah",
+      "versesCount": 78,
+      "bismillahPre": true,
+      "pages": [
+        332,
+        341
+      ]
+    },
+    {
+      "id": 23,
+      "nameSimple": "Al-Mu'minun",
+      "nameArabic": "المؤمنون",
+      "revelationPlace": "makkah",
+      "versesCount": 118,
+      "bismillahPre": true,
+      "pages": [
+        342,
+        349
+      ]
+    },
+    {
+      "id": 24,
+      "nameSimple": "An-Nur",
+      "nameArabic": "النور",
+      "revelationPlace": "madinah",
+      "versesCount": 64,
+      "bismillahPre": true,
+      "pages": [
+        350,
+        359
+      ]
+    },
+    {
+      "id": 25,
+      "nameSimple": "Al-Furqan",
+      "nameArabic": "الفرقان",
+      "revelationPlace": "makkah",
+      "versesCount": 77,
+      "bismillahPre": true,
+      "pages": [
+        359,
+        366
+      ]
+    },
+    {
+      "id": 26,
+      "nameSimple": "Ash-Shu'ara",
+      "nameArabic": "الشعراء",
+      "revelationPlace": "makkah",
+      "versesCount": 227,
+      "bismillahPre": true,
+      "pages": [
+        367,
+        376
+      ]
+    },
+    {
+      "id": 27,
+      "nameSimple": "An-Naml",
+      "nameArabic": "النمل",
+      "revelationPlace": "makkah",
+      "versesCount": 93,
+      "bismillahPre": true,
+      "pages": [
+        377,
+        385
+      ]
+    },
+    {
+      "id": 28,
+      "nameSimple": "Al-Qasas",
+      "nameArabic": "القصص",
+      "revelationPlace": "makkah",
+      "versesCount": 88,
+      "bismillahPre": true,
+      "pages": [
+        385,
+        396
+      ]
+    },
+    {
+      "id": 29,
+      "nameSimple": "Al-'Ankabut",
+      "nameArabic": "العنكبوت",
+      "revelationPlace": "makkah",
+      "versesCount": 69,
+      "bismillahPre": true,
+      "pages": [
+        396,
+        404
+      ]
+    },
+    {
+      "id": 30,
+      "nameSimple": "Ar-Rum",
+      "nameArabic": "الروم",
+      "revelationPlace": "makkah",
+      "versesCount": 60,
+      "bismillahPre": true,
+      "pages": [
+        404,
+        410
+      ]
+    },
+    {
+      "id": 31,
+      "nameSimple": "Luqman",
+      "nameArabic": "لقمان",
+      "revelationPlace": "makkah",
+      "versesCount": 34,
+      "bismillahPre": true,
+      "pages": [
+        411,
+        414
+      ]
+    },
+    {
+      "id": 32,
+      "nameSimple": "As-Sajdah",
+      "nameArabic": "السجدة",
+      "revelationPlace": "makkah",
+      "versesCount": 30,
+      "bismillahPre": true,
+      "pages": [
+        415,
+        417
+      ]
+    },
+    {
+      "id": 33,
+      "nameSimple": "Al-Ahzab",
+      "nameArabic": "الأحزاب",
+      "revelationPlace": "madinah",
+      "versesCount": 73,
+      "bismillahPre": true,
+      "pages": [
+        418,
+        427
+      ]
+    },
+    {
+      "id": 34,
+      "nameSimple": "Saba",
+      "nameArabic": "سبإ",
+      "revelationPlace": "makkah",
+      "versesCount": 54,
+      "bismillahPre": true,
+      "pages": [
+        428,
+        434
+      ]
+    },
+    {
+      "id": 35,
+      "nameSimple": "Fatir",
+      "nameArabic": "فاطر",
+      "revelationPlace": "makkah",
+      "versesCount": 45,
+      "bismillahPre": true,
+      "pages": [
+        434,
+        440
+      ]
+    },
+    {
+      "id": 36,
+      "nameSimple": "Ya-Sin",
+      "nameArabic": "يس",
+      "revelationPlace": "makkah",
+      "versesCount": 83,
+      "bismillahPre": true,
+      "pages": [
+        440,
+        445
+      ]
+    },
+    {
+      "id": 37,
+      "nameSimple": "As-Saffat",
+      "nameArabic": "الصافات",
+      "revelationPlace": "makkah",
+      "versesCount": 182,
+      "bismillahPre": true,
+      "pages": [
+        446,
+        452
+      ]
+    },
+    {
+      "id": 38,
+      "nameSimple": "Sad",
+      "nameArabic": "ص",
+      "revelationPlace": "makkah",
+      "versesCount": 88,
+      "bismillahPre": true,
+      "pages": [
+        453,
+        458
+      ]
+    },
+    {
+      "id": 39,
+      "nameSimple": "Az-Zumar",
+      "nameArabic": "الزمر",
+      "revelationPlace": "makkah",
+      "versesCount": 75,
+      "bismillahPre": true,
+      "pages": [
+        458,
+        467
+      ]
+    },
+    {
+      "id": 40,
+      "nameSimple": "Ghafir",
+      "nameArabic": "غافر",
+      "revelationPlace": "makkah",
+      "versesCount": 85,
+      "bismillahPre": true,
+      "pages": [
+        467,
+        476
+      ]
+    },
+    {
+      "id": 41,
+      "nameSimple": "Fussilat",
+      "nameArabic": "فصلت",
+      "revelationPlace": "makkah",
+      "versesCount": 54,
+      "bismillahPre": true,
+      "pages": [
+        477,
+        482
+      ]
+    },
+    {
+      "id": 42,
+      "nameSimple": "Ash-Shuraa",
+      "nameArabic": "الشورى",
+      "revelationPlace": "makkah",
+      "versesCount": 53,
+      "bismillahPre": true,
+      "pages": [
+        483,
+        489
+      ]
+    },
+    {
+      "id": 43,
+      "nameSimple": "Az-Zukhruf",
+      "nameArabic": "الزخرف",
+      "revelationPlace": "makkah",
+      "versesCount": 89,
+      "bismillahPre": true,
+      "pages": [
+        489,
+        495
+      ]
+    },
+    {
+      "id": 44,
+      "nameSimple": "Ad-Dukhan",
+      "nameArabic": "الدخان",
+      "revelationPlace": "makkah",
+      "versesCount": 59,
+      "bismillahPre": true,
+      "pages": [
+        496,
+        498
+      ]
+    },
+    {
+      "id": 45,
+      "nameSimple": "Al-Jathiyah",
+      "nameArabic": "الجاثية",
+      "revelationPlace": "makkah",
+      "versesCount": 37,
+      "bismillahPre": true,
+      "pages": [
+        499,
+        502
+      ]
+    },
+    {
+      "id": 46,
+      "nameSimple": "Al-Ahqaf",
+      "nameArabic": "الأحقاف",
+      "revelationPlace": "makkah",
+      "versesCount": 35,
+      "bismillahPre": true,
+      "pages": [
+        502,
+        506
+      ]
+    },
+    {
+      "id": 47,
+      "nameSimple": "Muhammad",
+      "nameArabic": "محمد",
+      "revelationPlace": "madinah",
+      "versesCount": 38,
+      "bismillahPre": true,
+      "pages": [
+        507,
+        510
+      ]
+    },
+    {
+      "id": 48,
+      "nameSimple": "Al-Fath",
+      "nameArabic": "الفتح",
+      "revelationPlace": "madinah",
+      "versesCount": 29,
+      "bismillahPre": true,
+      "pages": [
+        511,
+        515
+      ]
+    },
+    {
+      "id": 49,
+      "nameSimple": "Al-Hujurat",
+      "nameArabic": "الحجرات",
+      "revelationPlace": "madinah",
+      "versesCount": 18,
+      "bismillahPre": true,
+      "pages": [
+        515,
+        517
+      ]
+    },
+    {
+      "id": 50,
+      "nameSimple": "Qaf",
+      "nameArabic": "ق",
+      "revelationPlace": "makkah",
+      "versesCount": 45,
+      "bismillahPre": true,
+      "pages": [
+        518,
+        520
+      ]
+    },
+    {
+      "id": 51,
+      "nameSimple": "Adh-Dhariyat",
+      "nameArabic": "الذاريات",
+      "revelationPlace": "makkah",
+      "versesCount": 60,
+      "bismillahPre": true,
+      "pages": [
+        520,
+        523
+      ]
+    },
+    {
+      "id": 52,
+      "nameSimple": "At-Tur",
+      "nameArabic": "الطور",
+      "revelationPlace": "makkah",
+      "versesCount": 49,
+      "bismillahPre": true,
+      "pages": [
+        523,
+        525
+      ]
+    },
+    {
+      "id": 53,
+      "nameSimple": "An-Najm",
+      "nameArabic": "النجم",
+      "revelationPlace": "makkah",
+      "versesCount": 62,
+      "bismillahPre": true,
+      "pages": [
+        526,
+        528
+      ]
+    },
+    {
+      "id": 54,
+      "nameSimple": "Al-Qamar",
+      "nameArabic": "القمر",
+      "revelationPlace": "makkah",
+      "versesCount": 55,
+      "bismillahPre": true,
+      "pages": [
+        528,
+        531
+      ]
+    },
+    {
+      "id": 55,
+      "nameSimple": "Ar-Rahman",
+      "nameArabic": "الرحمن",
+      "revelationPlace": "madinah",
+      "versesCount": 78,
+      "bismillahPre": true,
+      "pages": [
+        531,
+        534
+      ]
+    },
+    {
+      "id": 56,
+      "nameSimple": "Al-Waqi'ah",
+      "nameArabic": "الواقعة",
+      "revelationPlace": "makkah",
+      "versesCount": 96,
+      "bismillahPre": true,
+      "pages": [
+        534,
+        537
+      ]
+    },
+    {
+      "id": 57,
+      "nameSimple": "Al-Hadid",
+      "nameArabic": "الحديد",
+      "revelationPlace": "madinah",
+      "versesCount": 29,
+      "bismillahPre": true,
+      "pages": [
+        537,
+        541
+      ]
+    },
+    {
+      "id": 58,
+      "nameSimple": "Al-Mujadila",
+      "nameArabic": "المجادلة",
+      "revelationPlace": "madinah",
+      "versesCount": 22,
+      "bismillahPre": true,
+      "pages": [
+        542,
+        545
+      ]
+    },
+    {
+      "id": 59,
+      "nameSimple": "Al-Hashr",
+      "nameArabic": "الحشر",
+      "revelationPlace": "madinah",
+      "versesCount": 24,
+      "bismillahPre": true,
+      "pages": [
+        545,
+        548
+      ]
+    },
+    {
+      "id": 60,
+      "nameSimple": "Al-Mumtahanah",
+      "nameArabic": "الممتحنة",
+      "revelationPlace": "madinah",
+      "versesCount": 13,
+      "bismillahPre": true,
+      "pages": [
+        549,
+        551
+      ]
+    },
+    {
+      "id": 61,
+      "nameSimple": "As-Saf",
+      "nameArabic": "الصف",
+      "revelationPlace": "madinah",
+      "versesCount": 14,
+      "bismillahPre": true,
+      "pages": [
+        551,
+        552
+      ]
+    },
+    {
+      "id": 62,
+      "nameSimple": "Al-Jumu'ah",
+      "nameArabic": "الجمعة",
+      "revelationPlace": "madinah",
+      "versesCount": 11,
+      "bismillahPre": true,
+      "pages": [
+        553,
+        554
+      ]
+    },
+    {
+      "id": 63,
+      "nameSimple": "Al-Munafiqun",
+      "nameArabic": "المنافقون",
+      "revelationPlace": "madinah",
+      "versesCount": 11,
+      "bismillahPre": true,
+      "pages": [
+        554,
+        555
+      ]
+    },
+    {
+      "id": 64,
+      "nameSimple": "At-Taghabun",
+      "nameArabic": "التغابن",
+      "revelationPlace": "madinah",
+      "versesCount": 18,
+      "bismillahPre": true,
+      "pages": [
+        556,
+        557
+      ]
+    },
+    {
+      "id": 65,
+      "nameSimple": "At-Talaq",
+      "nameArabic": "الطلاق",
+      "revelationPlace": "madinah",
+      "versesCount": 12,
+      "bismillahPre": true,
+      "pages": [
+        558,
+        559
+      ]
+    },
+    {
+      "id": 66,
+      "nameSimple": "At-Tahrim",
+      "nameArabic": "التحريم",
+      "revelationPlace": "madinah",
+      "versesCount": 12,
+      "bismillahPre": true,
+      "pages": [
+        560,
+        561
+      ]
+    },
+    {
+      "id": 67,
+      "nameSimple": "Al-Mulk",
+      "nameArabic": "الملك",
+      "revelationPlace": "makkah",
+      "versesCount": 30,
+      "bismillahPre": true,
+      "pages": [
+        562,
+        564
+      ]
+    },
+    {
+      "id": 68,
+      "nameSimple": "Al-Qalam",
+      "nameArabic": "القلم",
+      "revelationPlace": "makkah",
+      "versesCount": 52,
+      "bismillahPre": true,
+      "pages": [
+        564,
+        566
+      ]
+    },
+    {
+      "id": 69,
+      "nameSimple": "Al-Haqqah",
+      "nameArabic": "الحاقة",
+      "revelationPlace": "makkah",
+      "versesCount": 52,
+      "bismillahPre": true,
+      "pages": [
+        566,
+        568
+      ]
+    },
+    {
+      "id": 70,
+      "nameSimple": "Al-Ma'arij",
+      "nameArabic": "المعارج",
+      "revelationPlace": "makkah",
+      "versesCount": 44,
+      "bismillahPre": true,
+      "pages": [
+        568,
+        570
+      ]
+    },
+    {
+      "id": 71,
+      "nameSimple": "Nuh",
+      "nameArabic": "نوح",
+      "revelationPlace": "makkah",
+      "versesCount": 28,
+      "bismillahPre": true,
+      "pages": [
+        570,
+        571
+      ]
+    },
+    {
+      "id": 72,
+      "nameSimple": "Al-Jinn",
+      "nameArabic": "الجن",
+      "revelationPlace": "makkah",
+      "versesCount": 28,
+      "bismillahPre": true,
+      "pages": [
+        572,
+        573
+      ]
+    },
+    {
+      "id": 73,
+      "nameSimple": "Al-Muzzammil",
+      "nameArabic": "المزمل",
+      "revelationPlace": "makkah",
+      "versesCount": 20,
+      "bismillahPre": true,
+      "pages": [
+        574,
+        575
+      ]
+    },
+    {
+      "id": 74,
+      "nameSimple": "Al-Muddaththir",
+      "nameArabic": "المدثر",
+      "revelationPlace": "makkah",
+      "versesCount": 56,
+      "bismillahPre": true,
+      "pages": [
+        575,
+        577
+      ]
+    },
+    {
+      "id": 75,
+      "nameSimple": "Al-Qiyamah",
+      "nameArabic": "القيامة",
+      "revelationPlace": "makkah",
+      "versesCount": 40,
+      "bismillahPre": true,
+      "pages": [
+        577,
+        578
+      ]
+    },
+    {
+      "id": 76,
+      "nameSimple": "Al-Insan",
+      "nameArabic": "الانسان",
+      "revelationPlace": "madinah",
+      "versesCount": 31,
+      "bismillahPre": true,
+      "pages": [
+        578,
+        580
+      ]
+    },
+    {
+      "id": 77,
+      "nameSimple": "Al-Mursalat",
+      "nameArabic": "المرسلات",
+      "revelationPlace": "makkah",
+      "versesCount": 50,
+      "bismillahPre": true,
+      "pages": [
+        580,
+        581
+      ]
+    },
+    {
+      "id": 78,
+      "nameSimple": "An-Naba",
+      "nameArabic": "النبإ",
+      "revelationPlace": "makkah",
+      "versesCount": 40,
+      "bismillahPre": true,
+      "pages": [
+        582,
+        583
+      ]
+    },
+    {
+      "id": 79,
+      "nameSimple": "An-Nazi'at",
+      "nameArabic": "النازعات",
+      "revelationPlace": "makkah",
+      "versesCount": 46,
+      "bismillahPre": true,
+      "pages": [
+        583,
+        584
+      ]
+    },
+    {
+      "id": 80,
+      "nameSimple": "'Abasa",
+      "nameArabic": "عبس",
+      "revelationPlace": "makkah",
+      "versesCount": 42,
+      "bismillahPre": true,
+      "pages": [
+        585,
+        585
+      ]
+    },
+    {
+      "id": 81,
+      "nameSimple": "At-Takwir",
+      "nameArabic": "التكوير",
+      "revelationPlace": "makkah",
+      "versesCount": 29,
+      "bismillahPre": true,
+      "pages": [
+        586,
+        586
+      ]
+    },
+    {
+      "id": 82,
+      "nameSimple": "Al-Infitar",
+      "nameArabic": "الإنفطار",
+      "revelationPlace": "makkah",
+      "versesCount": 19,
+      "bismillahPre": true,
+      "pages": [
+        587,
+        587
+      ]
+    },
+    {
+      "id": 83,
+      "nameSimple": "Al-Mutaffifin",
+      "nameArabic": "المطففين",
+      "revelationPlace": "makkah",
+      "versesCount": 36,
+      "bismillahPre": true,
+      "pages": [
+        587,
+        589
+      ]
+    },
+    {
+      "id": 84,
+      "nameSimple": "Al-Inshiqaq",
+      "nameArabic": "الإنشقاق",
+      "revelationPlace": "makkah",
+      "versesCount": 25,
+      "bismillahPre": true,
+      "pages": [
+        589,
+        589
+      ]
+    },
+    {
+      "id": 85,
+      "nameSimple": "Al-Buruj",
+      "nameArabic": "البروج",
+      "revelationPlace": "makkah",
+      "versesCount": 22,
+      "bismillahPre": true,
+      "pages": [
+        590,
+        590
+      ]
+    },
+    {
+      "id": 86,
+      "nameSimple": "At-Tariq",
+      "nameArabic": "الطارق",
+      "revelationPlace": "makkah",
+      "versesCount": 17,
+      "bismillahPre": true,
+      "pages": [
+        591,
+        591
+      ]
+    },
+    {
+      "id": 87,
+      "nameSimple": "Al-A'la",
+      "nameArabic": "الأعلى",
+      "revelationPlace": "makkah",
+      "versesCount": 19,
+      "bismillahPre": true,
+      "pages": [
+        591,
+        592
+      ]
+    },
+    {
+      "id": 88,
+      "nameSimple": "Al-Ghashiyah",
+      "nameArabic": "الغاشية",
+      "revelationPlace": "makkah",
+      "versesCount": 26,
+      "bismillahPre": true,
+      "pages": [
+        592,
+        592
+      ]
+    },
+    {
+      "id": 89,
+      "nameSimple": "Al-Fajr",
+      "nameArabic": "الفجر",
+      "revelationPlace": "makkah",
+      "versesCount": 30,
+      "bismillahPre": true,
+      "pages": [
+        593,
+        594
+      ]
+    },
+    {
+      "id": 90,
+      "nameSimple": "Al-Balad",
+      "nameArabic": "البلد",
+      "revelationPlace": "makkah",
+      "versesCount": 20,
+      "bismillahPre": true,
+      "pages": [
+        594,
+        594
+      ]
+    },
+    {
+      "id": 91,
+      "nameSimple": "Ash-Shams",
+      "nameArabic": "الشمس",
+      "revelationPlace": "makkah",
+      "versesCount": 15,
+      "bismillahPre": true,
+      "pages": [
+        595,
+        595
+      ]
+    },
+    {
+      "id": 92,
+      "nameSimple": "Al-Layl",
+      "nameArabic": "الليل",
+      "revelationPlace": "makkah",
+      "versesCount": 21,
+      "bismillahPre": true,
+      "pages": [
+        595,
+        596
+      ]
+    },
+    {
+      "id": 93,
+      "nameSimple": "Ad-Duhaa",
+      "nameArabic": "الضحى",
+      "revelationPlace": "makkah",
+      "versesCount": 11,
+      "bismillahPre": true,
+      "pages": [
+        596,
+        596
+      ]
+    },
+    {
+      "id": 94,
+      "nameSimple": "Ash-Sharh",
+      "nameArabic": "الشرح",
+      "revelationPlace": "makkah",
+      "versesCount": 8,
+      "bismillahPre": true,
+      "pages": [
+        596,
+        596
+      ]
+    },
+    {
+      "id": 95,
+      "nameSimple": "At-Tin",
+      "nameArabic": "التين",
+      "revelationPlace": "makkah",
+      "versesCount": 8,
+      "bismillahPre": true,
+      "pages": [
+        597,
+        597
+      ]
+    },
+    {
+      "id": 96,
+      "nameSimple": "Al-'Alaq",
+      "nameArabic": "العلق",
+      "revelationPlace": "makkah",
+      "versesCount": 19,
+      "bismillahPre": true,
+      "pages": [
+        597,
+        597
+      ]
+    },
+    {
+      "id": 97,
+      "nameSimple": "Al-Qadr",
+      "nameArabic": "القدر",
+      "revelationPlace": "makkah",
+      "versesCount": 5,
+      "bismillahPre": true,
+      "pages": [
+        598,
+        598
+      ]
+    },
+    {
+      "id": 98,
+      "nameSimple": "Al-Bayyinah",
+      "nameArabic": "البينة",
+      "revelationPlace": "madinah",
+      "versesCount": 8,
+      "bismillahPre": true,
+      "pages": [
+        598,
+        599
+      ]
+    },
+    {
+      "id": 99,
+      "nameSimple": "Az-Zalzalah",
+      "nameArabic": "الزلزلة",
+      "revelationPlace": "madinah",
+      "versesCount": 8,
+      "bismillahPre": true,
+      "pages": [
+        599,
+        599
+      ]
+    },
+    {
+      "id": 100,
+      "nameSimple": "Al-'Adiyat",
+      "nameArabic": "العاديات",
+      "revelationPlace": "makkah",
+      "versesCount": 11,
+      "bismillahPre": true,
+      "pages": [
+        599,
+        600
+      ]
+    },
+    {
+      "id": 101,
+      "nameSimple": "Al-Qari'ah",
+      "nameArabic": "القارعة",
+      "revelationPlace": "makkah",
+      "versesCount": 11,
+      "bismillahPre": true,
+      "pages": [
+        600,
+        600
+      ]
+    },
+    {
+      "id": 102,
+      "nameSimple": "At-Takathur",
+      "nameArabic": "التكاثر",
+      "revelationPlace": "makkah",
+      "versesCount": 8,
+      "bismillahPre": true,
+      "pages": [
+        600,
+        600
+      ]
+    },
+    {
+      "id": 103,
+      "nameSimple": "Al-'Asr",
+      "nameArabic": "العصر",
+      "revelationPlace": "makkah",
+      "versesCount": 3,
+      "bismillahPre": true,
+      "pages": [
+        601,
+        601
+      ]
+    },
+    {
+      "id": 104,
+      "nameSimple": "Al-Humazah",
+      "nameArabic": "الهمزة",
+      "revelationPlace": "makkah",
+      "versesCount": 9,
+      "bismillahPre": true,
+      "pages": [
+        601,
+        601
+      ]
+    },
+    {
+      "id": 105,
+      "nameSimple": "Al-Fil",
+      "nameArabic": "الفيل",
+      "revelationPlace": "makkah",
+      "versesCount": 5,
+      "bismillahPre": true,
+      "pages": [
+        601,
+        601
+      ]
+    },
+    {
+      "id": 106,
+      "nameSimple": "Quraysh",
+      "nameArabic": "قريش",
+      "revelationPlace": "makkah",
+      "versesCount": 4,
+      "bismillahPre": true,
+      "pages": [
+        602,
+        602
+      ]
+    },
+    {
+      "id": 107,
+      "nameSimple": "Al-Ma'un",
+      "nameArabic": "الماعون",
+      "revelationPlace": "makkah",
+      "versesCount": 7,
+      "bismillahPre": true,
+      "pages": [
+        602,
+        602
+      ]
+    },
+    {
+      "id": 108,
+      "nameSimple": "Al-Kawthar",
+      "nameArabic": "الكوثر",
+      "revelationPlace": "makkah",
+      "versesCount": 3,
+      "bismillahPre": true,
+      "pages": [
+        602,
+        602
+      ]
+    },
+    {
+      "id": 109,
+      "nameSimple": "Al-Kafirun",
+      "nameArabic": "الكافرون",
+      "revelationPlace": "makkah",
+      "versesCount": 6,
+      "bismillahPre": true,
+      "pages": [
+        603,
+        603
+      ]
+    },
+    {
+      "id": 110,
+      "nameSimple": "An-Nasr",
+      "nameArabic": "النصر",
+      "revelationPlace": "madinah",
+      "versesCount": 3,
+      "bismillahPre": true,
+      "pages": [
+        603,
+        603
+      ]
+    },
+    {
+      "id": 111,
+      "nameSimple": "Al-Masad",
+      "nameArabic": "المسد",
+      "revelationPlace": "makkah",
+      "versesCount": 5,
+      "bismillahPre": true,
+      "pages": [
+        603,
+        603
+      ]
+    },
+    {
+      "id": 112,
+      "nameSimple": "Al-Ikhlas",
+      "nameArabic": "الإخلاص",
+      "revelationPlace": "makkah",
+      "versesCount": 4,
+      "bismillahPre": true,
+      "pages": [
+        604,
+        604
+      ]
+    },
+    {
+      "id": 113,
+      "nameSimple": "Al-Falaq",
+      "nameArabic": "الفلق",
+      "revelationPlace": "makkah",
+      "versesCount": 5,
+      "bismillahPre": true,
+      "pages": [
+        604,
+        604
+      ]
+    },
+    {
+      "id": 114,
+      "nameSimple": "An-Nas",
+      "nameArabic": "الناس",
+      "revelationPlace": "makkah",
+      "versesCount": 6,
+      "bismillahPre": true,
+      "pages": [
+        604,
+        604
+      ]
+    }
+  ],
+  "juzs": [
+    {
+      "juzNumber": 1,
+      "versesCount": 148,
+      "verseMapping": {
+        "1": "1-7",
+        "2": "1-141"
+      },
+      "startPage": 1,
+      "endPage": 21,
+      "startLoc": {
+        "page": 1,
+        "line": 2,
+        "wordIndex": 1,
+        "wordId": "p1_l2_w1"
+      },
+      "endLoc": {
+        "page": 21,
+        "line": 15,
+        "wordIndex": 8,
+        "wordId": "p21_l15_w8"
+      },
+      "lastSurahNumber": 2,
+      "lastAyahNumber": 141
+    },
+    {
+      "juzNumber": 2,
+      "versesCount": 111,
+      "verseMapping": {
+        "2": "142-252"
+      },
+      "startPage": 22,
+      "endPage": 41,
+      "startLoc": {
+        "page": 22,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p22_l1_w1"
+      },
+      "endLoc": {
+        "page": 41,
+        "line": 15,
+        "wordIndex": 6,
+        "wordId": "p41_l15_w6"
+      },
+      "lastSurahNumber": 2,
+      "lastAyahNumber": 252
+    },
+    {
+      "juzNumber": 3,
+      "versesCount": 126,
+      "verseMapping": {
+        "2": "253-286",
+        "3": "1-92"
+      },
+      "startPage": 42,
+      "endPage": 62,
+      "startLoc": {
+        "page": 42,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p42_l1_w1"
+      },
+      "endLoc": {
+        "page": 62,
+        "line": 2,
+        "wordIndex": 4,
+        "wordId": "p62_l2_w4"
+      },
+      "lastSurahNumber": 3,
+      "lastAyahNumber": 92
+    },
+    {
+      "juzNumber": 4,
+      "versesCount": 131,
+      "verseMapping": {
+        "3": "93-200",
+        "4": "1-23"
+      },
+      "startPage": 62,
+      "endPage": 81,
+      "startLoc": {
+        "page": 62,
+        "line": 2,
+        "wordIndex": 5,
+        "wordId": "p62_l2_w5"
+      },
+      "endLoc": {
+        "page": 81,
+        "line": 15,
+        "wordIndex": 9,
+        "wordId": "p81_l15_w9"
+      },
+      "lastSurahNumber": 4,
+      "lastAyahNumber": 23
+    },
+    {
+      "juzNumber": 5,
+      "versesCount": 124,
+      "verseMapping": {
+        "4": "24-147"
+      },
+      "startPage": 82,
+      "endPage": 101,
+      "startLoc": {
+        "page": 82,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p82_l1_w1"
+      },
+      "endLoc": {
+        "page": 101,
+        "line": 15,
+        "wordIndex": 7,
+        "wordId": "p101_l15_w7"
+      },
+      "lastSurahNumber": 4,
+      "lastAyahNumber": 147
+    },
+    {
+      "juzNumber": 6,
+      "versesCount": 110,
+      "verseMapping": {
+        "4": "148-176",
+        "5": "1-81"
+      },
+      "startPage": 102,
+      "endPage": 121,
+      "startLoc": {
+        "page": 102,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p102_l1_w1"
+      },
+      "endLoc": {
+        "page": 121,
+        "line": 11,
+        "wordIndex": 7,
+        "wordId": "p121_l11_w7"
+      },
+      "lastSurahNumber": 5,
+      "lastAyahNumber": 81
+    },
+    {
+      "juzNumber": 7,
+      "versesCount": 149,
+      "verseMapping": {
+        "5": "82-120",
+        "6": "1-110"
+      },
+      "startPage": 121,
+      "endPage": 141,
+      "startLoc": {
+        "page": 121,
+        "line": 12,
+        "wordIndex": 1,
+        "wordId": "p121_l12_w1"
+      },
+      "endLoc": {
+        "page": 141,
+        "line": 15,
+        "wordIndex": 8,
+        "wordId": "p141_l15_w8"
+      },
+      "lastSurahNumber": 6,
+      "lastAyahNumber": 110
+    },
+    {
+      "juzNumber": 8,
+      "versesCount": 142,
+      "verseMapping": {
+        "6": "111-165",
+        "7": "1-87"
+      },
+      "startPage": 142,
+      "endPage": 161,
+      "startLoc": {
+        "page": 142,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p142_l1_w1"
+      },
+      "endLoc": {
+        "page": 161,
+        "line": 15,
+        "wordIndex": 8,
+        "wordId": "p161_l15_w8"
+      },
+      "lastSurahNumber": 7,
+      "lastAyahNumber": 87
+    },
+    {
+      "juzNumber": 9,
+      "versesCount": 159,
+      "verseMapping": {
+        "7": "88-206",
+        "8": "1-40"
+      },
+      "startPage": 162,
+      "endPage": 181,
+      "startLoc": {
+        "page": 162,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p162_l1_w1"
+      },
+      "endLoc": {
+        "page": 181,
+        "line": 15,
+        "wordIndex": 8,
+        "wordId": "p181_l15_w8"
+      },
+      "lastSurahNumber": 8,
+      "lastAyahNumber": 40
+    },
+    {
+      "juzNumber": 10,
+      "versesCount": 127,
+      "verseMapping": {
+        "8": "41-75",
+        "9": "1-92"
+      },
+      "startPage": 182,
+      "endPage": 201,
+      "startLoc": {
+        "page": 182,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p182_l1_w1"
+      },
+      "endLoc": {
+        "page": 201,
+        "line": 13,
+        "wordIndex": 5,
+        "wordId": "p201_l13_w5"
+      },
+      "lastSurahNumber": 9,
+      "lastAyahNumber": 92
+    },
+    {
+      "juzNumber": 11,
+      "versesCount": 151,
+      "verseMapping": {
+        "9": "93-129",
+        "10": "1-109",
+        "11": "1-5"
+      },
+      "startPage": 201,
+      "endPage": 221,
+      "startLoc": {
+        "page": 201,
+        "line": 13,
+        "wordIndex": 6,
+        "wordId": "p201_l13_w6"
+      },
+      "endLoc": {
+        "page": 221,
+        "line": 15,
+        "wordIndex": 9,
+        "wordId": "p221_l15_w9"
+      },
+      "lastSurahNumber": 11,
+      "lastAyahNumber": 5
+    },
+    {
+      "juzNumber": 12,
+      "versesCount": 170,
+      "verseMapping": {
+        "11": "6-123",
+        "12": "1-52"
+      },
+      "startPage": 222,
+      "endPage": 241,
+      "startLoc": {
+        "page": 222,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p222_l1_w1"
+      },
+      "endLoc": {
+        "page": 241,
+        "line": 15,
+        "wordIndex": 11,
+        "wordId": "p241_l15_w11"
+      },
+      "lastSurahNumber": 12,
+      "lastAyahNumber": 52
+    },
+    {
+      "juzNumber": 13,
+      "versesCount": 154,
+      "verseMapping": {
+        "12": "53-111",
+        "13": "1-43",
+        "14": "1-52"
+      },
+      "startPage": 242,
+      "endPage": 261,
+      "startLoc": {
+        "page": 242,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p242_l1_w1"
+      },
+      "endLoc": {
+        "page": 261,
+        "line": 15,
+        "wordIndex": 9,
+        "wordId": "p261_l15_w9"
+      },
+      "lastSurahNumber": 14,
+      "lastAyahNumber": 52
+    },
+    {
+      "juzNumber": 14,
+      "versesCount": 227,
+      "verseMapping": {
+        "15": "1-99",
+        "16": "1-128"
+      },
+      "startPage": 262,
+      "endPage": 281,
+      "startLoc": {
+        "page": 262,
+        "line": 3,
+        "wordIndex": 1,
+        "wordId": "p262_l3_w1"
+      },
+      "endLoc": {
+        "page": 281,
+        "line": 15,
+        "wordIndex": 8,
+        "wordId": "p281_l15_w8"
+      },
+      "lastSurahNumber": 16,
+      "lastAyahNumber": 128
+    },
+    {
+      "juzNumber": 15,
+      "versesCount": 185,
+      "verseMapping": {
+        "17": "1-111",
+        "18": "1-74"
+      },
+      "startPage": 282,
+      "endPage": 301,
+      "startLoc": {
+        "page": 282,
+        "line": 3,
+        "wordIndex": 1,
+        "wordId": "p282_l3_w1"
+      },
+      "endLoc": {
+        "page": 301,
+        "line": 15,
+        "wordIndex": 10,
+        "wordId": "p301_l15_w10"
+      },
+      "lastSurahNumber": 18,
+      "lastAyahNumber": 74
+    },
+    {
+      "juzNumber": 16,
+      "versesCount": 269,
+      "verseMapping": {
+        "18": "75-110",
+        "19": "1-98",
+        "20": "1-135"
+      },
+      "startPage": 302,
+      "endPage": 321,
+      "startLoc": {
+        "page": 302,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p302_l1_w1"
+      },
+      "endLoc": {
+        "page": 321,
+        "line": 15,
+        "wordIndex": 7,
+        "wordId": "p321_l15_w7"
+      },
+      "lastSurahNumber": 20,
+      "lastAyahNumber": 135
+    },
+    {
+      "juzNumber": 17,
+      "versesCount": 190,
+      "verseMapping": {
+        "21": "1-112",
+        "22": "1-78"
+      },
+      "startPage": 322,
+      "endPage": 341,
+      "startLoc": {
+        "page": 322,
+        "line": 3,
+        "wordIndex": 1,
+        "wordId": "p322_l3_w1"
+      },
+      "endLoc": {
+        "page": 341,
+        "line": 14,
+        "wordIndex": 8,
+        "wordId": "p341_l14_w8"
+      },
+      "lastSurahNumber": 22,
+      "lastAyahNumber": 78
+    },
+    {
+      "juzNumber": 18,
+      "versesCount": 202,
+      "verseMapping": {
+        "23": "1-118",
+        "24": "1-64",
+        "25": "1-20"
+      },
+      "startPage": 342,
+      "endPage": 361,
+      "startLoc": {
+        "page": 342,
+        "line": 2,
+        "wordIndex": 1,
+        "wordId": "p342_l2_w1"
+      },
+      "endLoc": {
+        "page": 361,
+        "line": 15,
+        "wordIndex": 6,
+        "wordId": "p361_l15_w6"
+      },
+      "lastSurahNumber": 25,
+      "lastAyahNumber": 20
+    },
+    {
+      "juzNumber": 19,
+      "versesCount": 339,
+      "verseMapping": {
+        "25": "21-77",
+        "26": "1-227",
+        "27": "1-55"
+      },
+      "startPage": 362,
+      "endPage": 381,
+      "startLoc": {
+        "page": 362,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p362_l1_w1"
+      },
+      "endLoc": {
+        "page": 381,
+        "line": 15,
+        "wordIndex": 9,
+        "wordId": "p381_l15_w9"
+      },
+      "lastSurahNumber": 27,
+      "lastAyahNumber": 55
+    },
+    {
+      "juzNumber": 20,
+      "versesCount": 171,
+      "verseMapping": {
+        "27": "56-93",
+        "28": "1-88",
+        "29": "1-45"
+      },
+      "startPage": 382,
+      "endPage": 401,
+      "startLoc": {
+        "page": 382,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p382_l1_w1"
+      },
+      "endLoc": {
+        "page": 401,
+        "line": 15,
+        "wordIndex": 8,
+        "wordId": "p401_l15_w8"
+      },
+      "lastSurahNumber": 29,
+      "lastAyahNumber": 45
+    },
+    {
+      "juzNumber": 21,
+      "versesCount": 178,
+      "verseMapping": {
+        "29": "46-69",
+        "30": "1-60",
+        "31": "1-34",
+        "32": "1-30",
+        "33": "1-30"
+      },
+      "startPage": 402,
+      "endPage": 421,
+      "startLoc": {
+        "page": 402,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p402_l1_w1"
+      },
+      "endLoc": {
+        "page": 421,
+        "line": 15,
+        "wordIndex": 8,
+        "wordId": "p421_l15_w8"
+      },
+      "lastSurahNumber": 33,
+      "lastAyahNumber": 30
+    },
+    {
+      "juzNumber": 22,
+      "versesCount": 169,
+      "verseMapping": {
+        "33": "31-73",
+        "34": "1-54",
+        "35": "1-45",
+        "36": "1-27"
+      },
+      "startPage": 422,
+      "endPage": 441,
+      "startLoc": {
+        "page": 422,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p422_l1_w1"
+      },
+      "endLoc": {
+        "page": 441,
+        "line": 15,
+        "wordIndex": 8,
+        "wordId": "p441_l15_w8"
+      },
+      "lastSurahNumber": 36,
+      "lastAyahNumber": 27
+    },
+    {
+      "juzNumber": 23,
+      "versesCount": 357,
+      "verseMapping": {
+        "36": "28-83",
+        "37": "1-182",
+        "38": "1-88",
+        "39": "1-31"
+      },
+      "startPage": 442,
+      "endPage": 461,
+      "startLoc": {
+        "page": 442,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p442_l1_w1"
+      },
+      "endLoc": {
+        "page": 461,
+        "line": 15,
+        "wordIndex": 7,
+        "wordId": "p461_l15_w7"
+      },
+      "lastSurahNumber": 39,
+      "lastAyahNumber": 31
+    },
+    {
+      "juzNumber": 24,
+      "versesCount": 175,
+      "verseMapping": {
+        "39": "32-75",
+        "40": "1-85",
+        "41": "1-46"
+      },
+      "startPage": 462,
+      "endPage": 481,
+      "startLoc": {
+        "page": 462,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p462_l1_w1"
+      },
+      "endLoc": {
+        "page": 481,
+        "line": 15,
+        "wordIndex": 8,
+        "wordId": "p481_l15_w8"
+      },
+      "lastSurahNumber": 41,
+      "lastAyahNumber": 46
+    },
+    {
+      "juzNumber": 25,
+      "versesCount": 246,
+      "verseMapping": {
+        "41": "47-54",
+        "42": "1-53",
+        "43": "1-89",
+        "44": "1-59",
+        "45": "1-37"
+      },
+      "startPage": 482,
+      "endPage": 502,
+      "startLoc": {
+        "page": 482,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p482_l1_w1"
+      },
+      "endLoc": {
+        "page": 502,
+        "line": 6,
+        "wordIndex": 7,
+        "wordId": "p502_l6_w7"
+      },
+      "lastSurahNumber": 45,
+      "lastAyahNumber": 37
+    },
+    {
+      "juzNumber": 26,
+      "versesCount": 195,
+      "verseMapping": {
+        "46": "1-35",
+        "47": "1-38",
+        "48": "1-29",
+        "49": "1-18",
+        "50": "1-45",
+        "51": "1-30"
+      },
+      "startPage": 502,
+      "endPage": 521,
+      "startLoc": {
+        "page": 502,
+        "line": 9,
+        "wordIndex": 1,
+        "wordId": "p502_l9_w1"
+      },
+      "endLoc": {
+        "page": 521,
+        "line": 15,
+        "wordIndex": 8,
+        "wordId": "p521_l15_w8"
+      },
+      "lastSurahNumber": 51,
+      "lastAyahNumber": 30
+    },
+    {
+      "juzNumber": 27,
+      "versesCount": 399,
+      "verseMapping": {
+        "51": "31-60",
+        "52": "1-49",
+        "53": "1-62",
+        "54": "1-55",
+        "55": "1-78",
+        "56": "1-96",
+        "57": "1-29"
+      },
+      "startPage": 522,
+      "endPage": 541,
+      "startLoc": {
+        "page": 522,
+        "line": 1,
+        "wordIndex": 1,
+        "wordId": "p522_l1_w1"
+      },
+      "endLoc": {
+        "page": 541,
+        "line": 15,
+        "wordIndex": 10,
+        "wordId": "p541_l15_w10"
+      },
+      "lastSurahNumber": 57,
+      "lastAyahNumber": 29
+    },
+    {
+      "juzNumber": 28,
+      "versesCount": 137,
+      "verseMapping": {
+        "58": "1-22",
+        "59": "1-24",
+        "60": "1-13",
+        "61": "1-14",
+        "62": "1-11",
+        "63": "1-11",
+        "64": "1-18",
+        "65": "1-12",
+        "66": "1-12"
+      },
+      "startPage": 542,
+      "endPage": 561,
+      "startLoc": {
+        "page": 542,
+        "line": 3,
+        "wordIndex": 1,
+        "wordId": "p542_l3_w1"
+      },
+      "endLoc": {
+        "page": 561,
+        "line": 15,
+        "wordIndex": 7,
+        "wordId": "p561_l15_w7"
+      },
+      "lastSurahNumber": 66,
+      "lastAyahNumber": 12
+    },
+    {
+      "juzNumber": 29,
+      "versesCount": 431,
+      "verseMapping": {
+        "67": "1-30",
+        "68": "1-52",
+        "69": "1-52",
+        "70": "1-44",
+        "71": "1-28",
+        "72": "1-28",
+        "73": "1-20",
+        "74": "1-56",
+        "75": "1-40",
+        "76": "1-31",
+        "77": "1-50"
+      },
+      "startPage": 562,
+      "endPage": 581,
+      "startLoc": {
+        "page": 562,
+        "line": 3,
+        "wordIndex": 1,
+        "wordId": "p562_l3_w1"
+      },
+      "endLoc": {
+        "page": 581,
+        "line": 15,
+        "wordIndex": 6,
+        "wordId": "p581_l15_w6"
+      },
+      "lastSurahNumber": 77,
+      "lastAyahNumber": 50
+    },
+    {
+      "juzNumber": 30,
+      "versesCount": 564,
+      "verseMapping": {
+        "78": "1-40",
+        "79": "1-46",
+        "80": "1-42",
+        "81": "1-29",
+        "82": "1-19",
+        "83": "1-36",
+        "84": "1-25",
+        "85": "1-22",
+        "86": "1-17",
+        "87": "1-19",
+        "88": "1-26",
+        "89": "1-30",
+        "90": "1-20",
+        "91": "1-15",
+        "92": "1-21",
+        "93": "1-11",
+        "94": "1-8",
+        "95": "1-8",
+        "96": "1-19",
+        "97": "1-5",
+        "98": "1-8",
+        "99": "1-8",
+        "100": "1-11",
+        "101": "1-11",
+        "102": "1-8",
+        "103": "1-3",
+        "104": "1-9",
+        "105": "1-5",
+        "106": "1-4",
+        "107": "1-7",
+        "108": "1-3",
+        "109": "1-6",
+        "110": "1-3",
+        "111": "1-5",
+        "112": "1-4",
+        "113": "1-5",
+        "114": "1-6"
+      },
+      "startPage": 582,
+      "endPage": 604,
+      "startLoc": {
+        "page": 582,
+        "line": 3,
+        "wordIndex": 1,
+        "wordId": "p582_l3_w1"
+      },
+      "endLoc": {
+        "page": 604,
+        "line": 15,
+        "wordIndex": 3,
+        "wordId": "p604_l15_w3"
+      },
+      "lastSurahNumber": 114,
+      "lastAyahNumber": 6
+    }
+  ]
+}

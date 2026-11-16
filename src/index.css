@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'IndoPakNastaleeq';
+  src: url('/fonts/indopak-nastaleeq-waqf-lazim-v4.2.1.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
   :root {
     --color-coffee-dark: #241811;
@@ -35,7 +43,16 @@
 }
 
 .font-quran {
+  font-family: 'IndoPakNastaleeq', 'Amiri', 'Traditional Arabic', serif;
+  font-weight: 400 !important;
+  font-synthesis: none;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+}
+
+.font-quran-uthmani {
   font-family: 'Amiri', 'Traditional Arabic', serif;
+  font-weight: 400 !important;
+  font-synthesis: none;
 }
 
 /* Subtle, sophisticated Islamic geometric pattern background */

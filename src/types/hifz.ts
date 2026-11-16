@@ -30,6 +30,7 @@ export interface StudentProfile {
   halqaName: string;
   enrollmentDate: string;
   currentJuz: number;
+  currentParaStartDate?: string; // Date when currentJuz was started (used to scope Sabqi to current para)
   completedParas: number[]; // Array of Para numbers student has completed, e.g. [1, 2, 3, 4, 5]
   memorizedPortionDesc?: string; // e.g. "Completed 5 Paras" or "Memorized up to Para 1 Page 10"
 }
@@ -63,7 +64,7 @@ export type PartStatus = 'pending' | 'in_progress' | 'passed' | 'repeat';
 
 export interface DailyPartPlan {
   part: PartType;
-  range: AssignmentRange;
+  range: AssignmentRange | null;
   status: PartStatus;
   repeatPracticeCount: number; // Student practice counter
   targetRepeats: number;
@@ -80,13 +81,14 @@ export interface DailyPartPlan {
   startAyah?: number;
   endAyah?: number;
   assignedParas?: number[]; // For Manzil: only the Paras specifically selected by teacher
-  portionType?: 'custom' | 'quarter_para' | 'half_para' | 'full_para'; // For Sabqi
+  portionType?: 'custom' | 'quarter_para' | 'half_para' | 'full_para' | 'current_para_passed'; // For Sabqi
   portionLabel?: string; // e.g. "Half Para (Pages 2-11)"
+  sabqiCustomOverride?: boolean; // True if Ustaad manually narrowed Sabqi for this day
 }
 
 export interface DayPlan {
   date: string; // ISO date "YYYY-MM-DD"
-  dayNumber: number; // e.g. Day 1, Day 2
+  dayNumber?: number; // Legacy optional metadata
   sabaq: DailyPartPlan;
   sabqi: DailyPartPlan;
   manzil: DailyPartPlan;
@@ -126,13 +128,17 @@ export interface SessionResult {
 }
 
 export interface AppSettings {
+  timeZone?: string; // School time zone (IANA, e.g. 'Asia/Karachi')
   freezeSabaqOnSabqiOrManzilFail: boolean;
   halqaDefaultLimits: StudentLimits;
+  mushafLayout?: 'hafizi' | 'madinah';
+  mushafScript?: 'indopak' | 'uthmani';
+  highContrastMushaf?: boolean;
 }
 
 export interface MadrasaState {
   currentDate: string;
-  dayCount: number;
+  dayCount?: number;
   currentRole: RoleId;
   language: 'en' | 'ur';
   settings: AppSettings;

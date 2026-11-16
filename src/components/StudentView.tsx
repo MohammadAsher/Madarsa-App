@@ -3,16 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { 
-  BookOpen, 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
-  Eye, 
-  EyeOff, 
-  RotateCcw, 
-  Plus, 
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  BookOpen,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Eye,
+  EyeOff,
+  RotateCcw,
+  Plus,
   AlertTriangle,
   Award,
   ArrowRight,
@@ -20,18 +20,26 @@ import {
   Info,
   Layers,
   BookmarkCheck,
-  History
+  History,
+  Grid,
 } from 'lucide-react';
-import { 
-  MadrasaState, 
-  StudentProfile, 
-  PartType, 
-  SessionResult, 
-  MistakeMark 
+import {
+  MadrasaState,
+  StudentProfile,
+  PartType,
+  AssignmentRange,
 } from '../types/hifz';
 import { MushafViewer } from './MushafViewer';
 import { StudentHistoryModal } from './StudentHistoryModal';
+import { ParaProgressGrid } from './ParaProgressGrid';
+import { DateNavigator } from './DateNavigator';
 import { translations } from '../i18n/translations';
+import {
+  computeCurrentParaSabqiRange,
+  getFullParaRange,
+  getManzilParaRanges,
+} from '../services/hifzService';
+import { getParaPageRange, getParaSurahName } from '../data/quranData';
 
 interface StudentViewProps {
   state: MadrasaState;
@@ -50,31 +58,71 @@ export const StudentView: React.FC<StudentViewProps> = ({
 }) => {
   const t = translations[state.language];
 
-  // Retrieve today's plan
-  const todayPlan = state.dailyPlans[student.id]?.[state.currentDate];
-  
-  // Selected part for viewing on the Mushaf
-  const [activePart, setActivePart] = useState<PartType>('sabaq');
+  const [selectedDate, setSelectedDate] = useState<string>(state.currentDate);
+  const prevCurrentDateRef = useRef<string>(state.currentDate);
 
-  // Mushaf page navigation
-  const currentPartPlan = todayPlan ? todayPlan[activePart] : null;
+  useEffect(() => {
+    if (prevCurrentDateRef.current !== state.currentDate) {
+      if (selectedDate >= prevCurrentDateRef.current) {
+        setSelectedDate(state.currentDate);
+      }
+      prevCurrentDateRef.current = state.currentDate;
+    }
+  }, [state.currentDate, selectedDate]);
+
+  useEffect(() => {
+    setSelectedDate(state.currentDate);
+  }, [student.id]);
+
+  const activeDate = selectedDate <= state.currentDate ? selectedDate : state.currentDate;
+  const isPastDate = activeDate < state.currentDate;
+  const todayPlan = state.dailyPlans[student.id]?.[activeDate];
+
+  const [activePart, setActivePart] = useState<PartType>('sabaq');
+  // Optional Para tile preview when student taps a tile in "My Completed Paras"
+  const [previewParaNum, setPreviewParaNum] = useState<number | null>(null);
+
+  const currentParaSabqi = computeCurrentParaSabqiRange(student, state, activeDate);
+
+  // Effective Sabqi range respects Ustaad manual narrowing override if present; otherwise all passed Sabaqs in current Para
+  const effectiveSabqiRange: AssignmentRange | null =
+    todayPlan?.sabqi?.sabqiCustomOverride && todayPlan.sabqi.range
+      ? todayPlan.sabqi.range
+      : currentParaSabqi?.range || null;
+
+  const activeRange: AssignmentRange | null =
+    previewParaNum !== null
+      ? getFullParaRange(previewParaNum)
+      : activePart === 'sabqi'
+      ? effectiveSabqiRange
+      : todayPlan?.[activePart]?.range || null;
+
   const [currentPage, setCurrentPage] = useState<number>(
-    targetJumpWord?.page || currentPartPlan?.range.start.page || 1
+    targetJumpWord?.page || activeRange?.start.page || 1
   );
 
-  // Hide & reveal practice mode state
-  const [hideAndRevealActive, setHideAndRevealActive] = useState<boolean>(false);
+  // Keep page synced when switching student roles or dates
+  useEffect(() => {
+    if (targetJumpWord) {
+      setCurrentPage(targetJumpWord.page);
+      return;
+    }
+    setPreviewParaNum(null);
+    const defaultPlan = state.dailyPlans[student.id]?.[activeDate];
+    const startPage = defaultPlan?.[activePart]?.range?.start.page;
+    if (startPage) {
+      setCurrentPage(startPage);
+    }
+  }, [student.id, activeDate]);
 
-  // Pulsing target word if jumped from results
+  const [hideAndRevealActive, setHideAndRevealActive] = useState<boolean>(false);
   const [pulsingWordId, setPulsingWordId] = useState<string | null>(
     targetJumpWord?.wordId || null
   );
-
-  // Lesson history modal state
   const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
 
-  // Jump to word helper
   const handleJumpToMistake = (page: number, wordId: string) => {
+    setPreviewParaNum(null);
     setCurrentPage(page);
     setPulsingWordId(wordId);
     setTimeout(() => {
@@ -83,12 +131,37 @@ export const StudentView: React.FC<StudentViewProps> = ({
     }, 5000);
   };
 
-  // Student practice counter increment handler
+  const handleOpenMySabqi = () => {
+    setPreviewParaNum(null);
+    setActivePart('sabqi');
+    if (effectiveSabqiRange) {
+      setCurrentPage(effectiveSabqiRange.start.page);
+    }
+  };
+
+  const handleTapParaTile = (paraNum: number) => {
+    const manzilParas = todayPlan?.manzil?.assignedParas || [];
+    if (manzilParas.includes(paraNum) && todayPlan?.manzil?.range) {
+      setPreviewParaNum(null);
+      setActivePart('manzil');
+      const { startPage } = getParaPageRange(paraNum);
+      setCurrentPage(startPage);
+    } else {
+      setPreviewParaNum(paraNum);
+      const { startPage } = getParaPageRange(paraNum);
+      setCurrentPage(startPage);
+    }
+  };
+
+  const currentPartPlan = todayPlan ? todayPlan[activePart] : null;
+
   const handleIncrementRepeat = () => {
-    if (!currentPartPlan) return;
+    if (isPastDate || !currentPartPlan || !activeRange) return;
     onUpdateState(prev => {
       const studentHistory = { ...(prev.dailyPlans[student.id] || {}) };
-      const dayPlan = studentHistory[prev.currentDate] ? { ...studentHistory[prev.currentDate] } : null;
+      const dayPlan = studentHistory[activeDate]
+        ? { ...studentHistory[activeDate] }
+        : null;
 
       if (dayPlan) {
         const currentCount = dayPlan[activePart].repeatPracticeCount || 0;
@@ -97,7 +170,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
           repeatPracticeCount: currentCount + 1,
           lastPracticedAt: new Date().toISOString(),
         };
-        studentHistory[prev.currentDate] = dayPlan;
+        studentHistory[activeDate] = dayPlan;
       }
 
       return {
@@ -110,19 +183,20 @@ export const StudentView: React.FC<StudentViewProps> = ({
     });
   };
 
-  // Reset practice counter
   const handleResetRepeat = () => {
-    if (!currentPartPlan) return;
+    if (isPastDate || !currentPartPlan || !activeRange) return;
     onUpdateState(prev => {
       const studentHistory = { ...(prev.dailyPlans[student.id] || {}) };
-      const dayPlan = studentHistory[prev.currentDate] ? { ...studentHistory[prev.currentDate] } : null;
+      const dayPlan = studentHistory[activeDate]
+        ? { ...studentHistory[activeDate] }
+        : null;
 
       if (dayPlan) {
         dayPlan[activePart] = {
           ...dayPlan[activePart],
           repeatPracticeCount: 0,
         };
-        studentHistory[prev.currentDate] = dayPlan;
+        studentHistory[activeDate] = dayPlan;
       }
 
       return {
@@ -135,25 +209,44 @@ export const StudentView: React.FC<StudentViewProps> = ({
     });
   };
 
-  // Get today's completed session results for this student
+  const handleUpdateMushafSettings = (patch: {
+    mushafLayout?: 'hafizi' | 'madinah';
+    mushafScript?: 'indopak' | 'uthmani';
+    highContrastMushaf?: boolean;
+  }) => {
+    onUpdateState(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        ...patch,
+      },
+    }));
+  };
+
   const todayResults = state.sessionResults.filter(
-    s => s.studentId === student.id && s.date === state.currentDate
+    s => s.studentId === student.id && s.date === activeDate
   );
 
-  // Marks for the current active part to display on the Mushaf
-  const activePartMarks = state.marksHistory.filter(
-    m => m.studentId === student.id && m.date === state.currentDate && m.part === activePart
-  );
+  const activePartMarks =
+    previewParaNum === null
+      ? state.marksHistory.filter(
+          m =>
+            m.studentId === student.id &&
+            m.date === activeDate &&
+            m.part === activePart
+        )
+      : [];
 
   const repeatCount = currentPartPlan?.repeatPracticeCount || 0;
   const targetRepeats = currentPartPlan?.targetRepeats || 10;
+  const manzilAssignedParas = todayPlan?.manzil?.assignedParas || [];
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-      {/* Student Profile Banner with Islamic styling */}
+      {/* Student Profile Banner */}
       <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#C5A059] to-transparent" />
-        
+
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#3E2B20] to-[#241811] text-[#DFCFA8] font-bold flex items-center justify-center text-lg shadow-xs border border-[#C5A059]">
             {student.name.charAt(0)}
@@ -164,18 +257,32 @@ export const StudentView: React.FC<StudentViewProps> = ({
               <span className="text-[#C5A059] text-xs">۞</span>
             </h1>
             <div className="text-xs text-[#7A6C60] mt-0.5">
-              {student.halqaName} · {state.language === 'ur' ? `پارہ ${student.currentJuz}` : `Juz ${student.currentJuz}`} · <span className="text-[#1F4E3D] font-bold">{student.completedParas?.length || 0} Paras Done</span>
+              {student.halqaName} ·{' '}
+              {state.language === 'ur' ? `پارہ ${student.currentJuz}` : `Juz ${student.currentJuz}`} ·{' '}
+              <span className="text-[#1F4E3D] font-bold">
+                {student.completedParas?.length || 0} Paras Done
+              </span>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-col sm:items-end gap-1.5 text-xs text-[#7A6C60]">
-          <div>{t.roleLabel} <strong className="text-[#241811]">{state.language === 'ur' ? student.urduName : student.name}</strong></div>
-          <div className="font-mono text-[#8F6E2B]">{state.currentDate} ({t.dayCounter} {state.dayCount})</div>
+        <div className="flex flex-col sm:items-end gap-2 text-xs text-[#7A6C60]">
+          <div>
+            {t.roleLabel}{' '}
+            <strong className="text-[#241811]">
+              {state.language === 'ur' ? student.urduName : student.name}
+            </strong>
+          </div>
+          <DateNavigator
+            selectedDate={activeDate}
+            todayDate={state.currentDate}
+            onChangeDate={d => setSelectedDate(d > state.currentDate ? state.currentDate : d)}
+            language={state.language}
+          />
           <button
             type="button"
             onClick={() => setShowHistoryModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F8F4EC] hover:bg-[#F3ECE1] border border-[#DFCFA8] hover:border-[#C5A059] text-[#241811] text-xs font-bold transition-all shadow-2xs cursor-pointer mt-1"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F8F4EC] hover:bg-[#F3ECE1] border border-[#DFCFA8] hover:border-[#C5A059] text-[#241811] text-xs font-bold transition-all shadow-2xs cursor-pointer"
           >
             <History className="w-3.5 h-3.5 text-[#8F6E2B]" />
             <span>{t.viewLessonHistory}</span>
@@ -183,14 +290,12 @@ export const StudentView: React.FC<StudentViewProps> = ({
         </div>
       </div>
 
-      {/* Sabaq Frozen Notice Banner (if revision failed yesterday) */}
+      {/* Sabaq Frozen Notice Banner */}
       {todayPlan?.sabaqFrozenDueToRevisionFail && (
         <div className="bg-[#FEF3C7] border-2 border-[#D97706] rounded-2xl p-4 flex items-start gap-3 shadow-xs">
           <AlertTriangle className="w-5 h-5 text-[#B45309] shrink-0 mt-0.5" />
           <div>
-            <h4 className="text-sm font-bold text-[#78350F]">
-              {t.sabaqFrozenAlert}
-            </h4>
+            <h4 className="text-sm font-bold text-[#78350F]">{t.sabaqFrozenAlert}</h4>
             <p className="text-xs text-[#92400E] mt-0.5">
               Focus today on perfecting your Sabqi and Manzil revision before advancing with new lines.
             </p>
@@ -198,12 +303,64 @@ export const StudentView: React.FC<StudentViewProps> = ({
         </div>
       )}
 
-      {/* 1. "Today's Plan" Cards: Sabaq, Sabqi, Manzil */}
+      {/* Requirement E: Dedicated "My Sabqi" Card */}
+      <button
+        type="button"
+        onClick={handleOpenMySabqi}
+        className={`w-full text-left rounded-2xl border p-4 shadow-xs transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+          activePart === 'sabqi' && previewParaNum === null
+            ? 'bg-[#FDFCF9] border-[#C5A059] ring-2 ring-[#C5A059]/40'
+            : 'bg-[#FCFAF6] border-[#E8DCC4] hover:border-[#C5A059]'
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#F8F4EC] border border-[#C5A059] flex items-center justify-center shrink-0">
+            <Layers className="w-5 h-5 text-[#8F6E2B]" />
+          </div>
+          <div>
+            <h2 className="text-sm md:text-base font-bold text-[#241811] flex items-center gap-2">
+              <span>{t.mySabqiTitle}</span>
+              <span className="text-[11px] font-mono bg-[#E8F0EC] text-[#1F4E3D] px-2 py-0.5 rounded">
+                Para {student.currentJuz}
+              </span>
+            </h2>
+            <p className="text-xs text-[#7A6C60] mt-0.5">{t.mySabqiHelp}</p>
+            {effectiveSabqiRange ? (
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs font-mono font-bold text-[#143429]">
+                <span className="bg-[#EBF3EE] border border-[#2E6A54]/40 px-2.5 py-0.5 rounded-md">
+                  Page {effectiveSabqiRange.start.page} line {effectiveSabqiRange.start.line} to Page{' '}
+                  {effectiveSabqiRange.end.page} line {effectiveSabqiRange.end.line}
+                </span>
+                <span className="text-[#8F6E2B]">
+                  ({effectiveSabqiRange.linesCount} lines · {currentParaSabqi?.passedCount || 0} passed lessons)
+                </span>
+              </div>
+            ) : (
+              <div className="mt-1.5 text-xs text-[#B45309] font-semibold">
+                {t.noPassedSabqiYet}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 text-xs font-bold text-[#8F6E2B] shrink-0">
+          <span>{effectiveSabqiRange ? 'Open Sabqi on Mushaf' : 'View Para Start'}</span>
+          <ArrowRight className="w-4 h-4" />
+        </div>
+      </button>
+
+      {/* 1. Assigned Work Cards: Sabaq, Sabqi, Manzil */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-bold text-[#241811] flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-[#8F6E2B]" />
-            <span>{t.todayPlan}</span>
+            <span>
+              {isPastDate
+                ? state.language === 'ur'
+                  ? `اسباق (${activeDate})`
+                  : `Assigned Work (${activeDate})`
+                : t.todayPlan}
+            </span>
           </h2>
           <span className="text-xs text-[#7A6C60]">
             Tap a plan to open and practice its lines
@@ -213,7 +370,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {(['sabaq', 'sabqi', 'manzil'] as PartType[]).map(partKey => {
             const plan = todayPlan ? todayPlan[partKey] : null;
-            const isSelected = activePart === partKey;
+            const isSelected = activePart === partKey && previewParaNum === null;
             const status = plan?.status || 'pending';
 
             let statusBadge = (
@@ -239,14 +396,21 @@ export const StudentView: React.FC<StudentViewProps> = ({
               );
             }
 
+            const displayedSabqiRange = effectiveSabqiRange;
+
             return (
               <button
                 key={partKey}
                 type="button"
                 onClick={() => {
+                  setPreviewParaNum(null);
                   setActivePart(partKey);
-                  if (plan) {
+                  if (partKey === 'sabqi' && displayedSabqiRange) {
+                    setCurrentPage(displayedSabqiRange.start.page);
+                  } else if (plan?.range) {
                     setCurrentPage(plan.range.start.page);
+                  } else if (partKey === 'sabaq') {
+                    setCurrentPage(getParaPageRange(student.currentJuz || 1).startPage);
                   }
                 }}
                 className={`p-5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden ${
@@ -276,87 +440,123 @@ export const StudentView: React.FC<StudentViewProps> = ({
 
                   {plan ? (
                     <div className="space-y-2">
-                      {/* 1. SABAQ CARD DETAILS: Exact Lines Assigned */}
-                      {partKey === 'sabaq' && (
-                        <div className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 text-xs space-y-1.5">
-                          <div className="flex items-center justify-between font-semibold text-[#241811]">
-                            <span>Surah: <strong>{plan.range.surahName || plan.surahName || 'Al-Baqarah'}</strong></span>
-                            <span className="text-[#1F4E3D] font-bold bg-[#E8F0EC] px-2 py-0.5 rounded">
-                              Para {plan.range.juzNumber || plan.juzNumber || 1}
-                            </span>
+                      {/* SABAQ */}
+                      {partKey === 'sabaq' &&
+                        (plan.range ? (
+                          <div className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 text-xs space-y-1.5">
+                            <div className="flex items-center justify-between font-semibold text-[#241811]">
+                              <span>
+                                Surah: <strong>{plan.range.surahName || plan.surahName || 'Al-Baqarah'}</strong>
+                              </span>
+                              <span className="text-[#1F4E3D] font-bold bg-[#E8F0EC] px-2 py-0.5 rounded">
+                                Para {plan.range.juzNumber || plan.juzNumber || 1}
+                              </span>
+                            </div>
+
+                            {(plan.range.startAyah || plan.startAyah) && (
+                              <div className="text-xs font-mono text-[#1F4E3D] bg-[#EBF3EE] px-2 py-0.5 rounded font-bold inline-block">
+                                {(plan.range.startAyah || plan.startAyah) ===
+                                (plan.range.endAyah || plan.endAyah)
+                                  ? `Ayah ${plan.range.startAyah || plan.startAyah}`
+                                  : `Ayat ${plan.range.startAyah || plan.startAyah} – ${plan.range.endAyah || plan.endAyah}`}
+                              </div>
+                            )}
+
+                            <div className="text-[#42362E] font-mono text-[11px] pt-1.5 border-t border-[#DFCFA8]">
+                              <div>
+                                Pages: <strong>{plan.range.startPage || plan.range.start.page}</strong>{' '}
+                                {plan.range.start.page !== plan.range.end.page
+                                  ? `to ${plan.range.endPage || plan.range.end.page}`
+                                  : ''}
+                              </div>
+                              <div className="text-[#1F4E3D] font-bold mt-0.5">
+                                Start: Line {plan.range.startLine || plan.range.start.line} · End: Line{' '}
+                                {plan.range.endLine || plan.range.end.line}
+                              </div>
+                              <div className="text-[#7A6C60] text-[10px] mt-0.5">
+                                Exact Length: <strong>{plan.range.linesCount} lines assigned</strong>
+                              </div>
+                            </div>
                           </div>
-
-                          {(plan.range.startAyah || plan.startAyah) && (
-                            <div className="text-xs font-mono text-[#1F4E3D] bg-[#EBF3EE] px-2 py-0.5 rounded font-bold inline-block">
-                              {(plan.range.startAyah || plan.startAyah) === (plan.range.endAyah || plan.endAyah)
-                                ? `Ayah ${plan.range.startAyah || plan.startAyah}`
-                                : `Ayat ${plan.range.startAyah || plan.startAyah} – ${plan.range.endAyah || plan.endAyah}`}
-                            </div>
-                          )}
-
-                          <div className="text-[#42362E] font-mono text-[11px] pt-1.5 border-t border-[#DFCFA8]">
-                            <div>
-                              Pages: <strong>{plan.range.startPage || plan.range.start.page}</strong> {plan.range.start.page !== plan.range.end.page ? `to ${plan.range.endPage || plan.range.end.page}` : ''}
-                            </div>
-                            <div className="text-[#1F4E3D] font-bold mt-0.5">
-                              Start: Line {plan.range.startLine || plan.range.start.line} · End: Line {plan.range.endLine || plan.range.end.line}
-                            </div>
-                            <div className="text-[#7A6C60] text-[10px] mt-0.5">
-                              Exact Length: <strong>{plan.range.linesCount} lines assigned</strong>
-                            </div>
+                        ) : (
+                          <div className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 text-xs text-[#78350F] font-semibold">
+                            {t.sabaqNotAssignedYet}
                           </div>
-                        </div>
-                      )}
+                        ))}
 
-                      {/* 2. SABQI CARD DETAILS: Revision based on memorized Quran */}
+                      {/* SABQI */}
                       {partKey === 'sabqi' && (
                         <div className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 text-xs space-y-1.5">
-                          <div className="text-[11px] text-[#7A6C60]">
-                            Student Progress: <strong className="text-[#241811]">{student.memorizedPortionDesc || 'Memorized Quran'}</strong>
-                          </div>
-
-                          <div className="font-semibold text-[#241811] pt-1.5 border-t border-[#DFCFA8]">
-                            Portion: <strong className="text-[#8F6E2B]">{plan.portionLabel || 'Teacher Assigned Revision'}</strong>
-                          </div>
-
-                          {(plan.range.startAyah || plan.startAyah) && (
-                            <div className="text-xs font-mono text-[#1F4E3D] bg-[#EBF3EE] px-2 py-0.5 rounded font-bold inline-block">
-                              {(plan.range.startAyah || plan.startAyah) === (plan.range.endAyah || plan.endAyah)
-                                ? `Ayah ${plan.range.startAyah || plan.startAyah}`
-                                : `Ayat ${plan.range.startAyah || plan.startAyah} – ${plan.range.endAyah || plan.endAyah}`}
+                          {displayedSabqiRange ? (
+                            <>
+                              <div className="font-semibold text-[#241811]">
+                                Current Para {student.currentJuz}:{' '}
+                                <strong className="text-[#8F6E2B]">
+                                  {plan.sabqiCustomOverride
+                                    ? plan.portionLabel
+                                    : `${currentParaSabqi?.passedCount || 0} Passed Sabaq(s)`}
+                                </strong>
+                              </div>
+                              <div className="text-[#42362E] font-mono text-[11px] pt-1 border-t border-[#DFCFA8]">
+                                Page {displayedSabqiRange.start.page} line{' '}
+                                {displayedSabqiRange.start.line} to Page{' '}
+                                {displayedSabqiRange.end.page} line {displayedSabqiRange.end.line} (
+                                {displayedSabqiRange.linesCount} lines)
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-[11px] text-[#B45309] font-medium">
+                              {t.noPassedSabqiYet}
                             </div>
                           )}
-
-                          <div className="text-[#42362E] font-mono text-[11px]">
-                            Pages {plan.range.start.page} to {plan.range.end.page} ({plan.range.linesCount} lines)
-                          </div>
                         </div>
                       )}
 
-                      {/* 3. MANZIL CARD DETAILS: Specifically assigned completed Paras */}
+                      {/* MANZIL */}
                       {partKey === 'manzil' && (
                         <div className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 text-xs space-y-1.5">
                           <div className="flex items-center justify-between text-[11px] text-[#7A6C60]">
                             <span>Total Completed:</span>
-                            <span className="font-bold text-[#241811]">{student.completedParas?.length || 0} Paras</span>
+                            <span className="font-bold text-[#241811]">
+                              {student.completedParas?.length || 0} Paras
+                            </span>
                           </div>
 
                           <div className="pt-1.5 border-t border-[#DFCFA8]">
                             <div className="text-[10px] text-[#7A6C60] uppercase tracking-wide font-semibold">
-                              Assigned for Today's Manzil:
+                              {t.manzilDuePrefix}: {activeDate}
                             </div>
                             <div className="text-sm font-bold text-[#1F4E3D] mt-0.5">
                               {plan.assignedParas && plan.assignedParas.length > 0
                                 ? `Para ${plan.assignedParas.join(', ')}`
-                                : `Pages ${plan.range.start.page} - ${plan.range.end.page}`}
+                                : student.completedParas.length === 0
+                                ? 'None (0 Paras completed yet)'
+                                : plan.range
+                                ? `Pages ${plan.range.start.page} - ${plan.range.end.page}`
+                                : 'Not assigned'}
                             </div>
                           </div>
 
-                          <div className="text-[11px] font-mono text-[#5A4333]">
-                            Pages {plan.range.start.page} - {plan.range.end.page} ({plan.range.linesCount} lines)
-                          </div>
+                          {plan.range && (
+                            <div className="text-[11px] font-mono text-[#5A4333]">
+                              {plan.assignedParas && plan.assignedParas.length > 1 ? (
+                                <>
+                                  {plan.assignedParas.length} Paras ({plan.range.linesCount} lines)
+                                </>
+                              ) : (
+                                <>
+                                  Pages {plan.range.start.page} - {plan.range.end.page} (
+                                  {plan.range.linesCount} lines)
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
+                    </div>
+                  ) : partKey === 'sabaq' ? (
+                    <div className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 text-xs text-[#78350F] font-semibold">
+                      {t.sabaqNotAssignedYet}
                     </div>
                   ) : (
                     <div className="text-xs text-[#A69888] italic">No assignment set</div>
@@ -373,15 +573,48 @@ export const StudentView: React.FC<StudentViewProps> = ({
         </div>
       </div>
 
+      {/* Requirement D: "My Completed Paras" 30-Tile Grid */}
+      <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-5 shadow-xs space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-base font-bold text-[#241811] flex items-center gap-2">
+              <Grid className="w-4 h-4 text-[#1F4E3D]" />
+              <span>{t.myCompletedParasTitle}</span>
+              <span className="text-xs font-mono bg-[#E8F0EC] text-[#1F4E3D] px-2 py-0.5 rounded font-bold">
+                {student.completedParas?.length || 0} / 30
+              </span>
+            </h2>
+            <p className="text-xs text-[#7A6C60] mt-0.5">{t.myCompletedParasHelp}</p>
+          </div>
+
+          {manzilAssignedParas.length > 0 && (
+            <div className="px-3 py-1 rounded-lg bg-[#FEF3C7] border border-[#D97706] text-[#78350F] text-xs font-bold">
+              {t.manzilDuePrefix}: {activeDate} — Para {manzilAssignedParas.join(', ')}
+            </div>
+          )}
+        </div>
+
+        <ParaProgressGrid
+          completedParas={student.completedParas || []}
+          currentJuz={student.currentJuz}
+          manzilAssignedParas={manzilAssignedParas}
+          currentDate={activeDate}
+          language={state.language}
+          manzilDuePrefix={t.manzilDuePrefix}
+          previewParaNum={previewParaNum}
+          onTapPara={handleTapParaTile}
+        />
+      </div>
+
       {/* 2. Practice Toolbar: Repeat Counter & Hide-and-Reveal Mode */}
       <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-4 shadow-xs flex flex-wrap items-center justify-between gap-4">
-        {/* Repeat Practice Counter (+1 Button) */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <button
               type="button"
+              disabled={isPastDate || (previewParaNum === null && !activeRange)}
               onClick={handleIncrementRepeat}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[#241811] hover:bg-[#38271D] text-[#FCFAF6] text-sm font-bold shadow-xs active:scale-95 transition-all cursor-pointer min-h-[46px] border border-[#C5A059]"
+              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[#241811] hover:bg-[#38271D] text-[#FCFAF6] text-sm font-bold shadow-xs active:scale-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed min-h-[46px] border border-[#C5A059]"
             >
               <Plus className="w-5 h-5 text-[#C5A059]" />
               <span>{t.practiceIncrement}</span>
@@ -389,8 +622,9 @@ export const StudentView: React.FC<StudentViewProps> = ({
 
             <button
               type="button"
+              disabled={isPastDate || (previewParaNum === null && !activeRange)}
               onClick={handleResetRepeat}
-              className="p-2.5 rounded-xl border border-[#DFCFA8] text-[#7A6C60] hover:text-[#241811] hover:bg-[#F3ECE1] transition-colors cursor-pointer min-h-[46px]"
+              className="p-2.5 rounded-xl border border-[#DFCFA8] text-[#7A6C60] hover:text-[#241811] hover:bg-[#F3ECE1] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed min-h-[46px]"
               title={t.resetCounter}
             >
               <RotateCcw className="w-4 h-4 text-[#8F6E2B]" />
@@ -399,15 +633,20 @@ export const StudentView: React.FC<StudentViewProps> = ({
 
           <div className="text-xs">
             <div className="font-mono text-base font-bold text-[#241811]">
-              {repeatCount} <span className="text-[#7A6C60] text-xs font-normal">/ {targetRepeats} target</span>
+              {repeatCount}{' '}
+              <span className="text-[#7A6C60] text-xs font-normal">/ {targetRepeats} target</span>
             </div>
             <div className="text-[#7A6C60] text-[11px]">
               {t.practiceCounter} for {t.parts[activePart]}
+              {isPastDate && (
+                <span className="ml-1.5 text-[#8F6E2B] font-semibold">
+                  ({state.language === 'ur' ? 'صرف مطالعہ' : 'Read-only'})
+                </span>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Hide & Reveal Memorization Test Mode Toggle */}
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -418,7 +657,11 @@ export const StudentView: React.FC<StudentViewProps> = ({
                 : 'bg-[#F8F4EC] hover:bg-[#F3ECE1] text-[#241811] border border-[#DFCFA8]'
             }`}
           >
-            {hideAndRevealActive ? <EyeOff className="w-4 h-4 text-[#241811]" /> : <Eye className="w-4 h-4 text-[#8F6E2B]" />}
+            {hideAndRevealActive ? (
+              <EyeOff className="w-4 h-4 text-[#241811]" />
+            ) : (
+              <Eye className="w-4 h-4 text-[#8F6E2B]" />
+            )}
             <span>{hideAndRevealActive ? 'Hide Mode Active' : t.hideAndRevealTitle}</span>
           </button>
         </div>
@@ -431,66 +674,132 @@ export const StudentView: React.FC<StudentViewProps> = ({
         </div>
       )}
 
-      {/* 3. Interactive Mushaf Viewer with Assigned Range Highlighted */}
+      {/* 3. Interactive Mushaf Viewer */}
       <div className="flex flex-col items-center gap-2 w-full">
-        {currentPartPlan && (
-          <div className="w-full max-w-4xl bg-[#241811] text-[#FCFAF6] border-2 border-[#C5A059] px-4 py-2.5 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs">
+        {previewParaNum !== null ? (
+          <div className="w-full max-w-4xl bg-[#1F4E3D] text-[#FCFAF6] border-2 border-[#C5A059] px-4 py-2.5 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs">
             <div className="flex items-center gap-2">
               <span className="font-bold uppercase tracking-wider bg-[#C5A059] text-[#241811] px-2 py-0.5 rounded text-[10px]">
-                {t.parts[activePart]}
+                Para {previewParaNum}
               </span>
               <span>
-                {activePart === 'sabaq' && (
-                  <>
-                    {t.showingAssignedOnly}: <strong>{currentPartPlan.range.surahName || 'Al-Baqarah'}</strong>, Para {currentPartPlan.range.juzNumber || 1}, Page {currentPartPlan.range.startPage || currentPartPlan.range.start.page} (Line {currentPartPlan.range.startLine || currentPartPlan.range.start.line}) to Page {currentPartPlan.range.endPage || currentPartPlan.range.end.page} (Line {currentPartPlan.range.endLine || currentPartPlan.range.end.line}).
-                  </>
-                )}
-                {activePart === 'sabqi' && (
-                  <>
-                    Teacher Revision Assignment ({currentPartPlan.portionLabel || 'Recent Revision'}): Pages {currentPartPlan.range.start.page} to {currentPartPlan.range.end.page} ({currentPartPlan.range.linesCount} lines).
-                  </>
-                )}
-                {activePart === 'manzil' && (
-                  <>
-                    Teacher Assigned Manzil: <strong>Para {currentPartPlan.assignedParas && currentPartPlan.assignedParas.length > 0 ? currentPartPlan.assignedParas.join(', ') : currentPartPlan.range.juzNumber}</strong> (Pages {currentPartPlan.range.start.page} - {currentPartPlan.range.end.page}).
-                  </>
-                )}
+                Viewing Para {previewParaNum} ({getParaSurahName(previewParaNum)}) from Completed Paras grid.
               </span>
             </div>
-            <span className="text-[#DFCFA8] text-[11px] font-mono">
-              {currentPartPlan.range.linesCount} {t.linesCount} assigned
-            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setPreviewParaNum(null);
+                if (currentPartPlan?.range) setCurrentPage(currentPartPlan.range.start.page);
+              }}
+              className="underline font-bold text-[#DFCFA8] hover:text-white cursor-pointer"
+            >
+              Return to Today's {t.parts[activePart]}
+            </button>
           </div>
+        ) : (
+          (currentPartPlan || activePart === 'sabaq') && (
+            <div className="w-full max-w-4xl bg-[#241811] text-[#FCFAF6] border-2 border-[#C5A059] px-4 py-2.5 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-bold uppercase tracking-wider bg-[#C5A059] text-[#241811] px-2 py-0.5 rounded text-[10px]">
+                  {t.parts[activePart]}
+                </span>
+                <span>
+                  {activePart === 'sabaq' &&
+                    (currentPartPlan?.range ? (
+                      <>
+                        {t.showingAssignedOnly}:{' '}
+                        <strong>{currentPartPlan.range.surahName || 'Al-Baqarah'}</strong>, Para{' '}
+                        {currentPartPlan.range.juzNumber || 1}, Page{' '}
+                        {currentPartPlan.range.startPage || currentPartPlan.range.start.page} (Line{' '}
+                        {currentPartPlan.range.startLine || currentPartPlan.range.start.line}) to Page{' '}
+                        {currentPartPlan.range.endPage || currentPartPlan.range.end.page} (Line{' '}
+                        {currentPartPlan.range.endLine || currentPartPlan.range.end.line}).
+                      </>
+                    ) : (
+                      <>{t.sabaqNotAssignedYet} — wait for your Ustaad to assign today's Sabaq.</>
+                    ))}
+                  {activePart === 'sabqi' &&
+                    (effectiveSabqiRange ? (
+                      <>
+                        My Sabqi (Para {student.currentJuz} passed Sabaqs): Page{' '}
+                        {effectiveSabqiRange.start.page} line {effectiveSabqiRange.start.line} to Page{' '}
+                        {effectiveSabqiRange.end.page} line {effectiveSabqiRange.end.line} (
+                        {effectiveSabqiRange.linesCount} lines).
+                      </>
+                    ) : (
+                      <>{t.noPassedSabqiYet}</>
+                    ))}
+                  {activePart === 'manzil' &&
+                    (currentPartPlan?.range ? (
+                      <>
+                        {t.manzilDuePrefix} ({activeDate}):{' '}
+                        <strong>
+                          Para{' '}
+                          {currentPartPlan.assignedParas && currentPartPlan.assignedParas.length > 0
+                            ? currentPartPlan.assignedParas.join(', ')
+                            : currentPartPlan.range.juzNumber}
+                        </strong>{' '}
+                        {currentPartPlan.assignedParas && currentPartPlan.assignedParas.length > 1
+                          ? `(${currentPartPlan.assignedParas.length} Paras selected).`
+                          : `(Pages ${currentPartPlan.range.start.page} - ${currentPartPlan.range.end.page}).`}
+                      </>
+                    ) : (
+                      <>No Manzil assigned yet.</>
+                    ))}
+                </span>
+              </div>
+              {activeRange && (
+                <span className="text-[#DFCFA8] text-[11px] font-mono">
+                  {activeRange.linesCount} {t.linesCount}
+                </span>
+              )}
+            </div>
+          )
         )}
 
-        {currentPartPlan ? (
-          <MushafViewer
-            pageNumber={currentPage}
-            onPageChange={setCurrentPage}
-            highlightRange={currentPartPlan.range}
-            interactiveMode="view"
-            currentMarks={activePartMarks}
-            hideAndRevealActive={hideAndRevealActive}
-            targetPulseWordId={pulsingWordId}
-            language={state.language}
-          />
-        ) : (
-          <div className="p-8 bg-[#FCFAF6] border border-[#DFCFA8] rounded-2xl text-center text-[#7A6C60] shadow-xs">
-            No assignment for this part yet.
-          </div>
-        )}
+        <MushafViewer
+          pageNumber={currentPage}
+          onPageChange={setCurrentPage}
+          highlightRange={activeRange || undefined}
+          highlightRanges={
+            previewParaNum === null &&
+            activePart === 'manzil' &&
+            currentPartPlan?.assignedParas &&
+            currentPartPlan.assignedParas.length > 0
+              ? getManzilParaRanges(currentPartPlan.assignedParas, currentPartPlan.range)
+              : undefined
+          }
+          interactiveMode="view"
+          currentMarks={activePartMarks}
+          hideAndRevealActive={hideAndRevealActive}
+          targetPulseWordId={pulsingWordId}
+          language={state.language}
+          mushafLayout={state.settings.mushafLayout || 'madinah'}
+          onLayoutChange={l => handleUpdateMushafSettings({ mushafLayout: l })}
+          mushafScript={state.settings.mushafScript || 'indopak'}
+          onScriptChange={s => handleUpdateMushafSettings({ mushafScript: s })}
+          highContrast={Boolean(state.settings.highContrastMushaf)}
+          onToggleHighContrast={() =>
+            handleUpdateMushafSettings({ highContrastMushaf: !state.settings.highContrastMushaf })
+          }
+        />
       </div>
 
-      {/* 4. Assessment Result Card (after Ustaad finishes grading) */}
+      {/* 4. Assessment Result Card */}
       <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-5 shadow-xs space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-bold text-[#241811] flex items-center gap-2">
             <Award className="w-5 h-5 text-[#8F6E2B]" />
-            <span>{t.resultCardTitle}</span>
+            <span>
+              {isPastDate
+                ? state.language === 'ur'
+                  ? `نتائج (${activeDate})`
+                  : `Assessment Results (${activeDate})`
+                : t.resultCardTitle}
+            </span>
           </h3>
-          <span className="text-xs text-[#7A6C60] font-mono">
-            {state.currentDate}
-          </span>
+          <span className="text-xs text-[#7A6C60] font-mono">{activeDate}</span>
         </div>
 
         {todayResults.length === 0 ? (
@@ -513,7 +822,8 @@ export const StudentView: React.FC<StudentViewProps> = ({
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-sm text-[#241811] capitalize">
-                        {t.parts[result.part]} ({t.parts[`${result.part}Desc` as keyof typeof t.parts]})
+                        {t.parts[result.part]} (
+                        {t.parts[`${result.part}Desc` as keyof typeof t.parts]})
                       </span>
                       {result.isOverridden && (
                         <span className="text-[10px] bg-[#FEF3C7] text-[#92400E] border border-[#F59E0B] px-1.5 py-0.5 rounded font-medium">
@@ -524,28 +834,30 @@ export const StudentView: React.FC<StudentViewProps> = ({
 
                     <div
                       className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold ${
-                        isPassed
-                          ? 'bg-[#1F4E3D] text-white'
-                          : 'bg-[#B91C1C] text-white'
+                        isPassed ? 'bg-[#1F4E3D] text-white' : 'bg-[#B91C1C] text-white'
                       }`}
                     >
-                      {isPassed ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                      {isPassed ? (
+                        <CheckCircle2 className="w-4 h-4" />
+                      ) : (
+                        <XCircle className="w-4 h-4" />
+                      )}
                       <span>{isPassed ? t.status.passed : t.status.repeat}</span>
                     </div>
                   </div>
 
-                  {/* Mistakes vs Limit breakdown */}
                   <div className="text-xs font-mono text-[#241811] mb-3 flex items-center gap-4">
                     <span>
-                      {t.ghaltiShort}: <strong>{result.ghaltiCount}</strong> (limit {result.ghaltiLimit})
+                      {t.ghaltiShort}: <strong>{result.ghaltiCount}</strong> (limit{' '}
+                      {result.ghaltiLimit})
                     </span>
                     <span className="text-[#C5A059]">·</span>
                     <span>
-                      {t.atkanShort}: <strong>{result.atkanCount}</strong> (limit {result.atkanLimit})
+                      {t.atkanShort}: <strong>{result.atkanCount}</strong> (limit{' '}
+                      {result.atkanLimit})
                     </span>
                   </div>
 
-                  {/* Marked words list with click-to-jump */}
                   {result.marks.length > 0 ? (
                     <div>
                       <div className="text-[11px] font-semibold text-[#5A4333] uppercase mb-1.5">
@@ -566,7 +878,9 @@ export const StudentView: React.FC<StudentViewProps> = ({
                             <span className="font-bold">
                               {mark.type === 'ghalti' ? t.ghaltiShort : t.atkanShort}
                             </span>
-                            <span>P{mark.page} : L{mark.line} : W{mark.wordIndex}</span>
+                            <span>
+                              P{mark.page} : L{mark.line} : W{mark.wordIndex}
+                            </span>
                             <ArrowRight className="w-3 h-3 text-[#5A4333]" />
                           </button>
                         ))}

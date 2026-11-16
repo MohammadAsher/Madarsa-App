@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { MadrasaState, StudentProfile, SessionResult, MistakeMark, DayPlan, PartStatus } from '../types/hifz';
 import { translations } from '../i18n/translations';
+import { getFutureDatedRecordsSummary } from '../services/storageService';
 
 interface StudentHistoryModalProps {
   state: MadrasaState;
@@ -37,11 +38,19 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
 }) => {
   const t = translations[state.language];
   const [activeTab, setActiveTab] = useState<'lessons' | 'weak_words' | 'sessions'>('lessons');
+  const [selectedDateFilter, setSelectedDateFilter] = useState<string>('');
 
   // Daily plans for this student sorted descending by date
   const studentDailyPlans = Object.values(state.dailyPlans[student.id] || {}).sort(
     (a, b) => b.date.localeCompare(a.date)
   );
+  const filteredDailyPlans = selectedDateFilter
+    ? studentDailyPlans.filter(d => d.date === selectedDateFilter)
+    : studentDailyPlans;
+  const futureDatedPlansCount = studentDailyPlans.filter(
+    d => d.date > state.currentDate
+  ).length;
+  const halqaFutureSummary = getFutureDatedRecordsSummary(state, state.currentDate);
 
   // Sessions for this student
   const studentSessions = state.sessionResults
@@ -198,32 +207,72 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
           {/* TAB 1: Daily Lessons Log (Review Sabaq & Sabqi Ayat Selections) */}
           {activeTab === 'lessons' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-sm font-bold text-[#241811] flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-[#8F6E2B]" />
                   <span>{t.dailyLessonHistory}</span>
                 </h3>
-                <span className="text-xs text-[#7A6C60]">
-                  Saved permanently in browser storage
-                </span>
+
+                {/* Student-card Date Picker (inspect any saved date without changing Today) */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-1.5 text-xs text-[#5A4333]">
+                    <span className="font-semibold">
+                      {state.language === 'ur' ? 'تاریخ منتخب کریں:' : 'View Date:'}
+                    </span>
+                    <input
+                      type="date"
+                      value={selectedDateFilter}
+                      onChange={e => setSelectedDateFilter(e.target.value)}
+                      className="px-2 py-1 rounded-lg border border-[#DFCFA8] bg-white font-mono text-xs text-[#241811]"
+                    />
+                  </label>
+                  {selectedDateFilter && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDateFilter('')}
+                      className="px-2.5 py-1 rounded-lg border border-[#DFCFA8] bg-[#F8F4EC] hover:bg-[#F3ECE1] text-xs font-bold text-[#241811] cursor-pointer"
+                    >
+                      {state.language === 'ur' ? 'تمام تاریخیں' : 'All Dates'}
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {studentDailyPlans.length === 0 ? (
+              {(futureDatedPlansCount > 0 || halqaFutureSummary.totalCount > 0) && (
+                <div className="px-3 py-2 rounded-xl bg-[#F8F4EC] border border-[#DFCFA8] text-[11px] text-[#5A4333] space-y-0.5">
+                  <div>
+                    Preserved from earlier demo clock (not deleted):{' '}
+                    <strong>{halqaFutureSummary.totalCount}</strong> future-dated record(s) across the Halqa (
+                    {halqaFutureSummary.dailyPlanEntriesCount} daily plans, {halqaFutureSummary.sessionResultsCount} exam sessions,{' '}
+                    {halqaFutureSummary.marksCount} marks on {halqaFutureSummary.futureDates.join(', ')}).
+                  </div>
+                  {futureDatedPlansCount > 0 && (
+                    <div>
+                      This student has <strong>{futureDatedPlansCount}</strong> future-dated daily plan(s) listed below.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {filteredDailyPlans.length === 0 ? (
                 <div className="p-6 bg-[#F8F4EC] rounded-2xl border border-[#DFCFA8] text-center text-xs text-[#7A6C60]">
-                  {t.noLessonRecordsYet}
+                  {selectedDateFilter
+                    ? `No saved lesson record for ${selectedDateFilter}.`
+                    : t.noLessonRecordsYet}
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {studentDailyPlans.map(day => {
+                  {filteredDailyPlans.map(day => {
                     const isToday = day.date === state.currentDate;
+                    const isFutureDated = day.date > state.currentDate;
                     const sabaq = day.sabaq;
                     const sabqi = day.sabqi;
                     const manzil = day.manzil;
 
-                    const sabaqStartAyah = sabaq.range.startAyah || sabaq.startAyah;
-                    const sabaqEndAyah = sabaq.range.endAyah || sabaq.endAyah;
-                    const sabqiStartAyah = sabqi.range.startAyah || sabqi.startAyah;
-                    const sabqiEndAyah = sabqi.range.endAyah || sabqi.endAyah;
+                    const sabaqStartAyah = sabaq.range?.startAyah || sabaq.startAyah;
+                    const sabaqEndAyah = sabaq.range?.endAyah || sabaq.endAyah;
+                    const sabqiStartAyah = sabqi.range?.startAyah || sabqi.startAyah;
+                    const sabqiEndAyah = sabqi.range?.endAyah || sabqi.endAyah;
 
                     return (
                       <div
@@ -234,19 +283,21 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
                             : 'bg-[#FAF7F0] border-[#E8DCC4]'
                         }`}
                       >
-                        {/* Day & Date Header */}
+                        {/* Date Header */}
                         <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#E8DCC4]">
                           <div className="flex items-center gap-2">
                             <span className="font-mono font-bold text-sm text-[#241811] flex items-center gap-1.5">
                               <Calendar className="w-3.5 h-3.5 text-[#8F6E2B]" />
                               <span>{day.date}</span>
                             </span>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-[#F3ECE1] text-[#5A4333] font-semibold border border-[#DFCFA8]">
-                              {t.dayCounter} {day.dayNumber}
-                            </span>
                             {isToday && (
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#1F4E3D] text-[#FCFAF6]">
-                                Today
+                                {state.language === 'ur' ? 'آج' : 'Today'}
+                              </span>
+                            )}
+                            {isFutureDated && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E] border border-[#F59E0B]">
+                                Future-dated
                               </span>
                             )}
                           </div>
@@ -270,32 +321,40 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
                                 {getStatusBadge(sabaq.status)}
                               </div>
 
-                              <div className="text-xs text-[#241811] font-semibold">
-                                {sabaq.range.surahName || sabaq.surahName || 'Al-Baqarah'}
-                                <span className="text-[#8F6E2B] font-normal ml-1">
-                                  (Para {sabaq.range.juzNumber || sabaq.juzNumber || 1})
-                                </span>
-                              </div>
+                              {sabaq.range ? (
+                                <>
+                                  <div className="text-xs text-[#241811] font-semibold">
+                                    {sabaq.range.surahName || sabaq.surahName || 'Quran'}
+                                    <span className="text-[#8F6E2B] font-normal ml-1">
+                                      (Para {sabaq.range.juzNumber || sabaq.juzNumber || 1})
+                                    </span>
+                                  </div>
 
-                              {/* Ayat selection */}
-                              {sabaqStartAyah && sabaqEndAyah && (
-                                <div className="mt-1 text-xs font-mono text-[#1F4E3D] bg-[#EBF3EE] px-2 py-0.5 rounded font-bold inline-block">
-                                  {sabaqStartAyah === sabaqEndAyah 
-                                    ? `Ayah ${sabaqStartAyah}` 
-                                    : `Ayat ${sabaqStartAyah} – ${sabaqEndAyah}`}
+                                  {sabaqStartAyah && sabaqEndAyah && (
+                                    <div className="mt-1 text-xs font-mono text-[#1F4E3D] bg-[#EBF3EE] px-2 py-0.5 rounded font-bold inline-block">
+                                      {sabaqStartAyah === sabaqEndAyah
+                                        ? `Ayah ${sabaqStartAyah}`
+                                        : `Ayat ${sabaqStartAyah} – ${sabaqEndAyah}`}
+                                    </div>
+                                  )}
+
+                                  <div className="text-[11px] font-mono text-[#5A4333] mt-1.5">
+                                    P{sabaq.range.start.page}:L{sabaq.range.start.line} to P{sabaq.range.end.page}:L{sabaq.range.end.line}
+                                    <span className="text-[#8F6E2B] font-bold ml-1">({sabaq.range.linesCount} lines)</span>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="text-xs text-[#78350F] italic mt-1">
+                                  {t.sabaqNotAssignedYet}
                                 </div>
                               )}
-
-                              <div className="text-[11px] font-mono text-[#5A4333] mt-1.5">
-                                P{sabaq.range.start.page}:L{sabaq.range.start.line} to P{sabaq.range.end.page}:L{sabaq.range.end.line}
-                                <span className="text-[#8F6E2B] font-bold ml-1">({sabaq.range.linesCount} lines)</span>
-                              </div>
                             </div>
 
-                            {onJumpToWord && (
+                            {onJumpToWord && sabaq.range && (
                               <button
                                 type="button"
                                 onClick={() => {
+                                  if (!sabaq.range) return;
                                   onJumpToWord(sabaq.range.start.page, sabaq.range.start.wordId);
                                   onClose();
                                 }}
@@ -322,25 +381,27 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
                                 {sabqi.portionLabel || 'Teacher Assigned Revision'}
                               </div>
 
-                              {/* Ayat selection if present */}
                               {sabqiStartAyah && sabqiEndAyah && (
                                 <div className="mt-1 text-xs font-mono text-[#1F4E3D] bg-[#EBF3EE] px-2 py-0.5 rounded font-bold inline-block">
-                                  {sabqiStartAyah === sabqiEndAyah 
-                                    ? `Ayah ${sabqiStartAyah}` 
+                                  {sabqiStartAyah === sabqiEndAyah
+                                    ? `Ayah ${sabqiStartAyah}`
                                     : `Ayat ${sabqiStartAyah} – ${sabqiEndAyah}`}
                                 </div>
                               )}
 
-                              <div className="text-[11px] font-mono text-[#5A4333] mt-1.5">
-                                P{sabqi.range.start.page}:L{sabqi.range.start.line} to P{sabqi.range.end.page}:L{sabqi.range.end.line}
-                                <span className="text-[#8F6E2B] font-bold ml-1">({sabqi.range.linesCount} lines)</span>
-                              </div>
+                              {sabqi.range && (
+                                <div className="text-[11px] font-mono text-[#5A4333] mt-1.5">
+                                  P{sabqi.range.start.page}:L{sabqi.range.start.line} to P{sabqi.range.end.page}:L{sabqi.range.end.line}
+                                  <span className="text-[#8F6E2B] font-bold ml-1">({sabqi.range.linesCount} lines)</span>
+                                </div>
+                              )}
                             </div>
 
-                            {onJumpToWord && (
+                            {onJumpToWord && sabqi.range && (
                               <button
                                 type="button"
                                 onClick={() => {
+                                  if (!sabqi.range) return;
                                   onJumpToWord(sabqi.range.start.page, sabqi.range.start.wordId);
                                   onClose();
                                 }}
@@ -366,19 +427,24 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
                               <div className="text-xs text-[#241811] font-semibold">
                                 {manzil.assignedParas && manzil.assignedParas.length > 0
                                   ? `Para ${manzil.assignedParas.join(', ')}`
-                                  : `Pages ${manzil.range.start.page} – ${manzil.range.end.page}`}
+                                  : manzil.range
+                                  ? `Pages ${manzil.range.start.page} – ${manzil.range.end.page}`
+                                  : 'Not assigned'}
                               </div>
 
-                              <div className="text-[11px] font-mono text-[#5A4333] mt-1.5">
-                                Pages {manzil.range.start.page} to {manzil.range.end.page}
-                                <span className="text-[#8F6E2B] font-bold ml-1">({manzil.range.linesCount} lines)</span>
-                              </div>
+                              {manzil.range && (
+                                <div className="text-[11px] font-mono text-[#5A4333] mt-1.5">
+                                  Pages {manzil.range.start.page} to {manzil.range.end.page}
+                                  <span className="text-[#8F6E2B] font-bold ml-1">({manzil.range.linesCount} lines)</span>
+                                </div>
+                              )}
                             </div>
 
-                            {onJumpToWord && (
+                            {onJumpToWord && manzil.range && (
                               <button
                                 type="button"
                                 onClick={() => {
+                                  if (!manzil.range) return;
                                   onJumpToWord(manzil.range.start.page, manzil.range.start.wordId);
                                   onClose();
                                 }}

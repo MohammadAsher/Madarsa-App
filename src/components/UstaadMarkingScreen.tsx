@@ -23,46 +23,56 @@ import {
 import { getEffectiveLimits } from '../services/storageService';
 import { MushafViewer } from './MushafViewer';
 import { MushafWord } from '../data/quranData';
+import { getManzilParaRanges } from '../services/hifzService';
 import { translations } from '../i18n/translations';
 
 interface UstaadMarkingScreenProps {
   state: MadrasaState;
   student: StudentProfile;
   initialPart?: PartType;
+  targetDate?: string;
   onBack: () => void;
   onSaveSession: (result: SessionResult, updatedMarks: MistakeMark[]) => void;
+  onUpdateMushafSettings?: (patch: {
+    mushafLayout?: 'hafizi' | 'madinah';
+    mushafScript?: 'indopak' | 'uthmani';
+    highContrastMushaf?: boolean;
+  }) => void;
 }
 
 export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
   state,
   student,
   initialPart = 'sabaq',
+  targetDate,
   onBack,
   onSaveSession,
+  onUpdateMushafSettings,
 }) => {
   const [activePart, setActivePart] = useState<PartType>(initialPart);
   const [activeTool, setActiveTool] = useState<MistakeType>('ghalti');
   const t = translations[state.language];
+  const activeDate = targetDate || state.currentDate;
 
-  // Retrieve today's plan for this student
-  const todayPlan = state.dailyPlans[student.id]?.[state.currentDate];
+  // Retrieve plan for this student on activeDate
+  const todayPlan = state.dailyPlans[student.id]?.[activeDate];
   const currentPartPlan = todayPlan ? todayPlan[activePart] : null;
 
   // Active page state in Mushaf viewer
   const [currentPage, setCurrentPage] = useState<number>(
-    currentPartPlan?.range.start.page || 1
+    currentPartPlan?.range?.start.page || 1
   );
 
-  // Sync current page when active part changes
+  // Sync current page when active part, student, or date changes
   useEffect(() => {
-    if (currentPartPlan) {
+    if (currentPartPlan?.range) {
       setCurrentPage(currentPartPlan.range.start.page);
     }
-  }, [activePart]);
+  }, [activePart, student.id, activeDate]);
 
   // Session marks created during this grading session
   const existingMarks = state.marksHistory.filter(
-    m => m.studentId === student.id && m.date === state.currentDate && m.part === activePart
+    m => m.studentId === student.id && m.date === activeDate && m.part === activePart
   );
 
   const [sessionMarks, setSessionMarks] = useState<MistakeMark[]>(existingMarks);
@@ -70,10 +80,10 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
   // When switching parts, reload existing marks
   useEffect(() => {
     const marksForPart = state.marksHistory.filter(
-      m => m.studentId === student.id && m.date === state.currentDate && m.part === activePart
+      m => m.studentId === student.id && m.date === activeDate && m.part === activePart
     );
     setSessionMarks(marksForPart);
-  }, [activePart, student.id, state.currentDate, state.marksHistory]);
+  }, [activePart, student.id, activeDate, state.marksHistory]);
 
   // Calculate live limits and counts
   const limits = getEffectiveLimits(student.id, state);
@@ -106,7 +116,7 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
       const newMark: MistakeMark = {
         id: `mark_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         studentId: student.id,
-        date: state.currentDate,
+        date: activeDate,
         part: activePart,
         wordId: word.id,
         page: word.pageNumber,
@@ -127,12 +137,12 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
 
   // Finalize session with result (Pass or Repeat)
   const handleFinalize = (chosenResult: 'passed' | 'repeat') => {
-    if (!currentPartPlan) return;
+    if (!currentPartPlan || !currentPartPlan.range) return;
 
     const sessionResult: SessionResult = {
-      id: `res_${student.id}_${state.currentDate}_${activePart}_${Date.now()}`,
+      id: `res_${student.id}_${activeDate}_${activePart}_${Date.now()}`,
       studentId: student.id,
-      date: state.currentDate,
+      date: activeDate,
       part: activePart,
       ghaltiCount,
       atkanCount,
@@ -174,6 +184,9 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
               <span className="text-[#DFCFA8] text-xs hidden sm:inline truncate">
                 {student.halqaName}
               </span>
+              <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-[#2E2017] border border-[#C5A059]/40 text-[#DFCFA8]">
+                {activeDate}
+              </span>
             </div>
           </div>
 
@@ -211,11 +224,15 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
       <div className="bg-[#F8F4EC] border-b border-[#DFCFA8] px-3 sm:px-4 py-1.5 shadow-2xs">
         <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
           {/* Assigned Range summary */}
-          {currentPartPlan ? (
+          {currentPartPlan?.range ? (
             <div className="flex items-center gap-1.5 sm:gap-2 text-xs text-[#42362E] truncate">
               <span className="font-bold text-[#241811]">{t.assignedRange}:</span>
               <span className="font-mono text-[#241811]">
-                {t.page} {currentPartPlan.range.start.page} {t.line} {currentPartPlan.range.start.line} {t.to} {t.page} {currentPartPlan.range.end.page} {t.line} {currentPartPlan.range.end.line}
+                {activePart === 'manzil' &&
+                currentPartPlan.assignedParas &&
+                currentPartPlan.assignedParas.length > 1
+                  ? `Para ${currentPartPlan.assignedParas.join(', ')}`
+                  : `${t.page} ${currentPartPlan.range.start.page} ${t.line} ${currentPartPlan.range.start.line} ${t.to} ${t.page} ${currentPartPlan.range.end.page} ${t.line} ${currentPartPlan.range.end.line}`}
               </span>
               <span className="text-[#C5A059]">·</span>
               <span className="font-bold text-[#1F4E3D] bg-[#E8F0EC] px-1.5 py-0.2 rounded border border-[#1F4E3D]/30 text-[11px]">
@@ -223,7 +240,9 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
               </span>
             </div>
           ) : (
-            <div className="text-xs text-[#7A6C60] italic">No plan set for {t.parts[activePart]} today</div>
+            <div className="text-xs text-[#78350F] font-semibold">
+              {activePart === 'sabaq' ? t.sabaqNotAssignedYet : `No plan set for ${t.parts[activePart]} today`}
+            </div>
           )}
 
           {/* Live Counter & Limit Indicator */}
@@ -266,21 +285,41 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
 
       {/* Main Mushaf Listening Workspace */}
       <main className="flex-1 max-w-5xl w-full mx-auto p-2 sm:p-3 flex flex-col items-center">
-        {currentPartPlan ? (
+        {currentPartPlan?.range ? (
           <MushafViewer
             pageNumber={currentPage}
             onPageChange={setCurrentPage}
             highlightRange={currentPartPlan.range}
+            highlightRanges={
+              activePart === 'manzil' &&
+              currentPartPlan.assignedParas &&
+              currentPartPlan.assignedParas.length > 0
+                ? getManzilParaRanges(currentPartPlan.assignedParas, currentPartPlan.range)
+                : undefined
+            }
             interactiveMode="marking"
             activeMarkTool={activeTool}
             currentMarks={sessionMarks}
             onWordClick={handleWordClick}
             language={state.language}
+            mushafLayout={state.settings.mushafLayout || 'madinah'}
+            onLayoutChange={l => onUpdateMushafSettings?.({ mushafLayout: l })}
+            mushafScript={state.settings.mushafScript || 'indopak'}
+            onScriptChange={s => onUpdateMushafSettings?.({ mushafScript: s })}
+            highContrast={Boolean(state.settings.highContrastMushaf)}
+            onToggleHighContrast={() =>
+              onUpdateMushafSettings?.({ highContrastMushaf: !state.settings.highContrastMushaf })
+            }
           />
         ) : (
           <div className="p-8 text-center text-[#7A6C60] bg-[#FCFAF6] rounded-2xl border border-[#DFCFA8] my-8 shadow-xs">
             <BookOpen className="w-10 h-10 text-[#C5A059] mx-auto mb-2" />
-            <p className="text-sm font-semibold text-[#241811]">Please assign work for this student first.</p>
+            <p className="text-sm font-semibold text-[#241811]">
+              {activePart === 'sabaq' ? t.sabaqNotAssignedYet : 'No assignment set for this part yet.'}
+            </p>
+            <p className="text-xs text-[#7A6C60] mt-1">
+              Return to the Halqa dashboard to assign words on the Mushaf first.
+            </p>
           </div>
         )}
 
@@ -391,8 +430,9 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
             {/* Mark Repeat Button */}
             <button
               type="button"
+              disabled={!currentPartPlan?.range}
               onClick={() => handleFinalize('repeat')}
-              className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs min-h-[34px] sm:min-h-[36px] ${
+              className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs min-h-[34px] sm:min-h-[36px] ${
                 suggestedResult === 'repeat'
                   ? 'bg-[#B91C1C] text-white hover:bg-[#991B1B] ring-2 ring-rose-400'
                   : 'bg-[#2E2017] border border-rose-700/80 text-rose-300 hover:bg-rose-950/60'
@@ -411,8 +451,9 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
             {/* Mark Passed Button */}
             <button
               type="button"
+              disabled={!currentPartPlan?.range}
               onClick={() => handleFinalize('passed')}
-              className={`flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs min-h-[34px] sm:min-h-[36px] ${
+              className={`flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs min-h-[34px] sm:min-h-[36px] ${
                 suggestedResult === 'passed'
                   ? 'bg-[#1F4E3D] text-white hover:bg-[#16382C] ring-2 ring-emerald-400 border border-[#C5A059]'
                   : 'bg-[#2E2017] border border-[#2E6A54] text-emerald-300 hover:bg-emerald-950/60'

@@ -7,15 +7,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   loadState, 
   saveState, 
-  resetDemoState, 
-  advanceToNextDay,
-  goToPreviousDate,
-  jumpToDate
+  resetDemoState,
+  syncStateToRealDate,
 } from './services/storageService';
+import { DEFAULT_SCHOOL_TIMEZONE } from './services/dateService';
 import { MadrasaState, RoleId, PartType, StudentProfile } from './types/hifz';
 import { Header } from './components/Header';
 import { UstaadDashboard } from './components/UstaadDashboard';
 import { StudentView } from './components/StudentView';
+import { SettingsModal } from './components/SettingsModal';
 
 interface NavigationHistoryEntry {
   role: RoleId;
@@ -25,11 +25,13 @@ interface NavigationHistoryEntry {
 export default function App() {
   const [state, setState] = useState<MadrasaState>(() => loadState());
   const [targetJumpWord, setTargetJumpWord] = useState<{ page: number; wordId: string } | null>(null);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
 
   // Active dedicated marking session (when teacher is listening & marking)
   const [markingSession, setMarkingSession] = useState<{
     studentId: string;
     part: PartType;
+    targetDate?: string;
   } | null>(null);
 
   // Navigation history stack for Back navigation
@@ -45,6 +47,29 @@ export default function App() {
     document.documentElement.lang = state.language;
     document.documentElement.dir = state.language === 'ur' ? 'rtl' : 'ltr';
   }, [state.language]);
+
+  // Automatic real-date rollover: at midnight if left open (checks every minute) + whenever tab regains focus/visibility
+  useEffect(() => {
+    const checkDateRollover = () => {
+      setState(prev => syncStateToRealDate(prev));
+    };
+
+    const intervalId = window.setInterval(checkDateRollover, 60_000);
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        checkDateRollover();
+      }
+    };
+
+    window.addEventListener('focus', checkDateRollover);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', checkDateRollover);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
 
   // Handle switching roles
   const handleSelectRole = (newRole: RoleId) => {
@@ -75,13 +100,13 @@ export default function App() {
   };
 
   // Start marking session for student
-  const handleStartMarking = (student: StudentProfile, part: PartType) => {
+  const handleStartMarking = (student: StudentProfile, part: PartType, targetDate?: string) => {
     setNavHistory(prev => [
       ...prev,
       { role: state.currentRole, markingSession: null }
     ]);
 
-    const session = { studentId: student.id, part };
+    const session = { studentId: student.id, part, targetDate };
     setMarkingSession(session);
 
     try {
@@ -182,23 +207,20 @@ export default function App() {
     }));
   };
 
-  const handlePrevDay = () => {
-    const updated = goToPreviousDate(state);
-    setState(updated);
-  };
-
-  const handleNextDay = () => {
-    const updated = advanceToNextDay(state);
-    setState(updated);
-  };
-
-  const handleSelectDate = (date: string) => {
-    const updated = jumpToDate(state, date);
-    setState(updated);
+  const handleChangeTimeZone = (timeZone: string) => {
+    setState(prev =>
+      syncStateToRealDate({
+        ...prev,
+        settings: {
+          ...prev.settings,
+          timeZone,
+        },
+      })
+    );
   };
 
   const handleResetDemo = () => {
-    const fresh = resetDemoState();
+    const fresh = resetDemoState(state.settings?.timeZone || DEFAULT_SCHOOL_TIMEZONE);
     setState(fresh);
     setTargetJumpWord(null);
     setMarkingSession(null);
@@ -231,14 +253,12 @@ export default function App() {
         state.language === 'ur' ? 'font-urdu' : ''
       }`}
     >
-      {/* Top Header Contract with Back Navigation */}
+      {/* Top Header Contract with Back Navigation & Real Date */}
       <Header
         state={state}
         onSelectRole={handleSelectRole}
         onToggleLanguage={handleToggleLanguage}
-        onPrevDay={handlePrevDay}
-        onNextDay={handleNextDay}
-        onSelectDate={handleSelectDate}
+        onOpenSettings={() => setShowSettings(true)}
         onResetDemo={handleResetDemo}
         onNavigateBack={handleNavigateBack}
         canGoBack={canGoBack}
@@ -257,6 +277,7 @@ export default function App() {
                 ? {
                     student: state.students[markingSession.studentId],
                     part: markingSession.part,
+                    targetDate: markingSession.targetDate,
                   }
                 : null
             }
@@ -275,6 +296,14 @@ export default function App() {
           />
         )}
       </main>
+
+      {showSettings && (
+        <SettingsModal
+          state={state}
+          onChangeTimeZone={handleChangeTimeZone}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </div>
   );
 }

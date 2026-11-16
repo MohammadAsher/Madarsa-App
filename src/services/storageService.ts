@@ -3,10 +3,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { MadrasaState, StudentLimits, DayPlan, DailyPartPlan, MistakeMark, SessionResult, AssignmentRange } from '../types/hifz';
-import { advanceLocationByLines, calculateRangeLines, getRangeMetadata, getParaPageRange } from '../data/quranData';
+import {
+  MadrasaState,
+  StudentLimits,
+  DayPlan,
+  DailyPartPlan,
+  MistakeMark,
+  SessionResult,
+  AssignmentRange,
+} from '../types/hifz';
+import { getRangeMetadata } from '../data/quranData';
+import { computeCurrentParaSabqiRange, getFullParaRange } from './hifzService';
+import {
+  DEFAULT_SCHOOL_TIMEZONE,
+  getRealTodayDate,
+  shiftIsoDate,
+} from './dateService';
 
-const STORAGE_KEY = 'hifz_madrasa_prototype_state_v4'; // bumped key to ensure clean load of new assignment logic
+const STORAGE_KEY = 'hifz_madrasa_prototype_state_v6';
 
 export const DEFAULT_HALQA_LIMITS: StudentLimits = {
   sabaqGhaltiLimit: 2,
@@ -18,12 +32,87 @@ export const DEFAULT_HALQA_LIMITS: StudentLimits = {
 };
 
 /**
- * Creates rich, realistic demo data with both yesterday (Day 1) and today (Day 2)
- * so date navigation works immediately on first load.
+ * Returns a clean, EMPTY Sabaq slot ("Sabaq not assigned yet") with no pre-selected page, line, or range.
  */
-export function createInitialDemoState(): MadrasaState {
-  const yesterday = '2026-11-10';
-  const today = '2026-11-11';
+export function createEmptySabaqPlan(): DailyPartPlan {
+  return {
+    part: 'sabaq',
+    range: null,
+    status: 'pending',
+    repeatPracticeCount: 0,
+    targetRepeats: 10,
+  };
+}
+
+/**
+ * Returns a clean DayPlan with empty Sabaq, Sabqi, and Manzil slots for a student with no prior plan on a date.
+ */
+export function createEmptyDayPlan(date: string, dayNumber?: number): DayPlan {
+  return {
+    date,
+    ...(dayNumber !== undefined ? { dayNumber } : {}),
+    sabaq: createEmptySabaqPlan(),
+    sabqi: {
+      part: 'sabqi',
+      range: null,
+      status: 'pending',
+      repeatPracticeCount: 0,
+      targetRepeats: 5,
+    },
+    manzil: {
+      part: 'manzil',
+      range: null,
+      status: 'pending',
+      repeatPracticeCount: 0,
+      targetRepeats: 3,
+      assignedParas: [],
+    },
+  };
+}
+
+function makeRange(
+  startP: number,
+  startL: number,
+  startW: number,
+  endP: number,
+  endL: number,
+  endW: number
+): AssignmentRange {
+  const startLoc = {
+    page: startP,
+    line: startL,
+    wordIndex: startW,
+    wordId: `p${startP}_l${startL}_w${startW}`,
+  };
+  const endLoc = {
+    page: endP,
+    line: endL,
+    wordIndex: endW,
+    wordId: `p${endP}_l${endL}_w${endW}`,
+  };
+  const meta = getRangeMetadata(startLoc, endLoc);
+  return {
+    start: startLoc,
+    end: endLoc,
+    linesCount: meta.linesCount,
+    surahName: meta.surahName,
+    juzNumber: meta.juzNumber,
+    startPage: meta.startPage,
+    endPage: meta.endPage,
+    startLine: meta.startLine,
+    endLine: meta.endLine,
+    startAyah: meta.startAyah,
+    endAyah: meta.endAyah,
+  };
+}
+
+/**
+ * Creates demo data anchored to the real current date in the school's time zone.
+ * Unassessed today Sabaqs (Zayd, Umar) start EMPTY ("Sabaq not assigned yet") — zero auto-fill!
+ */
+export function createInitialDemoState(timeZone: string = DEFAULT_SCHOOL_TIMEZONE): MadrasaState {
+  const today = getRealTodayDate(timeZone);
+  const yesterday = shiftIsoDate(today, -1);
 
   const students = {
     student_1: {
@@ -34,19 +123,21 @@ export function createInitialDemoState(): MadrasaState {
       halqaName: 'Halqa Al-Baqarah (Ustaad A)',
       enrollmentDate: '2026-01-15',
       currentJuz: 1,
-      completedParas: [1], // Has completed Para 1, working in Para 2
-      memorizedPortionDesc: 'Completed Para 1 (21 Pages)',
+      currentParaStartDate: yesterday,
+      completedParas: [],
+      memorizedPortionDesc: 'In Para 1 (Al-Fatihah & Al-Baqarah)',
     },
     student_2: {
       id: 'student_2',
-      name: 'Abdullah ibn Mas\'ud',
+      name: "Abdullah ibn Mas'ud",
       urduName: 'عبد اللہ بن مسعود',
       ustaadId: 'ustaad_a' as const,
       halqaName: 'Halqa Al-Baqarah (Ustaad A)',
       enrollmentDate: '2026-02-01',
-      currentJuz: 6,
-      completedParas: [1, 2, 3, 4, 5], // Completed 5 Paras!
-      memorizedPortionDesc: 'Completed Paras 1 - 5 (101 Pages)',
+      currentJuz: 5,
+      currentParaStartDate: yesterday,
+      completedParas: [1, 2, 3, 4],
+      memorizedPortionDesc: 'Completed Paras 1 - 4 · Finishing Para 5',
     },
     student_3: {
       id: 'student_3',
@@ -56,28 +147,31 @@ export function createInitialDemoState(): MadrasaState {
       halqaName: 'Halqa Al-Baqarah (Ustaad A)',
       enrollmentDate: '2026-03-10',
       currentJuz: 1,
-      completedParas: [], // New student: memorized 5 pages in Para 1
-      memorizedPortionDesc: 'Memorized first 5 pages of Para 1',
+      currentParaStartDate: yesterday,
+      completedParas: [],
+      memorizedPortionDesc: 'In Para 1 (Opening Pages)',
     },
     student_4: {
       id: 'student_4',
       name: 'Ibrahim Al-Khalil',
       urduName: 'ابراہیم الخلیل',
       ustaadId: 'ustaad_b' as const,
-      halqaName: 'Halqa Ali \'Imran (Ustaad B)',
+      halqaName: "Halqa Ali 'Imran (Ustaad B)",
       enrollmentDate: '2026-01-20',
-      currentJuz: 13,
-      completedParas: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-      memorizedPortionDesc: 'Completed Paras 1 - 12 (241 Pages)',
+      currentJuz: 12,
+      currentParaStartDate: yesterday,
+      completedParas: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+      memorizedPortionDesc: 'Completed Paras 1 - 11 · Finished Para 12',
     },
     student_5: {
       id: 'student_5',
       name: 'Umar ibn Al-Khattab',
       urduName: 'عمر بن الخطاب',
       ustaadId: 'ustaad_b' as const,
-      halqaName: 'Halqa Ali \'Imran (Ustaad B)',
+      halqaName: "Halqa Ali 'Imran (Ustaad B)",
       enrollmentDate: '2026-02-15',
       currentJuz: 16,
+      currentParaStartDate: yesterday,
       completedParas: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
       memorizedPortionDesc: 'Completed 15 Paras (Half Quran)',
     },
@@ -95,7 +189,7 @@ export function createInitialDemoState(): MadrasaState {
       id: 'ustaad_b' as const,
       name: 'Ustaad Bilal Al-Hafiz',
       urduName: 'استاد بلال الحافظ',
-      halqaName: 'Halqa Ali \'Imran',
+      halqaName: "Halqa Ali 'Imran",
       studentIds: ['student_4', 'student_5'],
     },
   };
@@ -111,44 +205,19 @@ export function createInitialDemoState(): MadrasaState {
     },
   };
 
-  const makeRange = (startP: number, startL: number, startW: number, endP: number, endL: number, endW: number) => {
-    const startLoc = {
-      page: startP,
-      line: startL,
-      wordIndex: startW,
-      wordId: `p${startP}_l${startL}_w${startW}`,
-    };
-    const endLoc = {
-      page: endP,
-      line: endL,
-      wordIndex: endW,
-      wordId: `p${endP}_l${endL}_w${endW}`,
-    };
-    const meta = getRangeMetadata(startLoc, endLoc);
-    return {
-      start: startLoc,
-      end: endLoc,
-      linesCount: meta.linesCount,
-      surahName: meta.surahName,
-      juzNumber: meta.juzNumber,
-      startPage: meta.startPage,
-      endPage: meta.endPage,
-      startLine: meta.startLine,
-      endLine: meta.endLine,
-      startAyah: meta.startAyah,
-      endAyah: meta.endAyah,
-    };
-  };
+  const para5Full = getFullParaRange(5);
+  const para3Full = getFullParaRange(3);
+  const para1Full = getFullParaRange(1);
 
-  // Seed plans for Day 1 (yesterday) AND Day 2 (today)
   const dailyPlans: Record<string, Record<string, DayPlan>> = {
+    // Student 1: Zayd — Yesterday Sabaq passed (Page 2 L3..8); Today Sabaq is EMPTY until Ustaad assigns!
     student_1: {
       [yesterday]: {
         date: yesterday,
         dayNumber: 1,
         sabaq: {
           part: 'sabaq',
-          range: makeRange(2, 3, 1, 3, 5, 6),
+          range: makeRange(2, 3, 1, 2, 8, 2),
           status: 'passed',
           repeatPracticeCount: 8,
           targetRepeats: 10,
@@ -157,95 +226,86 @@ export function createInitialDemoState(): MadrasaState {
           surahName: 'Al-Baqarah',
           juzNumber: 1,
           startPage: 2,
-          endPage: 3,
+          endPage: 2,
           startLine: 3,
-          endLine: 5,
+          endLine: 8,
         },
         sabqi: {
           part: 'sabqi',
-          range: makeRange(1, 1, 1, 2, 2, 4),
+          range: makeRange(1, 2, 1, 2, 8, 2),
           status: 'passed',
           repeatPracticeCount: 5,
           targetRepeats: 5,
           completedAt: `${yesterday}T09:30:00Z`,
           sessionResultId: 'res_s1_yesterday_sabqi',
-          portionType: 'quarter_para',
-          portionLabel: 'Quarter Para (Pages 1 - 2)',
+          portionType: 'current_para_passed',
+          portionLabel: 'Current Para Passed Sabaq (Page 1 - 2)',
         },
         manzil: {
           part: 'manzil',
-          range: makeRange(1, 1, 1, 21, 15, 8),
+          range: makeRange(1, 2, 1, 1, 8, 2),
           status: 'passed',
           repeatPracticeCount: 3,
           targetRepeats: 3,
-          assignedParas: [1],
+          assignedParas: [],
         },
       },
       [today]: {
         date: today,
         dayNumber: 2,
-        sabaq: {
-          part: 'sabaq',
-          range: makeRange(3, 6, 1, 4, 8, 5), // Starting where yesterday ended!
-          status: 'pending',
-          repeatPracticeCount: 4,
-          targetRepeats: 10,
-          surahName: 'Al-Baqarah',
-          juzNumber: 1,
-          startPage: 3,
-          endPage: 4,
-          startLine: 6,
-          endLine: 8,
-        },
+        sabaq: createEmptySabaqPlan(),
         sabqi: {
           part: 'sabqi',
-          range: makeRange(2, 1, 1, 3, 5, 6),
+          range: makeRange(2, 3, 1, 2, 8, 2),
           status: 'in_progress',
           repeatPracticeCount: 7,
           targetRepeats: 7,
-          portionType: 'half_para',
-          portionLabel: 'Half Para (Pages 2 - 3)',
+          portionType: 'current_para_passed',
+          portionLabel: 'Passed Sabaqs in Para 1 (P2:L3 - P2:L8)',
         },
         manzil: {
           part: 'manzil',
-          range: makeRange(1, 1, 1, 21, 15, 8),
+          range: makeRange(1, 2, 1, 1, 8, 2),
           status: 'pending',
           repeatPracticeCount: 2,
           targetRepeats: 5,
-          assignedParas: [1],
+          assignedParas: [],
         },
       },
     },
+
+    // Student 2: Abdullah (In Para 5, Completed [1,2,3,4]) — Day 1 repeat, Day 2 passed at Para 5 end
     student_2: {
       [yesterday]: {
         date: yesterday,
         dayNumber: 1,
         sabaq: {
           part: 'sabaq',
-          range: makeRange(4, 1, 1, 4, 15, 8),
-          status: 'passed',
-          repeatPracticeCount: 10,
+          range: makeRange(100, 1, 1, 100, 15, 8),
+          status: 'repeat',
+          repeatPracticeCount: 6,
           targetRepeats: 10,
           completedAt: `${yesterday}T08:30:00Z`,
-          surahName: 'Al-Baqarah',
-          juzNumber: 1,
-          startPage: 4,
-          endPage: 4,
+          sessionResultId: 'res_s2_yesterday_repeat',
+          surahName: 'An-Nisa',
+          juzNumber: 5,
+          startPage: 100,
+          endPage: 100,
           startLine: 1,
           endLine: 15,
         },
         sabqi: {
           part: 'sabqi',
-          range: makeRange(2, 1, 1, 3, 15, 8),
+          range: makeRange(98, 1, 1, 99, 15, 7),
           status: 'passed',
           repeatPracticeCount: 7,
           targetRepeats: 7,
-          portionType: 'half_para',
-          portionLabel: 'Half Para (Pages 2 - 3)',
+          portionType: 'current_para_passed',
+          portionLabel: 'Para 5 Passed Sabaq (P98 - P99)',
         },
         manzil: {
           part: 'manzil',
-          range: makeRange(1, 1, 1, 21, 15, 8),
+          range: para1Full,
           status: 'passed',
           repeatPracticeCount: 3,
           targetRepeats: 3,
@@ -257,45 +317,47 @@ export function createInitialDemoState(): MadrasaState {
         dayNumber: 2,
         sabaq: {
           part: 'sabaq',
-          range: makeRange(5, 1, 1, 5, 15, 8),
+          range: makeRange(101, 1, 1, 101, 15, 7),
           status: 'passed',
           repeatPracticeCount: 12,
           targetRepeats: 10,
           completedAt: `${today}T08:30:00Z`,
           sessionResultId: 'res_seed_s2_sabaq',
-          surahName: 'Al-Baqarah',
-          juzNumber: 1,
-          startPage: 5,
-          endPage: 5,
+          surahName: 'An-Nisa',
+          juzNumber: 5,
+          startPage: 101,
+          endPage: 101,
           startLine: 1,
           endLine: 15,
         },
         sabqi: {
           part: 'sabqi',
-          range: makeRange(2, 1, 1, 4, 15, 8),
+          range: makeRange(101, 1, 1, 101, 15, 7),
           status: 'pending',
           repeatPracticeCount: 5,
           targetRepeats: 7,
-          portionType: 'custom',
-          portionLabel: 'Recent 3 Pages (Pages 2 - 4)',
+          portionType: 'current_para_passed',
+          portionLabel: 'Passed Sabaqs in Para 5 (P101:L1 - P101:L15)',
         },
         manzil: {
           part: 'manzil',
-          range: makeRange(22, 1, 1, 41, 15, 8),
+          range: getFullParaRange(2),
           status: 'pending',
           repeatPracticeCount: 1,
           targetRepeats: 3,
-          assignedParas: [2], // Teacher selected Para 2 out of [1, 2, 3, 4, 5]!
+          assignedParas: [2],
         },
       },
     },
+
+    // Student 3: Hamza (In Para 1) — Day 1 passed, Day 2 Repeat (excluded from Sabqi)
     student_3: {
       [yesterday]: {
         date: yesterday,
         dayNumber: 1,
         sabaq: {
           part: 'sabaq',
-          range: makeRange(2, 3, 1, 2, 15, 8),
+          range: makeRange(2, 3, 1, 2, 8, 2),
           status: 'passed',
           repeatPracticeCount: 8,
           targetRepeats: 10,
@@ -304,24 +366,24 @@ export function createInitialDemoState(): MadrasaState {
           startPage: 2,
           endPage: 2,
           startLine: 3,
-          endLine: 15,
+          endLine: 8,
         },
         sabqi: {
           part: 'sabqi',
-          range: makeRange(1, 1, 1, 2, 2, 4),
+          range: makeRange(2, 3, 1, 2, 8, 2),
           status: 'repeat',
           repeatPracticeCount: 3,
           targetRepeats: 5,
-          portionType: 'quarter_para',
-          portionLabel: 'Opening Pages (Pages 1 - 2)',
+          portionType: 'current_para_passed',
+          portionLabel: 'Passed Sabaqs in Para 1 (P2:L3 - P2:L8)',
         },
         manzil: {
           part: 'manzil',
-          range: makeRange(1, 1, 1, 2, 15, 8),
+          range: makeRange(1, 2, 1, 1, 8, 2),
           status: 'pending',
           repeatPracticeCount: 1,
           targetRepeats: 3,
-          assignedParas: [1],
+          assignedParas: [],
         },
       },
       [today]: {
@@ -329,7 +391,7 @@ export function createInitialDemoState(): MadrasaState {
         dayNumber: 2,
         sabaq: {
           part: 'sabaq',
-          range: makeRange(3, 1, 1, 3, 8, 7),
+          range: makeRange(3, 1, 1, 3, 8, 8),
           status: 'repeat',
           repeatPracticeCount: 6,
           targetRepeats: 10,
@@ -344,56 +406,58 @@ export function createInitialDemoState(): MadrasaState {
         },
         sabqi: {
           part: 'sabqi',
-          range: makeRange(1, 1, 1, 2, 15, 8),
+          range: makeRange(2, 3, 1, 2, 8, 2),
           status: 'pending',
           repeatPracticeCount: 3,
           targetRepeats: 5,
-          portionType: 'quarter_para',
-          portionLabel: 'Quarter Para (Pages 1 - 2)',
+          portionType: 'current_para_passed',
+          portionLabel: 'Passed Sabaqs in Para 1 (P2:L3 - P2:L8)',
         },
         manzil: {
           part: 'manzil',
-          range: makeRange(1, 1, 1, 2, 15, 8),
+          range: makeRange(1, 2, 1, 1, 8, 2),
           status: 'pending',
           repeatPracticeCount: 1,
           targetRepeats: 3,
-          assignedParas: [1],
+          assignedParas: [],
         },
       },
     },
+
+    // Student 4: Ibrahim (Ustaad B, Completed [1..11], finished Para 12 all PASSED)
     student_4: {
       [yesterday]: {
         date: yesterday,
         dayNumber: 1,
         sabaq: {
           part: 'sabaq',
-          range: makeRange(10, 1, 1, 10, 15, 8),
+          range: makeRange(240, 1, 1, 240, 15, 9),
           status: 'passed',
           repeatPracticeCount: 9,
           targetRepeats: 10,
-          surahName: 'Al-Baqarah',
-          juzNumber: 1,
-          startPage: 10,
-          endPage: 10,
+          surahName: 'Yusuf',
+          juzNumber: 12,
+          startPage: 240,
+          endPage: 240,
           startLine: 1,
           endLine: 15,
         },
         sabqi: {
           part: 'sabqi',
-          range: makeRange(5, 1, 1, 9, 15, 8),
+          range: makeRange(240, 1, 1, 240, 15, 9),
           status: 'passed',
           repeatPracticeCount: 5,
           targetRepeats: 5,
-          portionType: 'half_para',
-          portionLabel: 'Half Para (Pages 5 - 9)',
+          portionType: 'current_para_passed',
+          portionLabel: 'Passed Sabaqs in Para 12 (P240)',
         },
         manzil: {
           part: 'manzil',
-          range: makeRange(82, 1, 1, 101, 15, 8),
+          range: para5Full,
           status: 'passed',
           repeatPracticeCount: 2,
           targetRepeats: 3,
-          assignedParas: [5], // Teacher assigned Para 5 out of 12 completed!
+          assignedParas: [5],
         },
       },
       [today]: {
@@ -401,29 +465,31 @@ export function createInitialDemoState(): MadrasaState {
         dayNumber: 2,
         sabaq: {
           part: 'sabaq',
-          range: makeRange(11, 1, 1, 11, 12, 8),
-          status: 'pending',
-          repeatPracticeCount: 5,
+          range: makeRange(241, 1, 1, 241, 15, 11),
+          status: 'passed',
+          repeatPracticeCount: 8,
           targetRepeats: 8,
-          surahName: 'Al-Baqarah',
-          juzNumber: 1,
-          startPage: 11,
-          endPage: 11,
+          completedAt: `${today}T09:00:00Z`,
+          sessionResultId: 'res_seed_s4_sabaq',
+          surahName: 'Yusuf',
+          juzNumber: 12,
+          startPage: 241,
+          endPage: 241,
           startLine: 1,
-          endLine: 12,
+          endLine: 15,
         },
         sabqi: {
           part: 'sabqi',
-          range: makeRange(6, 1, 1, 10, 15, 8),
+          range: makeRange(240, 1, 1, 241, 15, 11),
           status: 'pending',
           repeatPracticeCount: 3,
           targetRepeats: 5,
-          portionType: 'half_para',
-          portionLabel: 'Half Para (Pages 6 - 10)',
+          portionType: 'current_para_passed',
+          portionLabel: 'Passed Sabaqs in Para 12 (P240:L1 - P241:L15)',
         },
         manzil: {
           part: 'manzil',
-          range: makeRange(82, 1, 1, 101, 15, 8),
+          range: para5Full,
           status: 'pending',
           repeatPracticeCount: 2,
           targetRepeats: 3,
@@ -431,69 +497,59 @@ export function createInitialDemoState(): MadrasaState {
         },
       },
     },
+
+    // Student 5: Umar (Ustaad B, Completed [1..15], in Para 16) — Today Sabaq is EMPTY until Ustaad assigns!
     student_5: {
       [yesterday]: {
         date: yesterday,
         dayNumber: 1,
         sabaq: {
           part: 'sabaq',
-          range: makeRange(15, 1, 1, 15, 15, 8),
+          range: makeRange(302, 1, 1, 302, 10, 9),
           status: 'passed',
           repeatPracticeCount: 10,
           targetRepeats: 10,
-          surahName: 'Al-Baqarah',
-          juzNumber: 1,
-          startPage: 15,
-          endPage: 15,
+          surahName: 'Al-Kahf',
+          juzNumber: 16,
+          startPage: 302,
+          endPage: 302,
           startLine: 1,
-          endLine: 15,
+          endLine: 10,
         },
         sabqi: {
           part: 'sabqi',
-          range: makeRange(10, 1, 1, 14, 15, 8),
+          range: makeRange(302, 1, 1, 302, 10, 9),
           status: 'passed',
           repeatPracticeCount: 6,
           targetRepeats: 6,
-          portionType: 'half_para',
-          portionLabel: 'Half Para (Pages 10 - 14)',
+          portionType: 'current_para_passed',
+          portionLabel: 'Passed Sabaqs in Para 16 (P302:L1 - L10)',
         },
         manzil: {
           part: 'manzil',
-          range: makeRange(42, 1, 1, 61, 15, 8),
+          range: para3Full,
           status: 'passed',
           repeatPracticeCount: 3,
           targetRepeats: 3,
-          assignedParas: [3], // Teacher selected Para 3 out of 15 completed!
+          assignedParas: [3],
         },
       },
       [today]: {
         date: today,
         dayNumber: 2,
-        sabaq: {
-          part: 'sabaq',
-          range: makeRange(16, 1, 1, 16, 15, 8),
-          status: 'pending',
-          repeatPracticeCount: 3,
-          targetRepeats: 10,
-          surahName: 'Al-Baqarah',
-          juzNumber: 1,
-          startPage: 16,
-          endPage: 16,
-          startLine: 1,
-          endLine: 15,
-        },
+        sabaq: createEmptySabaqPlan(),
         sabqi: {
           part: 'sabqi',
-          range: makeRange(11, 1, 1, 15, 15, 8),
+          range: makeRange(302, 1, 1, 302, 10, 9),
           status: 'pending',
           repeatPracticeCount: 4,
           targetRepeats: 7,
-          portionType: 'half_para',
-          portionLabel: 'Half Para (Pages 11 - 15)',
+          portionType: 'current_para_passed',
+          portionLabel: 'Passed Sabaqs in Para 16 (P302:L1 - L10)',
         },
         manzil: {
           part: 'manzil',
-          range: makeRange(42, 1, 1, 61, 15, 8),
+          range: para3Full,
           status: 'pending',
           repeatPracticeCount: 1,
           targetRepeats: 3,
@@ -504,7 +560,6 @@ export function createInitialDemoState(): MadrasaState {
   };
 
   const marksHistory: MistakeMark[] = [
-    // Yesterday marks
     {
       id: 'mark_seed_1',
       studentId: 'student_1',
@@ -522,14 +577,13 @@ export function createInitialDemoState(): MadrasaState {
       studentId: 'student_1',
       date: yesterday,
       part: 'sabaq',
-      wordId: 'p3_l2_w4',
-      page: 3,
-      line: 2,
+      wordId: 'p2_l6_w4',
+      page: 2,
+      line: 6,
       wordIndex: 4,
       type: 'atkan',
       timestamp: Date.now() - 86000000,
     },
-    // Today marks
     {
       id: 'mark_seed_3',
       studentId: 'student_3',
@@ -583,12 +637,36 @@ export function createInitialDemoState(): MadrasaState {
       studentId: 'student_2',
       date: today,
       part: 'sabaq',
-      wordId: 'p5_l6_w4',
-      page: 5,
+      wordId: 'p101_l6_w4',
+      page: 101,
       line: 6,
       wordIndex: 4,
       type: 'atkan',
       timestamp: Date.now() - 12000000,
+    },
+    {
+      id: 'mark_seed_8',
+      studentId: 'student_2',
+      date: yesterday,
+      part: 'sabaq',
+      wordId: 'p100_l4_w3',
+      page: 100,
+      line: 4,
+      wordIndex: 3,
+      type: 'ghalti',
+      timestamp: Date.now() - 92000000,
+    },
+    {
+      id: 'mark_seed_9',
+      studentId: 'student_2',
+      date: yesterday,
+      part: 'sabaq',
+      wordId: 'p100_l9_w2',
+      page: 100,
+      line: 9,
+      wordIndex: 2,
+      type: 'ghalti',
+      timestamp: Date.now() - 91500000,
     },
   ];
 
@@ -606,8 +684,24 @@ export function createInitialDemoState(): MadrasaState {
       finalResult: 'passed',
       isOverridden: false,
       marks: [marksHistory[0], marksHistory[1]],
-      range: dailyPlans.student_1[yesterday].sabaq.range,
+      range: dailyPlans.student_1[yesterday].sabaq.range!,
       timestamp: Date.now() - 86400000,
+    },
+    {
+      id: 'res_s2_yesterday_repeat',
+      studentId: 'student_2',
+      date: yesterday,
+      part: 'sabaq',
+      ghaltiCount: 2,
+      atkanCount: 0,
+      ghaltiLimit: 1,
+      atkanLimit: 3,
+      suggestedResult: 'repeat',
+      finalResult: 'repeat',
+      isOverridden: false,
+      marks: [marksHistory[7], marksHistory[8]],
+      range: dailyPlans.student_2[yesterday].sabaq.range!,
+      timestamp: Date.now() - 91500000,
     },
     {
       id: 'res_seed_s2_sabaq',
@@ -622,7 +716,7 @@ export function createInitialDemoState(): MadrasaState {
       finalResult: 'passed',
       isOverridden: false,
       marks: [marksHistory[6]],
-      range: dailyPlans.student_2[today].sabaq.range,
+      range: dailyPlans.student_2[today].sabaq.range!,
       timestamp: Date.now() - 12000000,
     },
     {
@@ -638,19 +732,38 @@ export function createInitialDemoState(): MadrasaState {
       finalResult: 'repeat',
       isOverridden: false,
       marks: [marksHistory[2], marksHistory[3], marksHistory[4], marksHistory[5]],
-      range: dailyPlans.student_3[today].sabaq.range,
+      range: dailyPlans.student_3[today].sabaq.range!,
       timestamp: Date.now() - 8500000,
+    },
+    {
+      id: 'res_seed_s4_sabaq',
+      studentId: 'student_4',
+      date: today,
+      part: 'sabaq',
+      ghaltiCount: 0,
+      atkanCount: 0,
+      ghaltiLimit: 2,
+      atkanLimit: 4,
+      suggestedResult: 'passed',
+      finalResult: 'passed',
+      isOverridden: false,
+      marks: [],
+      range: dailyPlans.student_4[today].sabaq.range!,
+      timestamp: Date.now() - 10000000,
     },
   ];
 
   return {
     currentDate: today,
-    dayCount: 2,
     currentRole: 'ustaad_a',
     language: 'en',
     settings: {
+      timeZone,
       freezeSabaqOnSabqiOrManzilFail: true,
       halqaDefaultLimits: { ...DEFAULT_HALQA_LIMITS },
+      mushafLayout: 'madinah',
+      mushafScript: 'indopak',
+      highContrastMushaf: false,
     },
     students,
     ustaads,
@@ -661,19 +774,164 @@ export function createInitialDemoState(): MadrasaState {
   };
 }
 
+/**
+ * Synchronizes state to the real current date in the configured school time zone.
+ * - Rolls over student plans into today's real date cleanly if today doesn't exist yet (keeping Sabaq empty).
+ * - Never deletes any existing past or future-dated records.
+ */
+export function syncStateToRealDate(
+  currentState: MadrasaState,
+  now: Date = new Date()
+): MadrasaState {
+  const tz = currentState.settings?.timeZone || DEFAULT_SCHOOL_TIMEZONE;
+  const realToday = getRealTodayDate(tz, now);
+
+  let plansChanged = false;
+  const newDailyPlans: Record<string, Record<string, DayPlan>> = {
+    ...currentState.dailyPlans,
+  };
+
+  for (const studentId of Object.keys(currentState.students)) {
+    const student = currentState.students[studentId];
+    const studentHistory = currentState.dailyPlans[studentId] || {};
+
+    if (studentHistory[realToday]) {
+      continue;
+    }
+
+    // Find most recent prior DayPlan strictly before realToday
+    const priorDates = Object.keys(studentHistory)
+      .filter(d => d < realToday)
+      .sort();
+    const latestPriorDate = priorDates.length > 0 ? priorDates[priorDates.length - 1] : null;
+    const priorPlan = latestPriorDate ? studentHistory[latestPriorDate] : null;
+
+    if (!priorPlan) {
+      continue;
+    }
+
+    const sabqiStatus = priorPlan.sabqi?.status;
+    const manzilStatus = priorPlan.manzil?.status;
+    const revisionFailed = sabqiStatus === 'repeat' || manzilStatus === 'repeat';
+    const shouldFreezeNewSabaq =
+      Boolean(currentState.settings?.freezeSabaqOnSabqiOrManzilFail) && revisionFailed;
+
+    const computedSabqi = computeCurrentParaSabqiRange(
+      student,
+      currentState,
+      latestPriorDate || realToday
+    );
+    const nextSabqiRange: AssignmentRange | null = computedSabqi
+      ? computedSabqi.range
+      : priorPlan.sabqi?.range
+      ? { ...priorPlan.sabqi.range }
+      : null;
+    const nextSabqiLabel = computedSabqi
+      ? `Passed Sabaqs in Para ${student.currentJuz} (P${computedSabqi.range.start.page}:L${computedSabqi.range.start.line} - P${computedSabqi.range.end.page}:L${computedSabqi.range.end.line})`
+      : priorPlan.sabqi?.portionLabel;
+
+    let nextManzilRange: AssignmentRange | null = priorPlan.manzil?.range
+      ? { ...priorPlan.manzil.range }
+      : null;
+    let nextAssignedParas = priorPlan.manzil?.assignedParas
+      ? [...priorPlan.manzil.assignedParas]
+      : [];
+    if (
+      manzilStatus === 'passed' &&
+      student.completedParas &&
+      student.completedParas.length > 0
+    ) {
+      const sortedCompleted = [...student.completedParas].sort((a, b) => a - b);
+      const currAssigned = nextAssignedParas[0];
+      const currIdx = sortedCompleted.indexOf(currAssigned);
+      const nextPara = sortedCompleted[(currIdx + 1) % sortedCompleted.length];
+      nextAssignedParas = [nextPara];
+      nextManzilRange = getFullParaRange(nextPara);
+    }
+
+    const todayPlan: DayPlan = {
+      date: realToday,
+      sabaq: createEmptySabaqPlan(),
+      sabqi: {
+        part: 'sabqi',
+        range: nextSabqiRange,
+        status: 'pending',
+        repeatPracticeCount: 0,
+        targetRepeats: 7,
+        surahName: nextSabqiRange?.surahName,
+        juzNumber: nextSabqiRange?.juzNumber,
+        startPage: nextSabqiRange?.startPage,
+        endPage: nextSabqiRange?.endPage,
+        startLine: nextSabqiRange?.startLine,
+        endLine: nextSabqiRange?.endLine,
+        startAyah: nextSabqiRange?.startAyah,
+        endAyah: nextSabqiRange?.endAyah,
+        portionType: computedSabqi ? 'current_para_passed' : priorPlan.sabqi?.portionType,
+        portionLabel: nextSabqiLabel,
+      },
+      manzil: {
+        part: 'manzil',
+        range: nextManzilRange,
+        status: 'pending',
+        repeatPracticeCount: 0,
+        targetRepeats: 5,
+        surahName: nextManzilRange?.surahName,
+        juzNumber: nextManzilRange?.juzNumber,
+        startPage: nextManzilRange?.startPage,
+        endPage: nextManzilRange?.endPage,
+        startLine: nextManzilRange?.startLine,
+        endLine: nextManzilRange?.endLine,
+        startAyah: nextManzilRange?.startAyah,
+        endAyah: nextManzilRange?.endAyah,
+        assignedParas: nextAssignedParas,
+      },
+      sabaqFrozenDueToRevisionFail: shouldFreezeNewSabaq,
+    };
+
+    newDailyPlans[studentId] = {
+      ...studentHistory,
+      [realToday]: todayPlan,
+    };
+    plansChanged = true;
+  }
+
+  const settingsNeedUpdate = currentState.settings?.timeZone !== tz;
+  if (
+    currentState.currentDate === realToday &&
+    !plansChanged &&
+    !settingsNeedUpdate
+  ) {
+    return currentState;
+  }
+
+  return {
+    ...currentState,
+    currentDate: realToday,
+    settings: {
+      ...currentState.settings,
+      timeZone: tz,
+    },
+    dailyPlans: plansChanged ? newDailyPlans : currentState.dailyPlans,
+  };
+}
+
 export function loadState(): MadrasaState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      const initial = createInitialDemoState();
+      const initial = createInitialDemoState(DEFAULT_SCHOOL_TIMEZONE);
       saveState(initial);
       return initial;
     }
-    const parsed = JSON.parse(raw);
-    return parsed;
+    const parsed = JSON.parse(raw) as MadrasaState;
+    const synced = syncStateToRealDate(parsed);
+    if (synced !== parsed) {
+      saveState(synced);
+    }
+    return synced;
   } catch (err) {
     console.error('Failed to parse localStorage state, resetting:', err);
-    const initial = createInitialDemoState();
+    const initial = createInitialDemoState(DEFAULT_SCHOOL_TIMEZONE);
     saveState(initial);
     return initial;
   }
@@ -687,9 +945,9 @@ export function saveState(state: MadrasaState): void {
   }
 }
 
-export function resetDemoState(): MadrasaState {
+export function resetDemoState(timeZone: string = DEFAULT_SCHOOL_TIMEZONE): MadrasaState {
   localStorage.removeItem(STORAGE_KEY);
-  const fresh = createInitialDemoState();
+  const fresh = createInitialDemoState(timeZone);
   saveState(fresh);
   return fresh;
 }
@@ -707,241 +965,59 @@ export function getAllRecordedDates(state: MadrasaState): string[] {
 }
 
 /**
- * Navigate to the PREVIOUS day in history.
- * Does NOT overwrite or mutate any historical record.
+ * Inspects saved records dated strictly after today's real date (left over from the old simulated clock),
+ * without deleting or modifying them.
  */
-export function goToPreviousDate(currentState: MadrasaState): MadrasaState {
-  const recordedDates = getAllRecordedDates(currentState);
-  const currentIndex = recordedDates.indexOf(currentState.currentDate);
+export function getFutureDatedRecordsSummary(
+  state: MadrasaState,
+  referenceToday?: string
+): {
+  futureDates: string[];
+  dailyPlanEntriesCount: number;
+  sessionResultsCount: number;
+  marksCount: number;
+  totalCount: number;
+} {
+  const tz = state.settings?.timeZone || DEFAULT_SCHOOL_TIMEZONE;
+  const today = referenceToday || getRealTodayDate(tz);
+  const futureDateSet = new Set<string>();
+  let dailyPlanEntriesCount = 0;
 
-  let prevDate: string;
-  let prevDayCount = Math.max(1, currentState.dayCount - 1);
+  Object.values(state.dailyPlans).forEach(studentHistory => {
+    Object.keys(studentHistory).forEach(date => {
+      if (date > today) {
+        futureDateSet.add(date);
+        dailyPlanEntriesCount++;
+      }
+    });
+  });
 
-  if (currentIndex > 0) {
-    prevDate = recordedDates[currentIndex - 1];
-  } else {
-    // Decrement calendar date
-    const d = new Date(currentState.currentDate);
-    d.setDate(d.getDate() - 1);
-    prevDate = d.toISOString().split('T')[0];
-  }
+  const sessionResultsCount = state.sessionResults.filter(r => {
+    if (r.date > today) {
+      futureDateSet.add(r.date);
+      return true;
+    }
+    return false;
+  }).length;
 
-  const updatedState: MadrasaState = {
-    ...currentState,
-    currentDate: prevDate,
-    dayCount: prevDayCount,
+  const marksCount = state.marksHistory.filter(m => {
+    if (m.date > today) {
+      futureDateSet.add(m.date);
+      return true;
+    }
+    return false;
+  }).length;
+
+  return {
+    futureDates: Array.from(futureDateSet).sort(),
+    dailyPlanEntriesCount,
+    sessionResultsCount,
+    marksCount,
+    totalCount: dailyPlanEntriesCount + sessionResultsCount + marksCount,
   };
-
-  saveState(updatedState);
-  return updatedState;
 }
 
-/**
- * Navigate to the NEXT day.
- * If the next date already exists in history, it simply switches currentDate
- * without modifying or overwriting historical records!
- * Only if advancing past the latest date does it compute new promotion rules.
- */
-export function advanceToNextDay(currentState: MadrasaState): MadrasaState {
-  const recordedDates = getAllRecordedDates(currentState);
-  const currentIndex = recordedDates.indexOf(currentState.currentDate);
-
-  // If next date is already recorded in history, just navigate to it!
-  if (currentIndex >= 0 && currentIndex < recordedDates.length - 1) {
-    const nextExistingDate = recordedDates[currentIndex + 1];
-    const updatedState: MadrasaState = {
-      ...currentState,
-      currentDate: nextExistingDate,
-      dayCount: currentState.dayCount + 1,
-    };
-    saveState(updatedState);
-    return updatedState;
-  }
-
-  // Otherwise, we are advancing past the latest recorded date!
-  const currentD = new Date(currentState.currentDate);
-  currentD.setDate(currentD.getDate() + 1);
-  const nextDate = currentD.toISOString().split('T')[0];
-  const nextDayCount = currentState.dayCount + 1;
-
-  const newDailyPlans: Record<string, Record<string, DayPlan>> = { ...currentState.dailyPlans };
-
-  for (const studentId of Object.keys(currentState.students)) {
-    const studentHistory = currentState.dailyPlans[studentId] || {};
-    const todayPlan = studentHistory[currentState.currentDate];
-
-    if (!todayPlan) {
-      continue;
-    }
-
-    const sabaqStatus = todayPlan.sabaq.status;
-    const sabqiStatus = todayPlan.sabqi.status;
-    const manzilStatus = todayPlan.manzil.status;
-
-    const revisionFailed = sabqiStatus === 'repeat' || manzilStatus === 'repeat';
-    const shouldFreezeNewSabaq = currentState.settings.freezeSabaqOnSabqiOrManzilFail && revisionFailed;
-
-    let nextSabaqRange: AssignmentRange = { ...todayPlan.sabaq.range };
-    let sabaqFrozenFlag = false;
-
-    if (shouldFreezeNewSabaq) {
-      sabaqFrozenFlag = true;
-    } else if (sabaqStatus === 'repeat') {
-      nextSabaqRange = { ...todayPlan.sabaq.range };
-    } else {
-      const lastEnd = todayPlan.sabaq.range.end;
-      const linesLength = todayPlan.sabaq.range.linesCount || 8;
-      const newStart = { ...lastEnd };
-      const newEnd = advanceLocationByLines(newStart, linesLength);
-      const meta = getRangeMetadata(newStart, newEnd);
-      nextSabaqRange = {
-        start: newStart,
-        end: newEnd,
-        linesCount: meta.linesCount,
-        surahName: meta.surahName,
-        juzNumber: meta.juzNumber,
-        startPage: meta.startPage,
-        endPage: meta.endPage,
-        startLine: meta.startLine,
-        endLine: meta.endLine,
-        startAyah: meta.startAyah,
-        endAyah: meta.endAyah,
-      };
-    }
-
-    let nextSabqiRange: AssignmentRange = { ...todayPlan.sabqi.range };
-    if (sabqiStatus === 'passed') {
-      const nextSabqiStart = advanceLocationByLines(todayPlan.sabqi.range.start, 15);
-      const nextSabqiEnd = advanceLocationByLines(todayPlan.sabqi.range.end, 15);
-      const meta = getRangeMetadata(nextSabqiStart, nextSabqiEnd);
-      nextSabqiRange = {
-        start: nextSabqiStart,
-        end: nextSabqiEnd,
-        linesCount: meta.linesCount,
-        surahName: meta.surahName,
-        juzNumber: meta.juzNumber,
-        startPage: meta.startPage,
-        endPage: meta.endPage,
-        startLine: meta.startLine,
-        endLine: meta.endLine,
-        startAyah: meta.startAyah,
-        endAyah: meta.endAyah,
-      };
-    }
-
-    let nextManzilRange: AssignmentRange = { ...todayPlan.manzil.range };
-    if (manzilStatus === 'passed') {
-      const nextManzilStart = advanceLocationByLines(todayPlan.manzil.range.start, 75);
-      const nextManzilEnd = advanceLocationByLines(todayPlan.manzil.range.end, 75);
-      const meta = getRangeMetadata(nextManzilStart, nextManzilEnd);
-      nextManzilRange = {
-        start: nextManzilStart,
-        end: nextManzilEnd,
-        linesCount: meta.linesCount,
-        surahName: meta.surahName,
-        juzNumber: meta.juzNumber,
-        startPage: meta.startPage,
-        endPage: meta.endPage,
-        startLine: meta.startLine,
-        endLine: meta.endLine,
-        startAyah: meta.startAyah,
-        endAyah: meta.endAyah,
-      };
-    }
-
-    const nextDayPlan: DayPlan = {
-      date: nextDate,
-      dayNumber: nextDayCount,
-      sabaq: {
-        part: 'sabaq',
-        range: nextSabaqRange,
-        status: 'pending',
-        repeatPracticeCount: 0,
-        targetRepeats: 10,
-        surahName: nextSabaqRange.surahName,
-        juzNumber: nextSabaqRange.juzNumber,
-        startPage: nextSabaqRange.startPage,
-        endPage: nextSabaqRange.endPage,
-        startLine: nextSabaqRange.startLine,
-        endLine: nextSabaqRange.endLine,
-        startAyah: nextSabaqRange.startAyah,
-        endAyah: nextSabaqRange.endAyah,
-      },
-      sabqi: {
-        part: 'sabqi',
-        range: nextSabqiRange,
-        status: 'pending',
-        repeatPracticeCount: 0,
-        targetRepeats: 7,
-        surahName: nextSabqiRange.surahName,
-        juzNumber: nextSabqiRange.juzNumber,
-        startPage: nextSabqiRange.startPage,
-        endPage: nextSabqiRange.endPage,
-        startLine: nextSabqiRange.startLine,
-        endLine: nextSabqiRange.endLine,
-        startAyah: nextSabqiRange.startAyah,
-        endAyah: nextSabqiRange.endAyah,
-        portionType: todayPlan.sabqi.portionType,
-        portionLabel: todayPlan.sabqi.portionLabel,
-      },
-      manzil: {
-        part: 'manzil',
-        range: nextManzilRange,
-        status: 'pending',
-        repeatPracticeCount: 0,
-        targetRepeats: 5,
-        surahName: nextManzilRange.surahName,
-        juzNumber: nextManzilRange.juzNumber,
-        startPage: nextManzilRange.startPage,
-        endPage: nextManzilRange.endPage,
-        startLine: nextManzilRange.startLine,
-        endLine: nextManzilRange.endLine,
-        startAyah: nextManzilRange.startAyah,
-        endAyah: nextManzilRange.endAyah,
-        assignedParas: todayPlan.manzil.assignedParas,
-      },
-      sabaqFrozenDueToRevisionFail: sabaqFrozenFlag,
-    };
-
-    if (!newDailyPlans[studentId]) {
-      newDailyPlans[studentId] = {};
-    }
-    newDailyPlans[studentId][nextDate] = nextDayPlan;
-  }
-
-  const updatedState: MadrasaState = {
-    ...currentState,
-    currentDate: nextDate,
-    dayCount: nextDayCount,
-    dailyPlans: newDailyPlans,
-  };
-
-  saveState(updatedState);
-  return updatedState;
-}
-
-/**
- * Jump directly to a selected recorded date without overwriting anything.
- */
-export function jumpToDate(currentState: MadrasaState, targetDate: string): MadrasaState {
-  const recordedDates = getAllRecordedDates(currentState);
-  const dateIdx = recordedDates.indexOf(targetDate);
-  const targetDayCount = dateIdx >= 0 ? dateIdx + 1 : currentState.dayCount;
-
-  const updatedState: MadrasaState = {
-    ...currentState,
-    currentDate: targetDate,
-    dayCount: targetDayCount,
-  };
-
-  saveState(updatedState);
-  return updatedState;
-}
-
-export function getEffectiveLimits(
-  studentId: string,
-  state: MadrasaState
-): StudentLimits {
+export function getEffectiveLimits(studentId: string, state: MadrasaState): StudentLimits {
   const defaults = state.settings.halqaDefaultLimits;
   const overrides = state.studentLimitsOverride[studentId] || {};
   return {

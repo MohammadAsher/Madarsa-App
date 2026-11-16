@@ -11,22 +11,17 @@ import {
   RotateCcw, 
   Languages, 
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  History,
+  Settings,
   ArrowLeft
 } from 'lucide-react';
 import { MadrasaState, RoleId } from '../types/hifz';
 import { translations } from '../i18n/translations';
-import { getAllRecordedDates } from '../services/storageService';
 
 interface HeaderProps {
   state: MadrasaState;
   onSelectRole: (role: RoleId) => void;
   onToggleLanguage: () => void;
-  onPrevDay: () => void;
-  onNextDay: () => void;
-  onSelectDate: (date: string) => void;
+  onOpenSettings: () => void;
   onResetDemo: () => void;
   onNavigateBack?: () => void;
   canGoBack?: boolean;
@@ -36,24 +31,17 @@ export const Header: React.FC<HeaderProps> = ({
   state,
   onSelectRole,
   onToggleLanguage,
-  onPrevDay,
-  onNextDay,
-  onSelectDate,
+  onOpenSettings,
   onResetDemo,
   onNavigateBack,
   canGoBack = true,
 }) => {
   const t = translations[state.language];
   const [showRoleMenu, setShowRoleMenu] = useState(false);
-  const [showDateMenu, setShowDateMenu] = useState(false);
 
   const getRoleDisplayName = (roleId: RoleId) => {
     return t.roles[roleId] || roleId;
   };
-
-  const recordedDates = getAllRecordedDates(state);
-  const latestRecordedDate = recordedDates[recordedDates.length - 1];
-  const isViewingHistorical = state.currentDate < latestRecordedDate;
 
   return (
     <header className="sticky top-0 z-40 bg-[#241811] text-[#FCFAF6] border-b-2 border-[#C5A059] shadow-md">
@@ -193,82 +181,30 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
 
-        {/* Zone 3: Date Navigation & Reset */}
+        {/* Zone 3: Real Current Date, Settings & Reset */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Date Navigator Strip with Antique Gold border */}
-          <div className="flex items-center bg-[#2E2017] border border-[#C5A059]/40 rounded-xl p-0.5 shadow-xs">
-            {/* Previous Day Button */}
-            <button
-              type="button"
-              onClick={onPrevDay}
-              className="p-1 sm:p-1.5 rounded-lg hover:bg-[#3A291E] text-[#FCFAF6] transition-colors cursor-pointer text-xs flex items-center gap-1 font-medium"
-              title={t.prevDayTooltip}
-            >
-              <ChevronLeft className="w-4 h-4 text-[#C5A059]" />
-              <span className="hidden lg:inline">{t.prevDay}</span>
-            </button>
-
-            {/* Current Date Button / Menu */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowDateMenu(prev => !prev)}
-                className={`px-2 py-1 rounded-md text-xs font-mono font-bold flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer ${
-                  isViewingHistorical
-                    ? 'bg-[#C5A059] text-[#241811] shadow-xs'
-                    : 'bg-[#FAF6EF] text-[#241811] shadow-xs border border-[#C5A059]/50'
-                }`}
-                title="Click to jump to another date"
-              >
-                <Calendar className="w-3.5 h-3.5 text-[#8F6E2B]" />
-                <span>{state.currentDate}</span>
-                <span className="text-[10px] text-[#7A6C60] hidden sm:inline">
-                  (D{state.dayCount})
-                </span>
-                {isViewingHistorical && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#241811]" />
-                )}
-              </button>
-
-              {showDateMenu && (
-                <div 
-                  className="absolute right-0 mt-2 w-60 bg-[#FCFAF6] text-[#241811] rounded-xl shadow-2xl border-2 border-[#C5A059] py-1.5 z-50 text-xs divide-y divide-[#EADEC7]"
-                  onClick={() => setShowDateMenu(false)}
-                >
-                  <div className="px-3 py-1 font-bold text-[#7A6C60] text-[10px] uppercase tracking-wider flex items-center gap-1">
-                    <History className="w-3 h-3 text-[#C5A059]" />
-                    <span>{t.selectDate}</span>
-                  </div>
-                  {recordedDates.map((d, idx) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => onSelectDate(d)}
-                      className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-[#F3ECE1] cursor-pointer ${
-                        state.currentDate === d ? 'bg-[#F3ECE1] text-[#241811] font-bold border-l-3 border-[#C5A059]' : 'text-[#3E2B20]'
-                      }`}
-                    >
-                      <span className="font-mono">{d}</span>
-                      <span className="text-[#7A6C60] font-sans text-[11px]">
-                        Day {idx + 1} {d === latestRecordedDate ? '(Latest)' : ''}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Next Day Button */}
-            <button
-              type="button"
-              onClick={onNextDay}
-              className="p-1 sm:p-1.5 rounded-lg hover:bg-[#3A291E] text-[#FCFAF6] transition-colors cursor-pointer text-xs flex items-center gap-1 font-semibold"
-              title={t.nextDayTooltip}
-            >
-              <span className="hidden lg:inline">{t.nextDay}</span>
-              <ChevronRight className="w-4 h-4 text-[#C5A059]" />
-            </button>
+          {/* Today's Real Date Display */}
+          <div
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#FAF6EF] text-[#241811] border border-[#C5A059] text-xs font-mono font-bold shadow-xs min-h-[38px]"
+            title={state.language === 'ur' ? 'آج کی اصل تاریخ' : 'Today'}
+          >
+            <Calendar className="w-3.5 h-3.5 text-[#8F6E2B] shrink-0" />
+            <span className="hidden sm:inline font-sans text-[#7A6C60] font-semibold">
+              {state.language === 'ur' ? 'آج:' : 'Today:'}
+            </span>
+            <span>{state.currentDate}</span>
           </div>
+
+          {/* School Settings Button */}
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="p-1.5 sm:p-2 rounded-xl border border-[#C5A059]/40 bg-[#2E2017] hover:bg-[#3A291E] text-[#DFCFA8] hover:text-[#FCFAF6] text-xs font-medium transition-colors cursor-pointer min-h-[38px]"
+            title={state.language === 'ur' ? 'ترتیبات' : 'Settings'}
+            aria-label="Settings"
+          >
+            <Settings className="w-3.5 h-3.5 text-[#C5A059]" />
+          </button>
 
           {/* Reset Demo Data button */}
           <button
@@ -286,23 +222,6 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
       </div>
-
-      {/* Historical viewing alert banner with warm antique aesthetic */}
-      {isViewingHistorical && (
-        <div className="bg-[#DFCFA8] text-[#241811] border-t border-[#C5A059] px-4 py-1.5 text-center text-xs font-medium flex items-center justify-center gap-1.5 shadow-inner">
-          <History className="w-3.5 h-3.5 text-[#5A4333]" />
-          <span>
-            {t.viewingHistoricalNotice}: <strong>{state.currentDate}</strong> ({t.dayCounter} {state.dayCount}). Student records and assignments reflect this date.
-          </span>
-          <button
-            type="button"
-            onClick={() => onSelectDate(latestRecordedDate)}
-            className="ml-2 underline font-bold hover:text-black cursor-pointer"
-          >
-            Jump to Today ({latestRecordedDate})
-          </button>
-        </div>
-      )}
     </header>
   );
 };

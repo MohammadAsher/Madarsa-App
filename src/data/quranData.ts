@@ -1,31 +1,42 @@
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
- * 
- * Quran Page Data Provider (Read-Only Interface)
- * 
- * Contains verified, authentic Uthmani Quranic Arabic text for Surah Al-Baqarah
- * (Ayahs 1 to 286, Pages 2 to 49) and Surah Al-Fatihah (Ayahs 1 to 7, Page 1).
- * Formatted into standard 15-line Mushaf pages with Ayahs, verse markers, and
- * stable word identifiers.
+ *
+ * Read-Only Full Quran Data Provider (114 Surahs, 6,236 Ayahs, 30 Paras, 604 Pages)
+ * Imported verbatim from Quran Foundation / Quran.com API v4.
+ * Layout: 15-Line Madinah Mushaf (604 pages) with Indo-Pak (text_indopak) & Uthmani (text_uthmani).
+ * See SOURCE.md for exact API endpoints, licence, fetch timestamp, and SHA-256 checksums.
  */
 
-import verifiedPagesJson from './quranSurahBaqarah.json';
+import quranPagesRaw from './quranPages.json';
+import quranMetadataRaw from './quranMetadata.json';
 
 export interface MushafWord {
   id: string; // e.g. "p4_l9_w3"
   pageNumber: number;
   lineNumber: number; // 1 to 15
-  wordIndex: number; // 1 to ~12
-  text: string; // Verified Arabic word
-  ayahNumber?: number;
+  wordIndex: number; // 1 to N
+  text: string; // Verbatim Indo-Pak text (text_indopak)
+  textUthmani: string; // Verbatim Uthmani text (text_uthmani)
+  surahNumber: number;
+  ayahNumber: number;
+  juzNumber: number;
   isAyahEnd?: boolean;
-  ayahMarker?: string; // e.g. " ﴿٥﴾ "
+  ayahMarker?: string; // Verbatim Arabic ayah numeral from API end token
+  rukuEndNumber?: number; // Present on the last word of a ruku
+  rubQuarter?: number; // 1..8 within Juz (1=Juz start, 3=Rub/quarter, 5=Nisf/half, 7=Thalathah Arba/three-quarters)
+  rubNumber?: number;
+  hizbNumber?: number;
+  sajdahNumber?: number;
 }
 
 export interface MushafLine {
   lineNumber: number; // 1 to 15
   isHeaderLine?: boolean;
+  headerSurahNumber?: number;
+  headerSurahName?: string;
+  headerSurahArabicName?: string;
+  headerSurahMeta?: string;
   isBismillahLine?: boolean;
   words: MushafWord[];
 }
@@ -34,10 +45,9 @@ export interface MushafPage {
   pageNumber: number;
   juzNumber: number; // 1 to 30
   surahName: string;
+  surahArabicName: string;
   surahEnglishName?: string;
   surahNumber: number;
-  hasSurahHeader?: boolean;
-  hasBismillah?: boolean;
   startAyah?: number;
   endAyah?: number;
   lines: MushafLine[];
@@ -50,106 +60,187 @@ export interface WordLocation {
   wordId: string;
 }
 
-// Fixed Surah names metadata for pages beyond 49
-const SURAH_NAMES_METADATA: { [pageRangeStart: number]: { name: string; urduName: string; num: number } } = {
-  1: { name: 'Al-Fatihah', urduName: 'الفاتحة', num: 1 },
-  2: { name: 'Al-Baqarah', urduName: 'البقرة', num: 2 },
-  50: { name: 'Ali \'Imran', urduName: 'آل عمران', num: 3 },
-  77: { name: 'An-Nisa', urduName: 'النساء', num: 4 },
-  106: { name: 'Al-Ma\'idah', urduName: 'المائدة', num: 5 },
-  128: { name: 'Al-An\'am', urduName: 'الأنعام', num: 6 },
-  151: { name: 'Al-A\'raf', urduName: 'الأعراف', num: 7 },
-  177: { name: 'Al-Anfal', urduName: 'الأنفال', num: 8 },
-  187: { name: 'At-Tawbah', urduName: 'التوبة', num: 9 },
-  208: { name: 'Yunus', urduName: 'يونس', num: 10 },
-};
-
-function getSurahForPage(pageNumber: number) {
-  const starts = Object.keys(SURAH_NAMES_METADATA)
-    .map(Number)
-    .sort((a, b) => b - a);
-  for (const start of starts) {
-    if (pageNumber >= start) {
-      return SURAH_NAMES_METADATA[start];
-    }
-  }
-  return { name: 'Surah', urduName: 'سورۃ', num: 1 };
+export interface SurahInfo {
+  id: number;
+  nameSimple: string;
+  nameArabic: string;
+  revelationPlace: string;
+  versesCount: number;
+  bismillahPre: boolean;
+  pages: [number, number];
 }
 
-// In-memory cache
-const verifiedPages: Record<number, MushafPage> = verifiedPagesJson as unknown as Record<number, MushafPage>;
-const fallbackCache: Map<number, MushafPage> = new Map();
+export interface JuzInfo {
+  juzNumber: number;
+  versesCount: number;
+  verseMapping: Record<string, string>;
+  startPage: number;
+  endPage: number;
+  startLoc: WordLocation;
+  endLoc: WordLocation;
+  lastSurahNumber: number;
+  lastAyahNumber: number;
+}
+
+interface CompactWord {
+  id: string;
+  wi: number;
+  t: string;
+  u: string;
+  s: number;
+  a: number;
+  j: number;
+  e?: number;
+  am?: string;
+  rk?: number;
+  rb?: number;
+  rbn?: number;
+  hbn?: number;
+  sj?: number;
+}
+
+interface CompactLine {
+  l: number;
+  h?: number;
+  b?: number;
+  w: CompactWord[];
+}
+
+interface CompactPage {
+  p: number;
+  j: number;
+  s: number;
+  sn: string;
+  sa: string;
+  sa1: number;
+  sa2: number;
+  lines: CompactLine[];
+}
+
+interface QuranMetadataFile {
+  source: string;
+  fetchedAt: string;
+  totalSurahs: number;
+  totalAyahs: number;
+  totalJuzs: number;
+  totalPages: number;
+  chapters: SurahInfo[];
+  juzs: JuzInfo[];
+}
+
+const rawPages = quranPagesRaw as unknown as Record<string, CompactPage>;
+const metadata = quranMetadataRaw as unknown as QuranMetadataFile;
+
+export const QURAN_DATA_INFO = {
+  source: metadata.source,
+  fetchedAt: metadata.fetchedAt,
+  totalSurahs: metadata.totalSurahs,
+  totalAyahs: metadata.totalAyahs,
+  totalJuzs: metadata.totalJuzs,
+  totalPages: metadata.totalPages,
+  activeLayout: 'madinah' as const,
+  totalMadinahPages: 604,
+  totalHafiziPages: 610,
+};
+
+export const ALL_SURAHS: SurahInfo[] = metadata.chapters;
+export const ALL_JUZS: JuzInfo[] = metadata.juzs;
+
+const surahMap = new Map<number, SurahInfo>(ALL_SURAHS.map(c => [c.id, c]));
+const juzMap = new Map<number, JuzInfo>(ALL_JUZS.map(j => [j.juzNumber, j]));
+const pageCache = new Map<number, MushafPage>();
+
+function toArabicNumerals(num: number): string {
+  const digits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+  return String(num)
+    .split('')
+    .map(d => digits[parseInt(d, 10)] ?? d)
+    .join('');
+}
 
 /**
- * Standard 15-line Mushaf Page Getter
- * Returns verified Arabic text for Surah Al-Baqarah (Pages 2-49) and Al-Fatihah (Page 1).
+ * Standard 15-line Mushaf Page Getter (Madinah 604-page layout)
+ * Returns verified, unmodified Quranic Arabic words from local read-only JSON.
  */
 export function getPage(pageNumber: number): MushafPage {
-  const validPage = Math.max(1, Math.min(604, Math.floor(pageNumber)));
+  const validPage = Math.max(1, Math.min(metadata.totalPages, Math.floor(pageNumber)));
 
-  // 1. Check verified Surah Al-Baqarah / Al-Fatihah pages
-  if (verifiedPages[validPage]) {
-    const p = verifiedPages[validPage];
-    return {
-      pageNumber: p.pageNumber,
-      juzNumber: p.juzNumber,
-      surahName: p.surahName,
-      surahEnglishName: p.surahEnglishName || 'Al-Baqarah',
-      surahNumber: p.pageNumber === 1 ? 1 : 2,
-      hasSurahHeader: p.hasSurahHeader,
-      hasBismillah: p.hasBismillah,
-      startAyah: p.startAyah,
-      endAyah: p.endAyah,
-      lines: p.lines,
-    };
+  if (pageCache.has(validPage)) {
+    return pageCache.get(validPage)!;
   }
 
-  // 2. Check cache for pages beyond 49
-  if (fallbackCache.has(validPage)) {
-    return fallbackCache.get(validPage)!;
+  const raw = rawPages[String(validPage)];
+  if (!raw) {
+    throw new Error(`Quran page ${validPage} missing from local dataset.`);
   }
 
-  const juzNumber = Math.min(30, Math.floor((validPage - 1) / 20) + 1);
-  const surahInfo = getSurahForPage(validPage);
-  const lines: MushafLine[] = [];
-
-  for (let lineNumber = 1; lineNumber <= 15; lineNumber++) {
-    const seed = (validPage * 31 + lineNumber * 17) % 3;
-    const wordsPerLine = 8 + seed;
-
-    const words: MushafWord[] = [];
-    for (let wordIndex = 1; wordIndex <= wordsPerLine; wordIndex++) {
-      const id = `p${validPage}_l${lineNumber}_w${wordIndex}`;
-      words.push({
-        id,
-        pageNumber: validPage,
-        lineNumber,
-        wordIndex,
-        text: `Word ${wordIndex}`,
-      });
+  const lines: MushafLine[] = raw.lines.map(cl => {
+    if (cl.h !== undefined) {
+      const ch = surahMap.get(cl.h);
+      const revAr = ch?.revelationPlace === 'makkah' ? 'مَكِّيَّةٌ' : 'مَدَنِيَّةٌ';
+      const ayahCountAr = ch ? toArabicNumerals(ch.versesCount) : '';
+      return {
+        lineNumber: cl.l,
+        isHeaderLine: true,
+        headerSurahNumber: cl.h,
+        headerSurahName: ch?.nameSimple || `Surah ${cl.h}`,
+        headerSurahArabicName: ch?.nameArabic || '',
+        headerSurahMeta: ch ? `${revAr} · آيَاتُهَا ${ayahCountAr}` : '',
+        words: [],
+      };
     }
 
-    lines.push({
-      lineNumber,
+    if (cl.b === 1) {
+      return {
+        lineNumber: cl.l,
+        isBismillahLine: true,
+        words: [],
+      };
+    }
+
+    const words: MushafWord[] = cl.w.map(cw => ({
+      id: cw.id,
+      pageNumber: validPage,
+      lineNumber: cl.l,
+      wordIndex: cw.wi,
+      text: cw.t,
+      textUthmani: cw.u,
+      surahNumber: cw.s,
+      ayahNumber: cw.a,
+      juzNumber: cw.j,
+      isAyahEnd: cw.e === 1,
+      ayahMarker: cw.am,
+      rukuEndNumber: cw.rk,
+      rubQuarter: cw.rb,
+      rubNumber: cw.rbn,
+      hizbNumber: cw.hbn,
+      sajdahNumber: cw.sj,
+    }));
+
+    return {
+      lineNumber: cl.l,
       words,
-    });
-  }
+    };
+  });
 
   const page: MushafPage = {
-    pageNumber: validPage,
-    juzNumber,
-    surahName: surahInfo.name,
-    surahEnglishName: surahInfo.name,
-    surahNumber: surahInfo.num,
+    pageNumber: raw.p,
+    juzNumber: raw.j,
+    surahName: raw.sn,
+    surahArabicName: raw.sa,
+    surahEnglishName: raw.sn,
+    surahNumber: raw.s,
+    startAyah: raw.sa1,
+    endAyah: raw.sa2,
     lines,
   };
 
-  fallbackCache.set(validPage, page);
+  pageCache.set(validPage, page);
   return page;
 }
 
 /**
- * Fetch a word by its ID
+ * Fetch a word by its ID (e.g. "p4_l9_w3")
  */
 export function getWordById(wordId: string): MushafWord | null {
   const match = wordId.match(/^p(\d+)_l(\d+)_w(\d+)$/);
@@ -158,10 +249,52 @@ export function getWordById(wordId: string): MushafWord | null {
   const lineNum = parseInt(match[2], 10);
   const wordIdx = parseInt(match[3], 10);
 
+  if (pageNum < 1 || pageNum > metadata.totalPages) return null;
   const page = getPage(pageNum);
   const line = page.lines.find(l => l.lineNumber === lineNum);
   if (!line) return null;
   return line.words.find(w => w.wordIndex === wordIdx) || null;
+}
+
+/**
+ * Find the first real word on or after a given page/line
+ */
+export function getFirstWordOnOrAfter(pageNum: number, lineNum = 1): WordLocation {
+  let p = Math.max(1, Math.min(metadata.totalPages, pageNum));
+  let l = Math.max(1, Math.min(15, lineNum));
+  while (p <= metadata.totalPages) {
+    const page = getPage(p);
+    for (const line of page.lines) {
+      if (line.lineNumber >= l && line.words.length > 0) {
+        const w = line.words[0];
+        return { page: p, line: line.lineNumber, wordIndex: w.wordIndex, wordId: w.id };
+      }
+    }
+    p++;
+    l = 1;
+  }
+  return juzMap.get(30)!.endLoc;
+}
+
+/**
+ * Find the last real word on or before a given page/line
+ */
+export function getLastWordOnOrBefore(pageNum: number, lineNum = 15): WordLocation {
+  let p = Math.max(1, Math.min(metadata.totalPages, pageNum));
+  let l = Math.max(1, Math.min(15, lineNum));
+  while (p >= 1) {
+    const page = getPage(p);
+    for (let idx = page.lines.length - 1; idx >= 0; idx--) {
+      const line = page.lines[idx];
+      if (line.lineNumber <= l && line.words.length > 0) {
+        const w = line.words[line.words.length - 1];
+        return { page: p, line: line.lineNumber, wordIndex: w.wordIndex, wordId: w.id };
+      }
+    }
+    p--;
+    l = 15;
+  }
+  return juzMap.get(1)!.startLoc;
 }
 
 /**
@@ -197,93 +330,115 @@ export function isWordInRange(
  */
 export function calculateRangeLines(start: WordLocation, end: WordLocation): number {
   const [from, to] = compareWordLocations(start, end) <= 0 ? [start, end] : [end, start];
-  if (from.page === to.page) {
-    return Math.max(1, to.line - from.line + 1);
+  let count = 0;
+  for (let p = from.page; p <= to.page; p++) {
+    const page = getPage(p);
+    for (const line of page.lines) {
+      if (line.words.length === 0) continue;
+      if (p === from.page && line.lineNumber < from.line) continue;
+      if (p === to.page && line.lineNumber > to.line) continue;
+      count++;
+    }
   }
-  const firstPageLines = 15 - from.line + 1;
-  const fullMiddlePagesLines = Math.max(0, to.page - from.page - 1) * 15;
-  const lastPageLines = to.line;
-  return firstPageLines + fullMiddlePagesLines + lastPageLines;
+  return Math.max(1, count);
 }
 
 /**
- * Advance a word location by lines
+ * Advance a word location forward by N actual text lines, landing on the last word of that line
  */
 export function advanceLocationByLines(loc: WordLocation, linesToAdd: number): WordLocation {
-  let targetPage = loc.page;
-  let targetLine = loc.line + linesToAdd;
+  let remaining = Math.max(0, Math.floor(linesToAdd));
+  let lastMatchedLine: { page: number; lineNumber: number; words: MushafWord[] } | null = null;
 
-  while (targetLine > 15) {
-    targetLine -= 15;
-    targetPage += 1;
+  for (let p = loc.page; p <= metadata.totalPages; p++) {
+    const page = getPage(p);
+    for (const line of page.lines) {
+      if (line.words.length === 0) continue;
+      if (p === loc.page && line.lineNumber < loc.line) continue;
+
+      lastMatchedLine = { page: p, lineNumber: line.lineNumber, words: line.words };
+      if (remaining === 0) {
+        const w = line.words[line.words.length - 1];
+        return {
+          page: p,
+          line: line.lineNumber,
+          wordIndex: w.wordIndex,
+          wordId: w.id,
+        };
+      }
+      remaining--;
+    }
   }
 
-  const page = getPage(targetPage);
-  const line = page.lines.find(l => l.lineNumber === targetLine) || page.lines[page.lines.length - 1];
-  const word = line.words[Math.min(loc.wordIndex - 1, line.words.length - 1)] || line.words[0] || {
-    id: `p${targetPage}_l${line.lineNumber}_w1`,
-    wordIndex: 1,
-    lineNumber: line.lineNumber,
-    pageNumber: targetPage,
-    text: '',
-  };
+  if (lastMatchedLine && lastMatchedLine.words.length > 0) {
+    const w = lastMatchedLine.words[lastMatchedLine.words.length - 1];
+    return {
+      page: lastMatchedLine.page,
+      line: lastMatchedLine.lineNumber,
+      wordIndex: w.wordIndex,
+      wordId: w.id,
+    };
+  }
 
-  return {
-    page: targetPage,
-    line: line.lineNumber,
-    wordIndex: word.wordIndex,
-    wordId: word.id,
-  };
+  return getLastWordOnOrBefore(metadata.totalPages, 15);
 }
 
 /**
- * Returns exact start and end page for a given Para (Juz) 1 to 30
+ * Advance to the word immediately following `loc` (for starting tomorrow's Sabaq cleanly after yesterday's last word)
+ */
+export function getNextWordAfter(loc: WordLocation): WordLocation {
+  const page = getPage(loc.page);
+  const line = page.lines.find(l => l.lineNumber === loc.line);
+  if (line) {
+    const nextInLine = line.words.find(w => w.wordIndex > loc.wordIndex);
+    if (nextInLine) {
+      return {
+        page: loc.page,
+        line: loc.line,
+        wordIndex: nextInLine.wordIndex,
+        wordId: nextInLine.id,
+      };
+    }
+  }
+  if (loc.line < 15) {
+    return getFirstWordOnOrAfter(loc.page, loc.line + 1);
+  }
+  if (loc.page < metadata.totalPages) {
+    return getFirstWordOnOrAfter(loc.page + 1, 1);
+  }
+  return loc;
+}
+
+export function getSurahMetadata(surahNumber: number): SurahInfo | undefined {
+  return surahMap.get(surahNumber);
+}
+
+export function getJuzMetadata(juzNumber: number): JuzInfo {
+  const j = Math.max(1, Math.min(30, Math.floor(juzNumber)));
+  return juzMap.get(j)!;
+}
+
+/**
+ * Returns exact start and end page for a given Para (Juz) 1 to 30 from verified metadata
  */
 export function getParaPageRange(paraNumber: number): { startPage: number; endPage: number } {
-  const p = Math.max(1, Math.min(30, Math.floor(paraNumber)));
-  if (p === 1) return { startPage: 1, endPage: 21 };
-  const startPage = (p - 1) * 20 + 2;
-  const endPage = Math.min(604, p * 20 + 1);
-  return { startPage, endPage };
+  const info = getJuzMetadata(paraNumber);
+  return { startPage: info.startPage, endPage: info.endPage };
 }
 
 /**
- * Returns typical Surah names found in a Para
+ * Returns Surah names contained in a Para from verified verseMapping
  */
 export function getParaSurahName(paraNumber: number): string {
-  const names: Record<number, string> = {
-    1: 'Al-Fatihah & Al-Baqarah',
-    2: 'Al-Baqarah (Part 2)',
-    3: 'Al-Baqarah & Ali \'Imran',
-    4: 'Ali \'Imran & An-Nisa',
-    5: 'An-Nisa',
-    6: 'An-Nisa & Al-Ma\'idah',
-    7: 'Al-Ma\'idah & Al-An\'am',
-    8: 'Al-An\'am & Al-A\'raf',
-    9: 'Al-A\'raf & Al-Anfal',
-    10: 'Al-Anfal & At-Tawbah',
-    11: 'Yunus & Hud',
-    12: 'Hud & Yusuf',
-    13: 'Yusuf & Ar-Ra\'d & Ibrahim',
-    14: 'Al-Hijr & An-Nahl',
-    15: 'Al-Isra & Al-Kahf',
-    16: 'Al-Kahf & Maryam & Ta-Ha',
-    17: 'Al-Anbiya & Al-Hajj',
-    18: 'Al-Mu\'minun & An-Nur & Al-Furqan',
-    19: 'Al-Furqan & Ash-Shu\'ara & An-Naml',
-    20: 'An-Naml & Al-Qasas & Al-\'Ankabut',
-    21: 'Al-\'Ankabut & Ar-Rum & Luqman & As-Sajdah & Al-Ahzab',
-    22: 'Al-Ahzab & Saba & Fatir & Ya-Sin',
-    23: 'Ya-Sin & As-Saffat & Sad & Az-Zumar',
-    24: 'Az-Zumar & Ghafir & Fussilat',
-    25: 'Fussilat & Ash-Shura & Az-Zukhruf & Ad-Dukhan & Al-Jathiyah',
-    26: 'Al-Ahqaf & Muhammad & Al-Fath & Al-Hujurat & Qaf & Adh-Dhariyat',
-    27: 'Adh-Dhariyat & At-Tur & An-Najm & Al-Qamar & Ar-Rahman & Al-Waqi\'ah & Al-Hadid',
-    28: 'Al-Mujadila to At-Tahrim',
-    29: 'Al-Mulk to Al-Mursalat',
-    30: 'An-Naba to An-Nas (Amma Yatasa\'alun)',
-  };
-  return names[paraNumber] || `Para ${paraNumber}`;
+  const info = getJuzMetadata(paraNumber);
+  const surahIds = Object.keys(info.verseMapping)
+    .map(Number)
+    .sort((a, b) => a - b);
+  const names = surahIds
+    .map(id => surahMap.get(id)?.nameSimple)
+    .filter(Boolean) as string[];
+  if (names.length <= 3) return names.join(' & ');
+  return `${names[0]} to ${names[names.length - 1]}`;
 }
 
 /**
@@ -295,25 +450,30 @@ export function getRangeMetadata(start: WordLocation, end: WordLocation) {
   const endPageData = getPage(to.page);
   const linesCount = calculateRangeLines(from, to);
 
-  const startWord = getWordById(from.wordId) || 
-    startPageData.lines.find(l => l.lineNumber === from.line)?.words.find(w => w.wordIndex === from.wordIndex);
-  
-  const endWord = getWordById(to.wordId) || 
-    endPageData.lines.find(l => l.lineNumber === to.line)?.words.find(w => w.wordIndex === to.wordIndex);
+  const startWord =
+    getWordById(from.wordId) ||
+    startPageData.lines.find(l => l.lineNumber === from.line)?.words.find(w => w.wordIndex === from.wordIndex) ||
+    startPageData.lines.find(l => l.words.length > 0)?.words[0];
 
-  const startAyah = startWord?.ayahNumber;
-  const endAyah = endWord?.ayahNumber;
+  const endWord =
+    getWordById(to.wordId) ||
+    endPageData.lines.find(l => l.lineNumber === to.line)?.words.find(w => w.wordIndex === to.wordIndex) ||
+    endPageData.lines[endPageData.lines.length - 1]?.words.slice(-1)[0];
+
+  const startSurah = startWord ? surahMap.get(startWord.surahNumber)?.nameSimple : startPageData.surahName;
+  const endSurah = endWord ? surahMap.get(endWord.surahNumber)?.nameSimple : endPageData.surahName;
+  const surahLabel =
+    startSurah && endSurah && startSurah !== endSurah ? `${startSurah} – ${endSurah}` : startSurah || startPageData.surahName;
 
   return {
-    surahName: startPageData.surahName,
-    juzNumber: startPageData.juzNumber,
+    surahName: surahLabel,
+    juzNumber: startWord?.juzNumber || startPageData.juzNumber,
     startPage: from.page,
     endPage: to.page,
     startLine: from.line,
     endLine: to.line,
     linesCount,
-    startAyah,
-    endAyah,
+    startAyah: startWord?.ayahNumber,
+    endAyah: endWord?.ayahNumber,
   };
 }
-
