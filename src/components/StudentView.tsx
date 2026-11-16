@@ -242,9 +242,9 @@ export const StudentView: React.FC<StudentViewProps> = ({
   const manzilAssignedParas = todayPlan?.manzil?.assignedParas || [];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+    <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 py-4 sm:py-6 space-y-5">
       {/* Student Profile Banner */}
-      <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden">
+      <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-3.5 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#C5A059] to-transparent" />
 
         <div className="flex items-center gap-3.5">
@@ -574,7 +574,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
       </div>
 
       {/* Requirement D: "My Completed Paras" 30-Tile Grid */}
-      <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-5 shadow-xs space-y-3">
+      <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-3.5 sm:p-5 shadow-xs space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-base font-bold text-[#241811] flex items-center gap-2">
@@ -607,7 +607,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
       </div>
 
       {/* 2. Practice Toolbar: Repeat Counter & Hide-and-Reveal Mode */}
-      <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-4 shadow-xs flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-3 sm:p-4 shadow-xs flex flex-wrap items-center justify-between gap-3 sm:gap-4">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <button

@@ -160,38 +160,39 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#FAF6EF] bg-islamic-pattern pb-14 sm:pb-16">
-      {/* Top Navigation & Student Header Bar - Slim, non-intrusive */}
-      <header className="sticky top-0 z-30 bg-[#241811] text-[#FCFAF6] border-b border-[#C5A059] px-3 sm:px-4 py-2 shadow-sm">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-2 sm:gap-4">
-          <div className="flex items-center gap-2 sm:gap-3">
+    <div className="flex flex-col min-h-screen w-full bg-[#FAF6EF] bg-islamic-pattern pb-16 sm:pb-16">
+      {/* Top Navigation & Student Header Bar - wraps cleanly on mobile */}
+      <header className="sticky top-0 z-30 w-full bg-[#241811] text-[#FCFAF6] border-b border-[#C5A059] px-2.5 sm:px-4 py-2 shadow-sm">
+        <div className="w-full max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             {/* Direct Back to Halqa button */}
             <button
               type="button"
               onClick={onBack}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#C5A059]/40 bg-[#2E2017] hover:bg-[#3A291E] active:scale-95 text-[#FCFAF6] text-xs font-semibold transition-colors cursor-pointer shadow-xs min-h-[34px]"
+              className="flex items-center gap-1 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-[#C5A059]/40 bg-[#2E2017] hover:bg-[#3A291E] active:scale-95 text-[#FCFAF6] text-xs font-semibold transition-colors cursor-pointer shadow-xs min-h-[34px] shrink-0"
               title={t.backToDashboard}
+              aria-label={t.backToDashboard}
             >
               <ArrowLeft className="w-4 h-4 text-[#C5A059] shrink-0" />
-              <span>{t.backToDashboard}</span>
+              <span className="hidden sm:inline">{t.backToDashboard}</span>
             </button>
 
-            <div className="flex items-center gap-1.5 truncate">
-              <span className="font-bold text-[#FCFAF6] text-sm sm:text-base truncate">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-bold text-[#FCFAF6] text-xs sm:text-base truncate">
                 {state.language === 'ur' ? student.urduName : student.name}
               </span>
               <span className="text-[#C5A059] hidden sm:inline">۞</span>
-              <span className="text-[#DFCFA8] text-xs hidden sm:inline truncate">
+              <span className="text-[#DFCFA8] text-xs hidden md:inline truncate">
                 {student.halqaName}
               </span>
-              <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-[#2E2017] border border-[#C5A059]/40 text-[#DFCFA8]">
+              <span className="font-mono text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded bg-[#2E2017] border border-[#C5A059]/40 text-[#DFCFA8] shrink-0">
                 {activeDate}
               </span>
             </div>
           </div>
 
           {/* Part Switcher Tabs */}
-          <div className="flex items-center p-0.5 bg-[#2E2017] rounded-lg border border-[#C5A059]/40">
+          <div className="flex items-center p-0.5 bg-[#2E2017] rounded-lg border border-[#C5A059]/40 shrink-0">
             {(['sabaq', 'sabqi', 'manzil'] as PartType[]).map(partKey => {
               const isActive = activePart === partKey;
               const partStatus = todayPlan ? todayPlan[partKey]?.status : 'pending';
@@ -205,13 +206,13 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
                   key={partKey}
                   type="button"
                   onClick={() => setActivePart(partKey)}
-                  className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer ${
                     isActive
                       ? 'bg-[#FCFAF6] text-[#241811] shadow-xs'
                       : 'text-[#DFCFA8] hover:text-[#FCFAF6]'
                   }`}
                 >
-                  <span className={`w-2 h-2 rounded-full ${statusIndicatorColor}`} />
+                  <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${statusIndicatorColor}`} />
                   <span className="capitalize">{t.parts[partKey]}</span>
                 </button>
               );
@@ -284,7 +285,7 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
       </div>
 
       {/* Main Mushaf Listening Workspace */}
-      <main className="flex-1 max-w-5xl w-full mx-auto p-2 sm:p-3 flex flex-col items-center">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-1.5 sm:px-3 py-2 flex flex-col items-center">
         {currentPartPlan?.range ? (
           <MushafViewer
             pageNumber={currentPage}
@@ -368,25 +369,26 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
         )}
       </main>
 
-      {/* Compact Sticky Bottom Marking Toolbar - Sleek single-row layout that does not cover the Mushaf */}
-      <div className="fixed bottom-0 inset-x-0 bg-[#241811]/95 backdrop-blur-md border-t border-[#C5A059] shadow-xl px-2.5 sm:px-4 py-1.5 sm:py-2 z-40">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-1.5 sm:gap-3">
+      {/* Compact Sticky Bottom Marking Toolbar - Fits cleanly at 360px+ without overflow */}
+      <div className="fixed bottom-0 inset-x-0 w-full bg-[#241811]/95 backdrop-blur-md border-t border-[#C5A059] shadow-xl px-2 sm:px-4 py-1.5 sm:py-2 z-40">
+        <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-1.5 sm:gap-3">
           {/* Left Group: Marking Tools (Ghalti, Atkan, Undo) */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             {/* Ghalti Button */}
             <button
               type="button"
               onClick={() => setActiveTool('ghalti')}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer shadow-2xs min-h-[34px] sm:min-h-[36px] ${
+              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg font-bold text-[11px] sm:text-xs transition-all cursor-pointer shadow-2xs min-h-[34px] sm:min-h-[36px] ${
                 activeTool === 'ghalti'
                   ? 'bg-[#B91C1C] text-white ring-2 ring-rose-400 scale-[1.02]'
                   : 'bg-[#3E2B20] text-rose-200 border border-rose-800 hover:bg-rose-950/80'
               }`}
               title="Mark Ghalti (Mistake)"
             >
-              <span className="w-2.5 h-2.5 rounded-full bg-current shrink-0" />
-              <span className="whitespace-nowrap">{t.ghaltiButton}</span>
-              <span className="text-[11px] font-mono px-1.5 py-0.2 rounded bg-black/35 font-extrabold text-white">
+              <span className="w-2 h-2 rounded-full bg-current shrink-0" />
+              <span className="sm:hidden whitespace-nowrap">{t.ghaltiShort}</span>
+              <span className="hidden sm:inline whitespace-nowrap">{t.ghaltiButton}</span>
+              <span className="text-[10px] sm:text-[11px] font-mono px-1 rounded bg-black/35 font-extrabold text-white">
                 {ghaltiCount}
               </span>
             </button>
@@ -395,16 +397,17 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
             <button
               type="button"
               onClick={() => setActiveTool('atkan')}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-xs transition-all cursor-pointer shadow-2xs min-h-[34px] sm:min-h-[36px] ${
+              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg font-bold text-[11px] sm:text-xs transition-all cursor-pointer shadow-2xs min-h-[34px] sm:min-h-[36px] ${
                 activeTool === 'atkan'
                   ? 'bg-[#D97706] text-white ring-2 ring-amber-400 scale-[1.02]'
                   : 'bg-[#3E2B20] text-amber-200 border border-amber-800 hover:bg-amber-950/80'
               }`}
               title="Mark Atkan (Hesitation)"
             >
-              <span className="w-2.5 h-2.5 rounded-full bg-current shrink-0" />
-              <span className="whitespace-nowrap">{t.atkanButton}</span>
-              <span className="text-[11px] font-mono px-1.5 py-0.2 rounded bg-black/35 font-extrabold text-white">
+              <span className="w-2 h-2 rounded-full bg-current shrink-0" />
+              <span className="sm:hidden whitespace-nowrap">{t.atkanShort}</span>
+              <span className="hidden sm:inline whitespace-nowrap">{t.atkanButton}</span>
+              <span className="text-[10px] sm:text-[11px] font-mono px-1 rounded bg-black/35 font-extrabold text-white">
                 {atkanCount}
               </span>
             </button>
@@ -416,23 +419,21 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
               disabled={sessionMarks.length === 0}
               className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg border border-[#C5A059]/40 bg-[#2E2017] text-[#DFCFA8] hover:bg-[#3A291E] hover:text-[#FCFAF6] disabled:opacity-30 transition-colors cursor-pointer text-xs font-semibold min-h-[34px] sm:min-h-[36px]"
               title={t.undo}
+              aria-label={t.undo}
             >
               <RotateCcw className="w-3.5 h-3.5 text-[#C5A059] shrink-0" />
               <span className="hidden sm:inline whitespace-nowrap">{t.undo}</span>
             </button>
           </div>
 
-          {/* Center divider */}
-          <div className="h-5 w-px bg-[#C5A059]/30 hidden xs:block" />
-
           {/* Right Group: Finalize Actions (Repeat, Passed) */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             {/* Mark Repeat Button */}
             <button
               type="button"
               disabled={!currentPartPlan?.range}
               onClick={() => handleFinalize('repeat')}
-              className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs min-h-[34px] sm:min-h-[36px] ${
+              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs min-h-[34px] sm:min-h-[36px] ${
                 suggestedResult === 'repeat'
                   ? 'bg-[#B91C1C] text-white hover:bg-[#991B1B] ring-2 ring-rose-400'
                   : 'bg-[#2E2017] border border-rose-700/80 text-rose-300 hover:bg-rose-950/60'
@@ -440,12 +441,8 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
               title="Mark Repeat"
             >
               <XCircle className="w-3.5 h-3.5 shrink-0" />
-              <span className="whitespace-nowrap">{t.repeatButton}</span>
-              {suggestedResult === 'repeat' && (
-                <span className="hidden md:inline text-[10px] text-rose-200 font-normal">
-                  (Suggested)
-                </span>
-              )}
+              <span className="sm:hidden whitespace-nowrap">{t.status.repeat}</span>
+              <span className="hidden sm:inline whitespace-nowrap">{t.repeatButton}</span>
             </button>
 
             {/* Mark Passed Button */}
@@ -453,7 +450,7 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
               type="button"
               disabled={!currentPartPlan?.range}
               onClick={() => handleFinalize('passed')}
-              className={`flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs min-h-[34px] sm:min-h-[36px] ${
+              className={`flex items-center gap-1 px-2 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs min-h-[34px] sm:min-h-[36px] ${
                 suggestedResult === 'passed'
                   ? 'bg-[#1F4E3D] text-white hover:bg-[#16382C] ring-2 ring-emerald-400 border border-[#C5A059]'
                   : 'bg-[#2E2017] border border-[#2E6A54] text-emerald-300 hover:bg-emerald-950/60'
@@ -461,12 +458,8 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
               title="Mark Passed"
             >
               <CheckCircle2 className="w-3.5 h-3.5 text-[#DFCFA8] shrink-0" />
-              <span className="whitespace-nowrap">{t.passButton}</span>
-              {suggestedResult === 'passed' && (
-                <span className="hidden md:inline text-[10px] text-emerald-200 font-normal">
-                  (Suggested)
-                </span>
-              )}
+              <span className="sm:hidden whitespace-nowrap">{state.language === 'ur' ? 'پاس' : 'Pass'}</span>
+              <span className="hidden sm:inline whitespace-nowrap">{t.passButton}</span>
             </button>
           </div>
         </div>

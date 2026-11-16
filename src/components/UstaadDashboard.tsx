@@ -470,15 +470,15 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+    <div className="w-full max-w-6xl mx-auto px-2.5 sm:px-4 py-4 sm:py-6 space-y-5">
       {/* Halqa Banner & Rule Controls */}
-      <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-5 shadow-xs relative overflow-hidden">
+      <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-3.5 sm:p-5 shadow-xs relative overflow-hidden">
         <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#C5A059] to-transparent" />
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-lg md:text-xl text-[#241811]">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-bold text-base sm:text-lg md:text-xl text-[#241811]">
                 {state.language === 'ur' ? ustaad.urduName : ustaad.name}
               </span>
               <span className="text-[#C5A059]">۞</span>
@@ -498,8 +498,8 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-4 bg-[#F8F4EC] border border-[#DFCFA8] p-3 rounded-xl">
-            <div className="text-right">
+          <div className="flex items-center justify-between sm:justify-start gap-3 bg-[#F8F4EC] border border-[#DFCFA8] p-2.5 sm:p-3 rounded-xl">
+            <div className="text-left sm:text-right">
               <div className="text-xs font-bold text-[#241811]">{t.freezeRuleLabel}</div>
               <div className="text-[11px] text-[#7A6C60] max-w-xs">
                 {t.freezeRuleDescription} ({realTomorrow})
@@ -562,7 +562,7 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
             return (
               <div
                 key={student.id}
-                className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] shadow-xs hover:shadow-md hover:border-[#C5A059]/60 transition-all p-4 md:p-5 flex flex-col gap-4 relative overflow-hidden"
+                className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] shadow-xs hover:shadow-md hover:border-[#C5A059]/60 transition-all p-3.5 sm:p-5 flex flex-col gap-3.5 sm:gap-4 relative overflow-hidden"
               >
                 <div className="absolute top-0 left-6 right-6 h-0.5 bg-gradient-to-r from-transparent via-[#C5A059]/30 to-transparent" />
 

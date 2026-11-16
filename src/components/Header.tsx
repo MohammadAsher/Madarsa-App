@@ -44,57 +44,59 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-[#241811] text-[#FCFAF6] border-b-2 border-[#C5A059] shadow-md">
-      <div className="max-w-6xl mx-auto px-3 md:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-2 sm:gap-3">
+    <header className="sticky top-0 z-40 w-full bg-[#241811] text-[#FCFAF6] border-b-2 border-[#C5A059] shadow-md">
+      <div className="w-full max-w-6xl mx-auto px-2.5 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2">
         {/* Zone 1: Back Navigation Button & Brand Title */}
-        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-          {/* Back Navigation Button */}
+        <div className="order-1 flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+          {/* Back Navigation Button (icon-only on < sm) */}
           <button
             type="button"
             onClick={onNavigateBack}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-[#C5A059]/50 bg-[#2E2017] hover:bg-[#3A291E] active:scale-95 text-[#FCFAF6] text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-xs min-h-[38px]"
+            className="flex items-center justify-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border border-[#C5A059]/50 bg-[#2E2017] hover:bg-[#3A291E] active:scale-95 text-[#FCFAF6] text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-xs min-h-[34px] sm:min-h-[38px] shrink-0"
             title={canGoBack ? (t.backTooltip || 'Return to previous screen') : (state.language === 'ur' ? 'مرکزی ڈیش بورڈ' : 'Main Dashboard')}
+            aria-label={t.back || 'Back'}
           >
             <ArrowLeft className="w-4 h-4 text-[#C5A059] shrink-0" />
-            <span className="font-semibold">{t.back || 'Back'}</span>
+            <span className="hidden sm:inline font-semibold">{t.back || 'Back'}</span>
           </button>
 
           {/* Brand Title with Islamic Medallion */}
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-[#DFCFA8] to-[#C5A059] text-[#241811] flex items-center justify-center shadow-xs border border-[#F3ECE1]">
-              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-gradient-to-br from-[#DFCFA8] to-[#C5A059] text-[#241811] flex items-center justify-center shadow-xs border border-[#F3ECE1] shrink-0">
+              <BookOpen className="w-3.5 h-3.5 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <div className="font-bold text-[#FCFAF6] text-sm sm:text-base md:text-lg tracking-tight whitespace-nowrap flex items-center gap-1.5">
+            <div className="min-w-0">
+              <div className="font-bold text-[#FCFAF6] text-xs sm:text-base md:text-lg tracking-tight truncate flex items-center gap-1">
                 <span>{state.language === 'ur' ? 'مدرسہ حفظِ قرآن' : 'Hifz Madrasa'}</span>
                 <span className="text-[#C5A059] text-xs hidden md:inline">۞</span>
               </div>
-              <div className="text-[9px] sm:text-[10px] text-[#C5A059] font-medium tracking-wider uppercase -mt-0.5 hidden xs:block">
+              <div className="text-[9px] sm:text-[10px] text-[#C5A059] font-medium tracking-wider uppercase -mt-0.5 hidden sm:block">
                 {state.language === 'ur' ? 'نظامِ تعلیم و حفظِ مصحف' : '15-Line Mushaf Workflow'}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Zone 2: Role Switcher & Language */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Role Switcher Dropdown */}
-          <div className="relative">
+        {/* Zone 2: Student / Ustaad Switcher (full-width row on mobile, inline on sm+) */}
+        <div className="order-3 w-full sm:order-2 sm:w-auto flex items-center gap-1.5">
+          <div className="relative w-full sm:w-auto">
             <button
               type="button"
               onClick={() => setShowRoleMenu(prev => !prev)}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-[#C5A059]/40 bg-[#2E2017] hover:bg-[#3A291E] text-[#FCFAF6] text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs min-h-[38px]"
+              className="w-full sm:w-auto flex items-center justify-between gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-[#C5A059]/40 bg-[#2E2017] hover:bg-[#3A291E] text-[#FCFAF6] text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs min-h-[36px] sm:min-h-[38px]"
             >
-              <UserCheck className="w-4 h-4 text-[#C5A059] shrink-0" />
-              <span className="truncate max-w-[90px] sm:max-w-[160px]">
-                {getRoleDisplayName(state.currentRole)}
+              <span className="flex items-center gap-1.5 min-w-0">
+                <UserCheck className="w-4 h-4 text-[#C5A059] shrink-0" />
+                <span className="truncate sm:max-w-[190px]">
+                  {getRoleDisplayName(state.currentRole)}
+                </span>
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-[#DFCFA8] shrink-0" />
             </button>
 
             {showRoleMenu && (
               <div 
-                className="absolute right-0 mt-2 w-72 bg-[#FCFAF6] text-[#241811] rounded-xl shadow-2xl border-2 border-[#C5A059] py-1.5 z-50 text-xs divide-y divide-[#EADEC7] animate-in fade-in zoom-in-95 duration-100"
+                className="absolute left-0 right-0 sm:left-auto sm:right-0 mt-2 sm:w-72 bg-[#FCFAF6] text-[#241811] rounded-xl shadow-2xl border-2 border-[#C5A059] py-1.5 z-50 text-xs divide-y divide-[#EADEC7] animate-in fade-in zoom-in-95 duration-100 max-h-[75vh] overflow-y-auto"
                 onClick={() => setShowRoleMenu(false)}
               >
                 {/* Ustaad Section */}
@@ -168,38 +170,38 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
           </div>
-
-          {/* Language Toggle: EN / اردو */}
-          <button
-            type="button"
-            onClick={onToggleLanguage}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-[#C5A059]/40 bg-[#2E2017] hover:bg-[#3A291E] text-[#FCFAF6] text-xs font-semibold transition-colors cursor-pointer min-h-[38px]"
-            title="Toggle Language / زبان تبدیل کریں"
-          >
-            <Languages className="w-3.5 h-3.5 text-[#C5A059]" />
-            <span>{state.language === 'en' ? 'اردو' : 'EN'}</span>
-          </button>
         </div>
 
-        {/* Zone 3: Real Current Date, Settings & Reset */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Zone 3: Real Current Date, Language, Settings & Reset */}
+        <div className="order-2 sm:order-3 flex items-center gap-1 sm:gap-1.5 shrink-0">
           {/* Today's Real Date Display */}
           <div
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#FAF6EF] text-[#241811] border border-[#C5A059] text-xs font-mono font-bold shadow-xs min-h-[38px]"
+            className="flex items-center gap-1 px-2 py-1 rounded-xl bg-[#FAF6EF] text-[#241811] border border-[#C5A059] text-[11px] sm:text-xs font-mono font-bold shadow-xs min-h-[34px] sm:min-h-[38px]"
             title={state.language === 'ur' ? 'آج کی اصل تاریخ' : 'Today'}
           >
-            <Calendar className="w-3.5 h-3.5 text-[#8F6E2B] shrink-0" />
-            <span className="hidden sm:inline font-sans text-[#7A6C60] font-semibold">
+            <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#8F6E2B] shrink-0" />
+            <span className="hidden md:inline font-sans text-[#7A6C60] font-semibold">
               {state.language === 'ur' ? 'آج:' : 'Today:'}
             </span>
             <span>{state.currentDate}</span>
           </div>
 
+          {/* Language Toggle: EN / اردو */}
+          <button
+            type="button"
+            onClick={onToggleLanguage}
+            className="flex items-center gap-1 px-2 py-1 rounded-xl border border-[#C5A059]/40 bg-[#2E2017] hover:bg-[#3A291E] text-[#FCFAF6] text-[11px] sm:text-xs font-semibold transition-colors cursor-pointer min-h-[34px] sm:min-h-[38px]"
+            title="Toggle Language / زبان تبدیل کریں"
+          >
+            <Languages className="w-3.5 h-3.5 text-[#C5A059] hidden sm:inline" />
+            <span>{state.language === 'en' ? 'اردو' : 'EN'}</span>
+          </button>
+
           {/* School Settings Button */}
           <button
             type="button"
             onClick={onOpenSettings}
-            className="p-1.5 sm:p-2 rounded-xl border border-[#C5A059]/40 bg-[#2E2017] hover:bg-[#3A291E] text-[#DFCFA8] hover:text-[#FCFAF6] text-xs font-medium transition-colors cursor-pointer min-h-[38px]"
+            className="p-1.5 sm:p-2 rounded-xl border border-[#C5A059]/40 bg-[#2E2017] hover:bg-[#3A291E] text-[#DFCFA8] hover:text-[#FCFAF6] text-xs font-medium transition-colors cursor-pointer min-h-[34px] sm:min-h-[38px]"
             title={state.language === 'ur' ? 'ترتیبات' : 'Settings'}
             aria-label="Settings"
           >
@@ -214,8 +216,9 @@ export const Header: React.FC<HeaderProps> = ({
                 onResetDemo();
               }
             }}
-            className="p-1.5 sm:p-2 rounded-xl border border-[#C5A059]/40 bg-[#2E2017] hover:bg-rose-950/60 hover:border-rose-400 text-[#DFCFA8] hover:text-rose-200 text-xs font-medium transition-colors cursor-pointer min-h-[38px]"
+            className="p-1.5 sm:p-2 rounded-xl border border-[#C5A059]/40 bg-[#2E2017] hover:bg-rose-950/60 hover:border-rose-400 text-[#DFCFA8] hover:text-rose-200 text-xs font-medium transition-colors cursor-pointer min-h-[34px] sm:min-h-[38px]"
             title={t.resetDemo}
+            aria-label={t.resetDemo}
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span className="hidden xl:inline ml-1">{t.resetDemo}</span>
