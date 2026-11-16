@@ -5,8 +5,9 @@
 
 import React, { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Eye, EyeOff, Contrast, AlertCircle } from 'lucide-react';
-import { getPage, MushafWord, WordLocation, isWordInRange, QURAN_DATA_INFO } from '../data/quranData';
+import { getPage, MushafWord, WordLocation, isWordInRange, QURAN_DATA_INFO, VERBATIM_BISMILLAH } from '../data/quranData';
 import { MistakeMark, MistakeType } from '../types/hifz';
+import { OpeningPageFrame, OrnamentalSurahCartouche } from './OpeningMushafDecor';
 
 interface MushafViewerProps {
   pageNumber: number;
@@ -145,9 +146,41 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
   const totalPages = QURAN_DATA_INFO.totalPages;
   const safePageNumber = Math.max(1, Math.min(totalPages, pageNumber));
   const page = getPage(safePageNumber);
+  const isOpeningSpread = safePageNumber === 1 || safePageNumber === 2;
 
   const [revealedLines, setRevealedLines] = useState<Set<number>>(new Set());
   const [revealedWords, setRevealedWords] = useState<Set<string>>(new Set());
+  const touchSwipeStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStartSwipe = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length !== 1) {
+      touchSwipeStartRef.current = null;
+      return;
+    }
+    touchSwipeStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+    };
+  };
+
+  const handleTouchEndSwipe = (e: React.TouchEvent<HTMLDivElement>) => {
+    const start = touchSwipeStartRef.current;
+    touchSwipeStartRef.current = null;
+    if (!start || e.changedTouches.length !== 1) return;
+
+    const dx = e.changedTouches[0].clientX - start.x;
+    const dy = e.changedTouches[0].clientY - start.y;
+
+    // Only turn page on deliberate horizontal swipe; never call preventDefault so vertical scroll always works
+    if (Math.abs(dx) > 65 && Math.abs(dx) > Math.abs(dy) * 1.8) {
+      // RTL Mushaf: swipe left-to-right (dx > 0) turns forward to next page; right-to-left (dx < 0) turns back
+      if (dx > 0 && safePageNumber < totalPages) {
+        onPageChange(safePageNumber + 1);
+      } else if (dx < 0 && safePageNumber > 1) {
+        onPageChange(safePageNumber - 1);
+      }
+    }
+  };
 
   // Dynamic single-row page font size calculated from container width & widest line on the page
   const textColWidthRef = useRef<HTMLDivElement | null>(null);
@@ -294,7 +327,11 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
   );
 
   return (
-    <div className="flex flex-col items-center w-full min-w-0 select-none relative">
+    <div
+      onTouchStart={handleTouchStartSwipe}
+      onTouchEnd={handleTouchEndSwipe}
+      className="flex flex-col items-center w-full min-w-0 shrink-0 select-none relative"
+    >
       {/* Offscreen line-width measurer (matches active script font & Ayah markers at 24px reference) */}
       <div
         ref={measureListRef}
@@ -306,7 +343,19 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
         style={{ fontSize: `${REF_FONT_SIZE}px`, visibility: 'hidden' }}
       >
         {page.lines.map(ln => {
-          if (ln.isHeaderLine || ln.isBismillahLine || ln.words.length === 0) return null;
+          if (ln.isHeaderLine) return null;
+          if (ln.isBismillahLine) {
+            return (
+              <div
+                key={`measure_${page.pageNumber}_${ln.lineNumber}`}
+                data-measure-line={ln.lineNumber}
+                className="inline-flex items-baseline whitespace-nowrap"
+              >
+                {VERBATIM_BISMILLAH[script]}
+              </div>
+            );
+          }
+          if (ln.words.length === 0) return null;
           return (
             <div
               key={`measure_${page.pageNumber}_${ln.lineNumber}`}
@@ -488,177 +537,197 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
         )}
       </div>
 
-      {/* Real Mushaf Page: Near-black crisp Arabic on light background, zero faux bold, 1 row per line */}
-      <div
-        dir="rtl"
-        className={`w-full max-w-4xl border-2 sm:border-4 p-1.5 sm:p-4 md:p-6 shadow-2xl transition-colors duration-150 relative rounded-b-2xl ${
-          highContrast
-            ? 'bg-white border-black text-black'
-            : 'bg-[#FFFDF9] border-[#C5A059] text-[#111111]'
-        }`}
-      >
-        {/* Inner Frame */}
-        <div
-          className={`border sm:border-2 p-1.5 sm:p-3.5 md:p-5 rounded-lg relative ${
-            highContrast ? 'border-black bg-white' : 'border-[#DFCFA8] bg-[#FFFDF9]'
-          }`}
-        >
-          {/* Page Header Margin Band (Surah name, Juz name, Page + Juz/Quarter marks moved out of lines) */}
-          <div
-            className={`border-b-2 pb-1.5 mb-2 space-y-1 text-xs md:text-sm ${
-              highContrast ? 'border-black text-black' : 'border-[#DFCFA8] text-[#5A4333]'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <div className="font-semibold flex items-center gap-1">
-                <span>الجزء</span>
-                <span>{toArabicNumerals(page.juzNumber)}</span>
+      {/* Real Mushaf Page: Opening Pages (1 & 2) use Illuminated Border & Vertically Centered 8 Lines; Pages 3..604 use 15-Line Frame */}
+      {(() => {
+        const innerPageContent = (
+          <>
+            {/* Page Header Margin Band (Surah name, Juz name, Page + Juz/Quarter marks moved out of lines) */}
+            <div
+              className={`border-b-2 pb-1.5 mb-2 space-y-1 text-xs md:text-sm ${
+                highContrast
+                  ? 'border-black text-black'
+                  : isOpeningSpread
+                    ? 'border-[#1B4D3E]/30 text-[#1B4D3E]'
+                    : 'border-[#DFCFA8] text-[#5A4333]'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-semibold flex items-center gap-1">
+                  <span>الجزء</span>
+                  <span>{toArabicNumerals(page.juzNumber)}</span>
+                </div>
+                <div className="font-semibold text-sm md:text-base flex items-center gap-2 text-[#111111]">
+                  <span>{page.surahArabicName || page.surahName}</span>
+                </div>
+                <div className="font-semibold flex items-center gap-1">
+                  <span>صفحة</span>
+                  <span>{toArabicNumerals(page.pageNumber)}</span>
+                </div>
               </div>
-              <div className="font-semibold text-sm md:text-base flex items-center gap-2 text-[#111111]">
-                <span>{page.surahArabicName || page.surahName}</span>
-              </div>
-              <div className="font-semibold flex items-center gap-1">
-                <span>صفحة</span>
-                <span>{toArabicNumerals(page.pageNumber)}</span>
-              </div>
+
+              {pageHeaderQuarterBadges.length > 0 && (
+                <div className="flex flex-wrap items-center justify-center gap-1.5 pt-0.5">
+                  {pageHeaderQuarterBadges.map(badge => (
+                    <span
+                      key={badge.key}
+                      className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] border whitespace-nowrap ${
+                        highContrast
+                          ? 'bg-black text-white border-black'
+                          : 'bg-[#F3ECE1] text-[#241811] border-[#C5A059]'
+                      }`}
+                      title={`${badge.en} (Line ${badge.lineNumber}) — Needs Qari check against printed copy`}
+                    >
+                      {badge.ar} · س{toArabicNumerals(badge.lineNumber)}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {pageHeaderQuarterBadges.length > 0 && (
-              <div className="flex flex-wrap items-center justify-center gap-1.5 pt-0.5">
-                {pageHeaderQuarterBadges.map(badge => (
-                  <span
-                    key={badge.key}
-                    className={`px-2 py-0.5 rounded text-[10px] sm:text-[11px] border whitespace-nowrap ${
-                      highContrast
-                        ? 'bg-black text-white border-black'
-                        : 'bg-[#F3ECE1] text-[#241811] border-[#C5A059]'
-                    }`}
-                    title={`${badge.en} (Line ${badge.lineNumber}) — Needs Qari check against printed copy`}
-                  >
-                    {badge.ar} · س{toArabicNumerals(badge.lineNumber)}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
+            {/* Width Calibration Reference Row (matches exact margin structure of all lines) */}
+            <div className="flex items-center h-0 overflow-hidden" aria-hidden="true">
+              <div className="w-4 sm:w-6 shrink-0" />
+              {hideAndRevealActive && <div className="w-6 shrink-0" />}
+              <div ref={textColWidthRef} className="flex-1 min-w-0" />
+              <div className="w-4 sm:w-5 shrink-0" />
+            </div>
 
-          {/* Width Calibration Reference Row (matches exact margin structure of all 15 lines) */}
-          <div className="flex items-center h-0 overflow-hidden" aria-hidden="true">
-            <div className="w-4 sm:w-6 shrink-0" />
-            {hideAndRevealActive && <div className="w-6 shrink-0" />}
-            <div ref={textColWidthRef} className="flex-1 min-w-0" />
-            <div className="w-4 sm:w-5 shrink-0" />
-          </div>
+            {/* Mushaf Lines Canvas — 8 vertically centered lines on Pages 1 & 2, 15 lines on Pages 3..604 */}
+            <div
+              className={
+                isOpeningSpread
+                  ? 'flex-1 flex flex-col justify-center py-2 sm:py-4'
+                  : 'flex-1 flex flex-col justify-between'
+              }
+            >
+              <div
+                className={
+                  isOpeningSpread
+                    ? 'flex flex-col gap-2.5 sm:gap-4 divide-y divide-[#C5A059]/25'
+                    : 'flex flex-col divide-y divide-[#DFCFA8]/35'
+                }
+              >
+                {page.lines.map(line => {
+                  const isLineRevealed = revealedLines.has(line.lineNumber);
 
-          {/* 15 Lines Canvas — strictly 1 row per line, never wrapping */}
-          <div className="flex flex-col divide-y divide-[#DFCFA8]/35">
-            {page.lines.map(line => {
-              const isLineRevealed = revealedLines.has(line.lineNumber);
+                  const rukuEndsInLine = line.words
+                    .filter(w => typeof w.rukuEndNumber === 'number')
+                    .map(w => w.rukuEndNumber!);
 
-              const rukuEndsInLine = line.words
-                .filter(w => typeof w.rukuEndNumber === 'number')
-                .map(w => w.rukuEndNumber!);
-
-              const lineMarginBadge = (
-                <span
-                  className={`w-4 sm:w-6 shrink-0 text-[9px] sm:text-[10px] font-mono text-center tabular-nums select-none ${
-                    highContrast ? 'text-neutral-700' : 'text-[#7A6C60]'
-                  }`}
-                  title={`Line ${line.lineNumber}`}
-                >
-                  {line.lineNumber}
-                </span>
-              );
-
-              const leftRukuMargin = (
-                <div className="w-4 sm:w-5 shrink-0 flex items-center justify-center select-none">
-                  {rukuEndsInLine.length > 0 && (
+                  const lineMarginBadge = (
                     <span
-                      className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border flex items-center justify-center text-[10px] sm:text-xs font-sans ${
-                        highContrast
-                          ? 'border-black bg-black text-white'
-                          : 'border-[#8F6E2B] bg-[#F8F4EC] text-[#241811]'
+                      className={`w-4 sm:w-6 shrink-0 text-[9px] sm:text-[10px] font-mono text-center tabular-nums select-none ${
+                        highContrast ? 'text-neutral-700' : 'text-[#7A6C60]'
                       }`}
-                      title={`Ruku #${rukuEndsInLine.join(', ')} Ends on Line ${line.lineNumber}`}
+                      title={`Line ${line.lineNumber}`}
                     >
-                      ع
+                      {line.lineNumber}
                     </span>
-                  )}
-                </div>
-              );
+                  );
 
-              // 1. Surah Header Line — strictly 1 row with right-margin line number
-              if (line.isHeaderLine) {
-                return (
-                  <div
-                    key={`p${page.pageNumber}_l${line.lineNumber}`}
-                    className="flex items-center min-h-[34px] sm:min-h-[42px] py-0.5"
-                  >
-                    {lineMarginBadge}
-                    {hideAndRevealActive && <div className="w-6 shrink-0" />}
-                    <div
-                      className={`flex-1 min-w-0 py-0.5 px-2 rounded border text-center whitespace-nowrap overflow-hidden flex items-center justify-center gap-2 ${
-                        highContrast
-                          ? 'border-black bg-neutral-100 text-black'
-                          : 'border-[#C5A059] bg-gradient-to-r from-[#F8F4EC] via-[#F1E8D5] to-[#F8F4EC] text-[#111111]'
-                      }`}
-                    >
-                      <span className="text-[#8F6E2B] text-xs" aria-hidden="true">۞</span>
-                      <span
-                        className={`whitespace-nowrap ${
-                          script === 'indopak' ? 'font-quran' : 'font-quran-uthmani'
-                        }`}
-                        style={{ fontSize: `${Math.min(22, Math.max(14, fittedFontSize * 1.05))}px`, lineHeight: 1.4 }}
-                      >
-                        {line.headerSurahArabicName || line.headerSurahName}
-                      </span>
-                      {line.headerSurahMeta && (
-                        <span className="text-[10px] text-[#5A4333] hidden sm:inline whitespace-nowrap">
-                          ({line.headerSurahMeta})
+                  const leftRukuMargin = (
+                    <div className="w-4 sm:w-5 shrink-0 flex items-center justify-center select-none">
+                      {rukuEndsInLine.length > 0 && (
+                        <span
+                          className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border flex items-center justify-center text-[10px] sm:text-xs font-sans ${
+                            highContrast
+                              ? 'border-black bg-black text-white'
+                              : 'border-[#8F6E2B] bg-[#F8F4EC] text-[#241811]'
+                          }`}
+                          title={`Ruku #${rukuEndsInLine.join(', ')} Ends on Line ${line.lineNumber}`}
+                        >
+                          ع
                         </span>
                       )}
-                      <span className="text-[#8F6E2B] text-xs" aria-hidden="true">۞</span>
                     </div>
-                    {leftRukuMargin}
-                  </div>
-                );
-              }
+                  );
 
-              // 2. Bismillah Line — strictly 1 row with right-margin line number
-              if (line.isBismillahLine) {
-                return (
-                  <div
-                    key={`p${page.pageNumber}_l${line.lineNumber}`}
-                    className="flex items-center min-h-[34px] sm:min-h-[42px] py-0.5"
-                  >
-                    {lineMarginBadge}
-                    {hideAndRevealActive && <div className="w-6 shrink-0" />}
+                  // 1. Surah Header Line — ornamental cartouche on Pages 1 & 2, clean banner elsewhere
+                  if (line.isHeaderLine) {
+                    return (
+                      <div
+                        key={`p${page.pageNumber}_l${line.lineNumber}`}
+                        className={`flex items-center py-0.5 ${
+                          isOpeningSpread ? 'min-h-[46px] sm:min-h-[58px] mb-1 sm:mb-2' : 'min-h-[34px] sm:min-h-[42px]'
+                        }`}
+                      >
+                        {lineMarginBadge}
+                        {hideAndRevealActive && <div className="w-6 shrink-0" />}
+                        {isOpeningSpread ? (
+                          <OrnamentalSurahCartouche
+                            surahArabicName={line.headerSurahArabicName || line.headerSurahName || ''}
+                            surahMeta={line.headerSurahMeta}
+                            fontClass={script === 'indopak' ? 'font-quran' : 'font-quran-uthmani'}
+                            fontSizePx={fittedFontSize}
+                            highContrast={highContrast}
+                          />
+                        ) : (
+                          <div
+                            className={`flex-1 min-w-0 py-0.5 px-2 rounded border text-center whitespace-nowrap overflow-hidden flex items-center justify-center gap-2 ${
+                              highContrast
+                                ? 'border-black bg-neutral-100 text-black'
+                                : 'border-[#C5A059] bg-gradient-to-r from-[#F8F4EC] via-[#F1E8D5] to-[#F8F4EC] text-[#111111]'
+                            }`}
+                          >
+                            <span className="text-[#8F6E2B] text-xs" aria-hidden="true">۞</span>
+                            <span
+                              className={`whitespace-nowrap ${
+                                script === 'indopak' ? 'font-quran' : 'font-quran-uthmani'
+                              }`}
+                              style={{ fontSize: `${Math.min(22, Math.max(14, fittedFontSize * 1.05))}px`, lineHeight: 1.4 }}
+                            >
+                              {line.headerSurahArabicName || line.headerSurahName}
+                            </span>
+                            {line.headerSurahMeta && (
+                              <span className="text-[10px] text-[#5A4333] hidden sm:inline whitespace-nowrap">
+                                ({line.headerSurahMeta})
+                              </span>
+                            )}
+                            <span className="text-[#8F6E2B] text-xs" aria-hidden="true">۞</span>
+                          </div>
+                        )}
+                        {leftRukuMargin}
+                      </div>
+                    );
+                  }
+
+                  // 2. Bismillah Line — strictly 1 row with verbatim source Bismillah
+                  if (line.isBismillahLine) {
+                    return (
+                      <div
+                        key={`p${page.pageNumber}_l${line.lineNumber}`}
+                        className={`flex items-center py-0.5 ${
+                          isOpeningSpread ? 'min-h-[38px] sm:min-h-[50px] pb-1.5 sm:pb-2' : 'min-h-[34px] sm:min-h-[42px]'
+                        }`}
+                      >
+                        {lineMarginBadge}
+                        {hideAndRevealActive && <div className="w-6 shrink-0" />}
+                        <div
+                          className={`flex-1 min-w-0 text-center whitespace-nowrap overflow-hidden select-none ${
+                            highContrast ? 'text-black' : 'text-[#111111]'
+                          } ${script === 'indopak' ? 'font-quran' : 'font-quran-uthmani'}`}
+                          style={{
+                            fontSize: `${Math.min(25, Math.max(14, fittedFontSize * 1.02))}px`,
+                            lineHeight: 1.6,
+                          }}
+                        >
+                          {VERBATIM_BISMILLAH[script]}
+                        </div>
+                        {leftRukuMargin}
+                      </div>
+                    );
+                  }
+
+                  // 3. Normal Quranic Text Line — single non-wrapping justified row
+                  const isSingleWord = line.words.length === 1;
+
+                  return (
                     <div
-                      className={`flex-1 min-w-0 text-center whitespace-nowrap overflow-hidden select-none ${
-                        highContrast ? 'text-black' : 'text-[#111111]'
-                      } ${script === 'indopak' ? 'font-quran' : 'font-quran-uthmani'}`}
-                      style={{
-                        fontSize: `${Math.min(25, Math.max(15, fittedFontSize * 1.12))}px`,
-                        lineHeight: 1.6,
-                      }}
+                      key={`p${page.pageNumber}_l${line.lineNumber}`}
+                      className={`flex items-center py-0.5 transition-colors ${
+                        isOpeningSpread ? 'min-h-[38px] sm:min-h-[50px]' : 'min-h-[34px] sm:min-h-[44px]'
+                      } ${highContrast ? 'hover:bg-neutral-100' : 'hover:bg-[#FAF6EF]'}`}
                     >
-                      بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ
-                    </div>
-                    {leftRukuMargin}
-                  </div>
-                );
-              }
-
-              // 3. Normal Quranic Text Line (1..15) — single non-wrapping justified row
-              const isSingleWord = line.words.length === 1;
-
-              return (
-                <div
-                  key={`p${page.pageNumber}_l${line.lineNumber}`}
-                  className={`flex items-center min-h-[34px] sm:min-h-[44px] py-0.5 transition-colors ${
-                    highContrast ? 'hover:bg-neutral-100' : 'hover:bg-[#FAF6EF]'
-                  }`}
-                >
                   {/* Right-Side Margin: Line # */}
                   {lineMarginBadge}
 
@@ -781,40 +850,74 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
                   {leftRukuMargin}
                 </div>
               );
-            })}
-          </div>
+                })}
+              </div>
+            </div>
 
-          {/* Footer Margin: Page Number + Verification Note for Quarter Marks */}
+            {/* Footer Margin: Page Number + Verification Note for Quarter Marks */}
+            <div
+              className={`border-t-2 pt-2 mt-2 flex flex-wrap items-center justify-between gap-2 text-xs ${
+                highContrast
+                  ? 'border-black text-black'
+                  : isOpeningSpread
+                    ? 'border-[#1B4D3E]/30 text-[#1B4D3E]'
+                    : 'border-[#DFCFA8] text-[#5A4333]'
+              }`}
+            >
+              <div>
+                الجزء {toArabicNumerals(page.juzNumber)}
+              </div>
+              <div className="font-semibold text-sm md:text-base text-[#111111] flex items-center gap-1 tabular-nums">
+                <span>-</span>
+                <span>{toArabicNumerals(page.pageNumber)}</span>
+                <span>-</span>
+              </div>
+              <div>
+                {page.surahArabicName || page.surahName}
+              </div>
+            </div>
+
+            {hasQuarterMarksOnPage && (
+              <div className="mt-2 pt-1.5 border-t border-dashed border-[#DFCFA8] text-[11px] text-[#7A6C60] flex items-center justify-center gap-1.5 text-center">
+                <AlertCircle className="w-3.5 h-3.5 text-[#B45309] shrink-0" />
+                <span>
+                  {language === 'ur'
+                    ? 'پارے کے ربع / نصف / ثلاثة أرباع کے نشانات: مطبوعہ نسخے سے قاری صاحب کی تصدیق درکار ہے'
+                    : 'Para quarter marks (ربع / نصف / ثلاثة أرباع) placed from rub-el-hizb boundaries — needs Qari check against the printed copy.'}
+                </span>
+              </div>
+            )}
+          </>
+        );
+
+        if (isOpeningSpread) {
+          return (
+            <OpeningPageFrame highContrast={highContrast}>
+              {innerPageContent}
+            </OpeningPageFrame>
+          );
+        }
+
+        return (
           <div
-            className={`border-t-2 pt-2 mt-2 flex flex-wrap items-center justify-between gap-2 text-xs ${
-              highContrast ? 'border-black text-black' : 'border-[#DFCFA8] text-[#5A4333]'
+            dir="rtl"
+            className={`w-full max-w-4xl shrink-0 border-2 sm:border-4 p-1.5 sm:p-4 md:p-6 shadow-2xl transition-colors duration-150 relative rounded-b-2xl ${
+              highContrast
+                ? 'bg-white border-black text-black'
+                : 'bg-[#FFFDF9] border-[#C5A059] text-[#111111]'
             }`}
           >
-            <div>
-              الجزء {toArabicNumerals(page.juzNumber)}
-            </div>
-            <div className="font-semibold text-sm md:text-base text-[#111111] flex items-center gap-1 tabular-nums">
-              <span>-</span>
-              <span>{toArabicNumerals(page.pageNumber)}</span>
-              <span>-</span>
-            </div>
-            <div>
-              {page.surahArabicName || page.surahName}
+            {/* Inner Frame matching opening pages' outer vertical proportions */}
+            <div
+              className={`border sm:border-2 p-1.5 sm:p-3.5 md:p-5 rounded-lg relative min-h-[520px] sm:min-h-[680px] flex flex-col justify-between ${
+                highContrast ? 'border-black bg-white' : 'border-[#DFCFA8] bg-[#FFFDF9]'
+              }`}
+            >
+              {innerPageContent}
             </div>
           </div>
-
-          {hasQuarterMarksOnPage && (
-            <div className="mt-2 pt-1.5 border-t border-dashed border-[#DFCFA8] text-[11px] text-[#7A6C60] flex items-center justify-center gap-1.5 text-center">
-              <AlertCircle className="w-3.5 h-3.5 text-[#B45309] shrink-0" />
-              <span>
-                {language === 'ur'
-                  ? 'پارے کے ربع / نصف / ثلاثة أرباع کے نشانات: مطبوعہ نسخے سے قاری صاحب کی تصدیق درکار ہے'
-                  : 'Para quarter marks (ربع / نصف / ثلاثة أرباع) placed from rub-el-hizb boundaries — needs Qari check against the printed copy.'}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
+        );
+      })()}
     </div>
   );
 };

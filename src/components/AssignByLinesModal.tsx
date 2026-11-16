@@ -220,8 +220,8 @@ export const AssignByLinesModal: React.FC<AssignByLinesModalProps> = ({
     editStart && editEnd ? getRangeMetadata(editStart, editEnd) : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-2 md:p-4 overflow-y-auto">
-      <div className="bg-[#FCFAF6] rounded-2xl shadow-2xl border-2 border-[#C5A059] w-full max-w-5xl max-h-[94vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-start [@media(min-height:600px)]:items-center justify-center bg-black/65 backdrop-blur-xs p-2 md:p-4 overflow-y-auto">
+      <div className="bg-[#FCFAF6] rounded-2xl shadow-2xl border-2 border-[#C5A059] w-full max-w-5xl [@media(min-height:600px)]:max-h-[94vh] flex flex-col [@media(min-height:600px)]:overflow-hidden my-auto">
         {/* Header */}
         <div className="px-5 py-3.5 border-b-2 border-[#C5A059] flex items-center justify-between bg-[#241811] text-[#FCFAF6]">
           <div>
@@ -234,6 +234,7 @@ export const AssignByLinesModal: React.FC<AssignByLinesModalProps> = ({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close"
             className="p-1.5 text-[#DFCFA8] hover:text-[#FCFAF6] hover:bg-[#3E2B20] rounded-xl transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -242,7 +243,7 @@ export const AssignByLinesModal: React.FC<AssignByLinesModalProps> = ({
 
         {/* If editing a specific student on Mushaf */}
         {editingStudent ? (
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col [@media(min-height:600px)]:overflow-hidden">
             <div className="px-5 py-3 bg-[#F8F4EC] border-b border-[#DFCFA8] flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <button
@@ -282,7 +283,10 @@ export const AssignByLinesModal: React.FC<AssignByLinesModalProps> = ({
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-3 bg-[#FAF6EF] bg-islamic-pattern flex justify-center">
+            <div
+              tabIndex={0}
+              className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-3 bg-[#FAF6EF] bg-islamic-pattern block focus:outline-none"
+            >
               <MushafViewer
                 pageNumber={editPage}
                 onPageChange={setEditPage}

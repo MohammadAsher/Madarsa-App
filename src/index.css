@@ -25,12 +25,18 @@
     --color-text-muted: #7A6C60;
   }
 
-  html,
+  html {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip;
+    margin: 0;
+    padding: 0;
+  }
+
   body,
   #root {
     width: 100%;
     max-width: 100%;
-    overflow-x: clip;
     margin: 0;
     padding: 0;
   }

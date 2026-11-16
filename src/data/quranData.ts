@@ -150,6 +150,13 @@ const surahMap = new Map<number, SurahInfo>(ALL_SURAHS.map(c => [c.id, c]));
 const juzMap = new Map<number, JuzInfo>(ALL_JUZS.map(j => [j.juzNumber, j]));
 const pageCache = new Map<number, MushafPage>();
 
+// Verbatim Bismillah text derived directly from Surah Al-Fatihah 1:1 in the read-only source data
+const page1BismillahLine = rawPages['1']?.lines.find(l => l.l === 2)?.w || [];
+export const VERBATIM_BISMILLAH = {
+  indopak: page1BismillahLine.map(w => w.t).join(' '),
+  uthmani: page1BismillahLine.map(w => w.u).join(' '),
+};
+
 function toArabicNumerals(num: number): string {
   const digits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
   return String(num)
@@ -174,7 +181,14 @@ export function getPage(pageNumber: number): MushafPage {
     throw new Error(`Quran page ${validPage} missing from local dataset.`);
   }
 
-  const lines: MushafLine[] = raw.lines.map(cl => {
+  // Pages 1 and 2 in the source layout have 8 populated lines (Surah header + Bismillah/1:1 + 6 text lines).
+  // Follow the source data exactly rather than padding trailing empty lines; pages 3..604 keep all 15 lines.
+  const sourceLines =
+    validPage <= 2
+      ? raw.lines.filter(cl => cl.h !== undefined || cl.b === 1 || cl.w.length > 0)
+      : raw.lines;
+
+  const lines: MushafLine[] = sourceLines.map(cl => {
     if (cl.h !== undefined) {
       const ch = surahMap.get(cl.h);
       const revAr = ch?.revelationPlace === 'makkah' ? 'مَكِّيَّةٌ' : 'مَدَنِيَّةٌ';

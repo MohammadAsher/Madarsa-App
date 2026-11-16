@@ -160,7 +160,7 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
   };
 
   return (
-    <div className="flex flex-col min-h-screen w-full bg-[#FAF6EF] bg-islamic-pattern pb-16 sm:pb-16">
+    <div className="flex flex-col min-h-screen w-full bg-[#FAF6EF] bg-islamic-pattern pb-32 md:pb-20">
       {/* Top Navigation & Student Header Bar - wraps cleanly on mobile */}
       <header className="sticky top-0 z-30 w-full bg-[#241811] text-[#FCFAF6] border-b border-[#C5A059] px-2.5 sm:px-4 py-2 shadow-sm">
         <div className="w-full max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
