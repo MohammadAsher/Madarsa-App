@@ -22,6 +22,7 @@ import {
 } from '../types/hifz';
 import { getEffectiveLimits } from '../services/storageService';
 import { MushafViewer } from './MushafViewer';
+import { StudentTypeBadge } from './StudentTypeBadge';
 import { MushafWord } from '../data/quranData';
 import { getManzilParaRanges } from '../services/hifzService';
 import { translations } from '../i18n/translations';
@@ -49,14 +50,16 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
   onSaveSession,
   onUpdateMushafSettings,
 }) => {
-  const [activePart, setActivePart] = useState<PartType>(initialPart);
+  const isNazra = student.studentType === 'nazra';
+  const [activePart, setActivePart] = useState<PartType>(isNazra ? 'sabaq' : initialPart);
+  const effectivePart: PartType = isNazra ? 'sabaq' : activePart;
   const [activeTool, setActiveTool] = useState<MistakeType>('ghalti');
   const t = translations[state.language];
   const activeDate = targetDate || state.currentDate;
 
   // Retrieve plan for this student on activeDate
   const todayPlan = state.dailyPlans[student.id]?.[activeDate];
-  const currentPartPlan = todayPlan ? todayPlan[activePart] : null;
+  const currentPartPlan = todayPlan ? todayPlan[effectivePart] : null;
 
   // Active page state in Mushaf viewer
   const [currentPage, setCurrentPage] = useState<number>(
@@ -68,11 +71,11 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
     if (currentPartPlan?.range) {
       setCurrentPage(currentPartPlan.range.start.page);
     }
-  }, [activePart, student.id, activeDate]);
+  }, [effectivePart, student.id, activeDate]);
 
   // Session marks created during this grading session
   const existingMarks = state.marksHistory.filter(
-    m => m.studentId === student.id && m.date === activeDate && m.part === activePart
+    m => m.studentId === student.id && m.date === activeDate && m.part === effectivePart
   );
 
   const [sessionMarks, setSessionMarks] = useState<MistakeMark[]>(existingMarks);
@@ -80,15 +83,15 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
   // When switching parts, reload existing marks
   useEffect(() => {
     const marksForPart = state.marksHistory.filter(
-      m => m.studentId === student.id && m.date === activeDate && m.part === activePart
+      m => m.studentId === student.id && m.date === activeDate && m.part === effectivePart
     );
     setSessionMarks(marksForPart);
-  }, [activePart, student.id, activeDate, state.marksHistory]);
+  }, [effectivePart, student.id, activeDate, state.marksHistory]);
 
   // Calculate live limits and counts
   const limits = getEffectiveLimits(student.id, state);
-  const ghaltiLimit = limits[`${activePart}GhaltiLimit` as keyof typeof limits];
-  const atkanLimit = limits[`${activePart}AtkanLimit` as keyof typeof limits];
+  const ghaltiLimit = limits[`${effectivePart}GhaltiLimit` as keyof typeof limits];
+  const atkanLimit = limits[`${effectivePart}AtkanLimit` as keyof typeof limits];
 
   const ghaltiCount = sessionMarks.filter(m => m.type === 'ghalti').length;
   const atkanCount = sessionMarks.filter(m => m.type === 'atkan').length;
@@ -117,7 +120,7 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
         id: `mark_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         studentId: student.id,
         date: activeDate,
-        part: activePart,
+        part: effectivePart,
         wordId: word.id,
         page: word.pageNumber,
         line: word.lineNumber,
@@ -140,10 +143,10 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
     if (!currentPartPlan || !currentPartPlan.range) return;
 
     const sessionResult: SessionResult = {
-      id: `res_${student.id}_${activeDate}_${activePart}_${Date.now()}`,
+      id: `res_${student.id}_${activeDate}_${effectivePart}_${Date.now()}`,
       studentId: student.id,
       date: activeDate,
-      part: activePart,
+      part: effectivePart,
       ghaltiCount,
       atkanCount,
       ghaltiLimit,
@@ -181,6 +184,11 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
               <span className="font-bold text-[#FCFAF6] text-xs sm:text-base truncate">
                 {state.language === 'ur' ? student.urduName : student.name}
               </span>
+              <StudentTypeBadge
+                type={student.studentType || 'hifz'}
+                language={state.language}
+                size="xs"
+              />
               <span className="text-[#C5A059] hidden sm:inline">۞</span>
               <span className="text-[#DFCFA8] text-xs hidden md:inline truncate">
                 {student.halqaName}
@@ -193,8 +201,8 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
 
           {/* Part Switcher Tabs */}
           <div className="flex items-center p-0.5 bg-[#2E2017] rounded-lg border border-[#C5A059]/40 shrink-0">
-            {(['sabaq', 'sabqi', 'manzil'] as PartType[]).map(partKey => {
-              const isActive = activePart === partKey;
+            {(isNazra ? (['sabaq'] as PartType[]) : (['sabaq', 'sabqi', 'manzil'] as PartType[])).map(partKey => {
+              const isActive = effectivePart === partKey;
               const partStatus = todayPlan ? todayPlan[partKey]?.status : 'pending';
               
               let statusIndicatorColor = 'bg-[#7A6C60]';
@@ -229,7 +237,7 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
             <div className="flex items-center gap-1.5 sm:gap-2 text-xs text-[#42362E] truncate">
               <span className="font-bold text-[#241811]">{t.assignedRange}:</span>
               <span className="font-mono text-[#241811]">
-                {activePart === 'manzil' &&
+                {effectivePart === 'manzil' &&
                 currentPartPlan.assignedParas &&
                 currentPartPlan.assignedParas.length > 1
                   ? `Para ${currentPartPlan.assignedParas.join(', ')}`
@@ -242,7 +250,7 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
             </div>
           ) : (
             <div className="text-xs text-[#78350F] font-semibold">
-              {activePart === 'sabaq' ? t.sabaqNotAssignedYet : `No plan set for ${t.parts[activePart]} today`}
+              {effectivePart === 'sabaq' ? t.sabaqNotAssignedYet : `No plan set for ${t.parts[effectivePart]} today`}
             </div>
           )}
 
@@ -292,7 +300,7 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
             onPageChange={setCurrentPage}
             highlightRange={currentPartPlan.range}
             highlightRanges={
-              activePart === 'manzil' &&
+              effectivePart === 'manzil' &&
               currentPartPlan.assignedParas &&
               currentPartPlan.assignedParas.length > 0
                 ? getManzilParaRanges(currentPartPlan.assignedParas, currentPartPlan.range)
@@ -303,7 +311,7 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
             currentMarks={sessionMarks}
             onWordClick={handleWordClick}
             language={state.language}
-            mushafLayout={state.settings.mushafLayout || 'madinah'}
+            mushafLayout={student.mushafLayout || state.settings.mushafLayout || 'madinah'}
             onLayoutChange={l => onUpdateMushafSettings?.({ mushafLayout: l })}
             mushafScript={state.settings.mushafScript || 'indopak'}
             onScriptChange={s => onUpdateMushafSettings?.({ mushafScript: s })}
@@ -316,7 +324,7 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
           <div className="p-8 text-center text-[#7A6C60] bg-[#FCFAF6] rounded-2xl border border-[#DFCFA8] my-8 shadow-xs">
             <BookOpen className="w-10 h-10 text-[#C5A059] mx-auto mb-2" />
             <p className="text-sm font-semibold text-[#241811]">
-              {activePart === 'sabaq' ? t.sabaqNotAssignedYet : 'No assignment set for this part yet.'}
+              {effectivePart === 'sabaq' ? t.sabaqNotAssignedYet : 'No assignment set for this part yet.'}
             </p>
             <p className="text-xs text-[#7A6C60] mt-1">
               Return to the Halqa dashboard to assign words on the Mushaf first.

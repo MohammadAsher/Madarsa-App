@@ -22,6 +22,7 @@ import {
   AssignmentRange,
 } from '../types/hifz';
 import { MushafViewer } from './MushafViewer';
+import { StudentTypeBadge } from './StudentTypeBadge';
 import {
   MushafWord,
   WordLocation,
@@ -75,12 +76,14 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
   onSave,
   onUpdateMushafSettings,
 }) => {
-  const [selectedPart, setSelectedPart] = useState<PartType>(initialPart);
+  const isNazra = student.studentType === 'nazra';
+  const [selectedPart, setSelectedPart] = useState<PartType>(isNazra ? 'sabaq' : initialPart);
+  const effectivePart: PartType = isNazra ? 'sabaq' : selectedPart;
   const t = translations[state.language];
   const activeDate = targetDate || state.currentDate;
 
   const todayPlan = state.dailyPlans[student.id]?.[activeDate];
-  const currentPlan = todayPlan?.[selectedPart];
+  const currentPlan = todayPlan?.[effectivePart];
   const currentRange = currentPlan?.range || null;
 
   const currentParaSabqi = computeCurrentParaSabqiRange(student, state, activeDate);
@@ -351,9 +354,15 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
               <span>{t.assignModalTitle}</span>
               <span className="text-[#C5A059] text-xs">۞</span>
             </h2>
-            <div className="text-xs text-[#DFCFA8] mt-0.5">
-              {state.language === 'ur' ? student.urduName : student.name} · {student.halqaName} ·
-              Para {student.currentJuz} · <span className="font-mono">{activeDate}</span>
+            <div className="text-xs text-[#DFCFA8] mt-0.5 flex flex-wrap items-center gap-1.5">
+              <span>{state.language === 'ur' ? student.urduName : student.name}</span>
+              <StudentTypeBadge
+                type={student.studentType || 'hifz'}
+                language={state.language}
+                size="xs"
+              />
+              <span>· {student.halqaName} · Para {student.currentJuz} ·</span>
+              <span className="font-mono">{activeDate}</span>
             </div>
           </div>
 
@@ -366,10 +375,10 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
           </button>
         </div>
 
-        {/* Dedicated Part Control Tabs: Sabaq | Sabqi | Manzil */}
+        {/* Dedicated Part Control Tabs: Sabaq (plus Sabqi | Manzil for Hifz) */}
         <div className="px-5 py-2.5 border-b border-[#DFCFA8] bg-[#F8F4EC] flex items-center gap-2.5">
-          {(['sabaq', 'sabqi', 'manzil'] as PartType[]).map(partKey => {
-            const isSelected = selectedPart === partKey;
+          {(isNazra ? (['sabaq'] as PartType[]) : (['sabaq', 'sabqi', 'manzil'] as PartType[])).map(partKey => {
+            const isSelected = effectivePart === partKey;
             return (
               <button
                 key={partKey}
@@ -775,7 +784,7 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
             interactiveMode="assigning"
             onWordClick={handleWordClick}
             language={state.language}
-            mushafLayout={state.settings.mushafLayout || 'madinah'}
+            mushafLayout={student.mushafLayout || state.settings.mushafLayout || 'madinah'}
             onLayoutChange={l => onUpdateMushafSettings?.({ mushafLayout: l })}
             mushafScript={state.settings.mushafScript || 'indopak'}
             onScriptChange={s => onUpdateMushafSettings?.({ mushafScript: s })}

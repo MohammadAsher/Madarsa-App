@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { X, Sliders, RotateCcw, Check, ShieldAlert } from 'lucide-react';
 import { MadrasaState, StudentProfile, StudentLimits } from '../types/hifz';
 import { getEffectiveLimits } from '../services/storageService';
+import { StudentTypeBadge } from './StudentTypeBadge';
 import { translations } from '../i18n/translations';
 
 interface LimitsModalProps {
@@ -27,6 +28,7 @@ export const LimitsModal: React.FC<LimitsModalProps> = ({
   onResetToDefaults,
 }) => {
   const t = translations[state.language];
+  const isNazra = student.studentType === 'nazra';
   const effective = getEffectiveLimits(student.id, state);
   const halqaDefaults = state.settings.halqaDefaultLimits;
   const isOverridden = Boolean(state.studentLimitsOverride[student.id]);
@@ -42,19 +44,32 @@ export const LimitsModal: React.FC<LimitsModalProps> = ({
   const [manzilAtkan, setManzilAtkan] = useState<number>(effective.manzilAtkanLimit);
 
   const handleSave = () => {
-    const limits: StudentLimits = {
-      sabaqGhaltiLimit: Math.max(1, sabaqGhalti),
-      sabaqAtkanLimit: Math.max(1, sabaqAtkan),
-      sabqiGhaltiLimit: Math.max(1, sabqiGhalti),
-      sabqiAtkanLimit: Math.max(1, sabqiAtkan),
-      manzilGhaltiLimit: Math.max(1, manzilGhalti),
-      manzilAtkanLimit: Math.max(1, manzilAtkan),
-    };
-
     if (mode === 'student') {
-      onSaveStudentLimits(student.id, limits);
+      if (isNazra) {
+        onSaveStudentLimits(student.id, {
+          ...(state.studentLimitsOverride[student.id] || {}),
+          sabaqGhaltiLimit: Math.max(1, sabaqGhalti),
+          sabaqAtkanLimit: Math.max(1, sabaqAtkan),
+        });
+      } else {
+        onSaveStudentLimits(student.id, {
+          sabaqGhaltiLimit: Math.max(1, sabaqGhalti),
+          sabaqAtkanLimit: Math.max(1, sabaqAtkan),
+          sabqiGhaltiLimit: Math.max(1, sabqiGhalti),
+          sabqiAtkanLimit: Math.max(1, sabqiAtkan),
+          manzilGhaltiLimit: Math.max(1, manzilGhalti),
+          manzilAtkanLimit: Math.max(1, manzilAtkan),
+        });
+      }
     } else {
-      onSaveHalqaDefaultLimits(limits);
+      onSaveHalqaDefaultLimits({
+        sabaqGhaltiLimit: Math.max(1, sabaqGhalti),
+        sabaqAtkanLimit: Math.max(1, sabaqAtkan),
+        sabqiGhaltiLimit: Math.max(1, sabqiGhalti),
+        sabqiAtkanLimit: Math.max(1, sabqiAtkan),
+        manzilGhaltiLimit: Math.max(1, manzilGhalti),
+        manzilAtkanLimit: Math.max(1, manzilAtkan),
+      });
     }
     onClose();
   };
@@ -97,13 +112,18 @@ export const LimitsModal: React.FC<LimitsModalProps> = ({
                 setManzilGhalti(effective.manzilGhaltiLimit);
                 setManzilAtkan(effective.manzilAtkanLimit);
               }}
-              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
                 mode === 'student'
                   ? 'bg-[#241811] text-[#FCFAF6] shadow-2xs border border-[#C5A059]'
                   : 'text-[#42362E] hover:text-[#241811]'
               }`}
             >
-              {t.studentOverride}: {state.language === 'ur' ? student.urduName : student.name}
+              <span>{t.studentOverride}: {state.language === 'ur' ? student.urduName : student.name}</span>
+              <StudentTypeBadge
+                type={student.studentType || 'hifz'}
+                language={state.language}
+                size="xs"
+              />
             </button>
             <button
               type="button"
@@ -179,77 +199,87 @@ export const LimitsModal: React.FC<LimitsModalProps> = ({
             </div>
           </div>
 
-          {/* Sabqi Limits */}
-          <div className="p-3.5 rounded-xl border border-[#DFCFA8] bg-[#F8F4EC]">
-            <div className="text-sm font-bold text-[#241811] mb-2 flex items-center justify-between">
-              <span>{t.parts.sabqi} ({t.parts.sabqiDesc})</span>
-              <span className="text-xs text-[#7A6C60] font-normal">Max before repeat</span>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-[#B91C1C] mb-1">
-                  {t.ghaltiShort} Limit
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={sabqiGhalti}
-                  onChange={e => setSabqiGhalti(parseInt(e.target.value, 10) || 1)}
-                  className="w-full px-3 py-2 border border-[#DFCFA8] rounded-lg text-sm font-mono font-bold text-[#241811] bg-[#FAF6EF] focus:ring-2 focus:ring-[#C5A059]"
-                />
+          {!(isNazra && mode === 'student') ? (
+            <>
+              {/* Sabqi Limits */}
+              <div className="p-3.5 rounded-xl border border-[#DFCFA8] bg-[#F8F4EC]">
+                <div className="text-sm font-bold text-[#241811] mb-2 flex items-center justify-between">
+                  <span>{t.parts.sabqi} ({t.parts.sabqiDesc})</span>
+                  <span className="text-xs text-[#7A6C60] font-normal">Max before repeat</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[#B91C1C] mb-1">
+                      {t.ghaltiShort} Limit
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={sabqiGhalti}
+                      onChange={e => setSabqiGhalti(parseInt(e.target.value, 10) || 1)}
+                      className="w-full px-3 py-2 border border-[#DFCFA8] rounded-lg text-sm font-mono font-bold text-[#241811] bg-[#FAF6EF] focus:ring-2 focus:ring-[#C5A059]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#D97706] mb-1">
+                      {t.atkanShort} Limit
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={sabqiAtkan}
+                      onChange={e => setSabqiAtkan(parseInt(e.target.value, 10) || 1)}
+                      className="w-full px-3 py-2 border border-[#DFCFA8] rounded-lg text-sm font-mono font-bold text-[#241811] bg-[#FAF6EF] focus:ring-2 focus:ring-[#C5A059]"
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-[#D97706] mb-1">
-                  {t.atkanShort} Limit
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={sabqiAtkan}
-                  onChange={e => setSabqiAtkan(parseInt(e.target.value, 10) || 1)}
-                  className="w-full px-3 py-2 border border-[#DFCFA8] rounded-lg text-sm font-mono font-bold text-[#241811] bg-[#FAF6EF] focus:ring-2 focus:ring-[#C5A059]"
-                />
-              </div>
-            </div>
-          </div>
 
-          {/* Manzil Limits */}
-          <div className="p-3.5 rounded-xl border border-[#DFCFA8] bg-[#F8F4EC]">
-            <div className="text-sm font-bold text-[#241811] mb-2 flex items-center justify-between">
-              <span>{t.parts.manzil} ({t.parts.manzilDesc})</span>
-              <span className="text-xs text-[#7A6C60] font-normal">Max before repeat</span>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-[#B91C1C] mb-1">
-                  {t.ghaltiShort} Limit
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={manzilGhalti}
-                  onChange={e => setManzilGhalti(parseInt(e.target.value, 10) || 1)}
-                  className="w-full px-3 py-2 border border-[#DFCFA8] rounded-lg text-sm font-mono font-bold text-[#241811] bg-[#FAF6EF] focus:ring-2 focus:ring-[#C5A059]"
-                />
+              {/* Manzil Limits */}
+              <div className="p-3.5 rounded-xl border border-[#DFCFA8] bg-[#F8F4EC]">
+                <div className="text-sm font-bold text-[#241811] mb-2 flex items-center justify-between">
+                  <span>{t.parts.manzil} ({t.parts.manzilDesc})</span>
+                  <span className="text-xs text-[#7A6C60] font-normal">Max before repeat</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[#B91C1C] mb-1">
+                      {t.ghaltiShort} Limit
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={manzilGhalti}
+                      onChange={e => setManzilGhalti(parseInt(e.target.value, 10) || 1)}
+                      className="w-full px-3 py-2 border border-[#DFCFA8] rounded-lg text-sm font-mono font-bold text-[#241811] bg-[#FAF6EF] focus:ring-2 focus:ring-[#C5A059]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#D97706] mb-1">
+                      {t.atkanShort} Limit
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={manzilAtkan}
+                      onChange={e => setManzilAtkan(parseInt(e.target.value, 10) || 1)}
+                      className="w-full px-3 py-2 border border-[#DFCFA8] rounded-lg text-sm font-mono font-bold text-[#241811] bg-[#FAF6EF] focus:ring-2 focus:ring-[#C5A059]"
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-[#D97706] mb-1">
-                  {t.atkanShort} Limit
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={manzilAtkan}
-                  onChange={e => setManzilAtkan(parseInt(e.target.value, 10) || 1)}
-                  className="w-full px-3 py-2 border border-[#DFCFA8] rounded-lg text-sm font-mono font-bold text-[#241811] bg-[#FAF6EF] focus:ring-2 focus:ring-[#C5A059]"
-                />
-              </div>
+            </>
+          ) : (
+            <div className="p-3 rounded-xl border border-[#16365D]/30 bg-[#E8EEF6] text-xs text-[#16365D]">
+              {state.language === 'ur'
+                ? 'ناظرہ طلبہ کے لیے صرف سبق کی حدیں لاگو ہوتی ہیں۔'
+                : 'Nazra students track Sabaq reading limits only. Sabqi and Manzil are hidden.'}
             </div>
-          </div>
+          )}
         </div>
 
         {/* Modal Footer */}

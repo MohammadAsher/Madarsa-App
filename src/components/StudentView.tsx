@@ -33,6 +33,7 @@ import { MushafViewer } from './MushafViewer';
 import { StudentHistoryModal } from './StudentHistoryModal';
 import { ParaProgressGrid } from './ParaProgressGrid';
 import { DateNavigator } from './DateNavigator';
+import { StudentTypeBadge } from './StudentTypeBadge';
 import { translations } from '../i18n/translations';
 import {
   computeCurrentParaSabqiRange,
@@ -78,24 +79,34 @@ export const StudentView: React.FC<StudentViewProps> = ({
   const isPastDate = activeDate < state.currentDate;
   const todayPlan = state.dailyPlans[student.id]?.[activeDate];
 
+  const isNazra = student.studentType === 'nazra';
   const [activePart, setActivePart] = useState<PartType>('sabaq');
+  const effectivePart: PartType = isNazra ? 'sabaq' : activePart;
+
+  useEffect(() => {
+    if (isNazra && activePart !== 'sabaq') {
+      setActivePart('sabaq');
+    }
+  }, [isNazra, activePart]);
+
   // Optional Para tile preview when student taps a tile in "My Completed Paras"
   const [previewParaNum, setPreviewParaNum] = useState<number | null>(null);
 
-  const currentParaSabqi = computeCurrentParaSabqiRange(student, state, activeDate);
+  const currentParaSabqi = isNazra ? null : computeCurrentParaSabqiRange(student, state, activeDate);
 
   // Effective Sabqi range respects Ustaad manual narrowing override if present; otherwise all passed Sabaqs in current Para
-  const effectiveSabqiRange: AssignmentRange | null =
-    todayPlan?.sabqi?.sabqiCustomOverride && todayPlan.sabqi.range
-      ? todayPlan.sabqi.range
-      : currentParaSabqi?.range || null;
+  const effectiveSabqiRange: AssignmentRange | null = isNazra
+    ? null
+    : todayPlan?.sabqi?.sabqiCustomOverride && todayPlan.sabqi.range
+    ? todayPlan.sabqi.range
+    : currentParaSabqi?.range || null;
 
   const activeRange: AssignmentRange | null =
     previewParaNum !== null
       ? getFullParaRange(previewParaNum)
-      : activePart === 'sabqi'
+      : effectivePart === 'sabqi'
       ? effectiveSabqiRange
-      : todayPlan?.[activePart]?.range || null;
+      : todayPlan?.[effectivePart]?.range || null;
 
   const [currentPage, setCurrentPage] = useState<number>(
     targetJumpWord?.page || activeRange?.start.page || 1
@@ -109,11 +120,13 @@ export const StudentView: React.FC<StudentViewProps> = ({
     }
     setPreviewParaNum(null);
     const defaultPlan = state.dailyPlans[student.id]?.[activeDate];
-    const startPage = defaultPlan?.[activePart]?.range?.start.page;
+    const startPage = defaultPlan?.[effectivePart]?.range?.start.page;
     if (startPage) {
       setCurrentPage(startPage);
+    } else if (isNazra) {
+      setCurrentPage(getParaPageRange(student.currentJuz || 1).startPage);
     }
-  }, [student.id, activeDate]);
+  }, [student.id, activeDate, isNazra]);
 
   const [hideAndRevealActive, setHideAndRevealActive] = useState<boolean>(false);
   const [pulsingWordId, setPulsingWordId] = useState<string | null>(
@@ -132,6 +145,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
   };
 
   const handleOpenMySabqi = () => {
+    if (isNazra) return;
     setPreviewParaNum(null);
     setActivePart('sabqi');
     if (effectiveSabqiRange) {
@@ -140,8 +154,8 @@ export const StudentView: React.FC<StudentViewProps> = ({
   };
 
   const handleTapParaTile = (paraNum: number) => {
-    const manzilParas = todayPlan?.manzil?.assignedParas || [];
-    if (manzilParas.includes(paraNum) && todayPlan?.manzil?.range) {
+    const manzilParas = !isNazra ? todayPlan?.manzil?.assignedParas || [] : [];
+    if (!isNazra && manzilParas.includes(paraNum) && todayPlan?.manzil?.range) {
       setPreviewParaNum(null);
       setActivePart('manzil');
       const { startPage } = getParaPageRange(paraNum);
@@ -153,7 +167,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
     }
   };
 
-  const currentPartPlan = todayPlan ? todayPlan[activePart] : null;
+  const currentPartPlan = todayPlan ? todayPlan[effectivePart] : null;
 
   const handleIncrementRepeat = () => {
     if (isPastDate || !currentPartPlan || !activeRange) return;
@@ -164,9 +178,9 @@ export const StudentView: React.FC<StudentViewProps> = ({
         : null;
 
       if (dayPlan) {
-        const currentCount = dayPlan[activePart].repeatPracticeCount || 0;
-        dayPlan[activePart] = {
-          ...dayPlan[activePart],
+        const currentCount = dayPlan[effectivePart].repeatPracticeCount || 0;
+        dayPlan[effectivePart] = {
+          ...dayPlan[effectivePart],
           repeatPracticeCount: currentCount + 1,
           lastPracticedAt: new Date().toISOString(),
         };
@@ -192,8 +206,8 @@ export const StudentView: React.FC<StudentViewProps> = ({
         : null;
 
       if (dayPlan) {
-        dayPlan[activePart] = {
-          ...dayPlan[activePart],
+        dayPlan[effectivePart] = {
+          ...dayPlan[effectivePart],
           repeatPracticeCount: 0,
         };
         studentHistory[activeDate] = dayPlan;
@@ -216,6 +230,15 @@ export const StudentView: React.FC<StudentViewProps> = ({
   }) => {
     onUpdateState(prev => ({
       ...prev,
+      students: patch.mushafLayout
+        ? {
+            ...prev.students,
+            [student.id]: {
+              ...prev.students[student.id],
+              mushafLayout: patch.mushafLayout,
+            },
+          }
+        : prev.students,
       settings: {
         ...prev.settings,
         ...patch,
@@ -224,7 +247,10 @@ export const StudentView: React.FC<StudentViewProps> = ({
   };
 
   const todayResults = state.sessionResults.filter(
-    s => s.studentId === student.id && s.date === activeDate
+    s =>
+      s.studentId === student.id &&
+      s.date === activeDate &&
+      (!isNazra || s.part === 'sabaq')
   );
 
   const activePartMarks =
@@ -233,13 +259,16 @@ export const StudentView: React.FC<StudentViewProps> = ({
           m =>
             m.studentId === student.id &&
             m.date === activeDate &&
-            m.part === activePart
+            m.part === effectivePart
         )
       : [];
 
   const repeatCount = currentPartPlan?.repeatPracticeCount || 0;
   const targetRepeats = currentPartPlan?.targetRepeats || 10;
-  const manzilAssignedParas = todayPlan?.manzil?.assignedParas || [];
+  const manzilAssignedParas = isNazra ? [] : todayPlan?.manzil?.assignedParas || [];
+  const displayedParasCount = isNazra
+    ? student.nazraCompletedParas?.length || 0
+    : student.completedParas?.length || 0;
 
   return (
     <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 py-4 sm:py-6 space-y-5">
@@ -252,15 +281,27 @@ export const StudentView: React.FC<StudentViewProps> = ({
             {student.name.charAt(0)}
           </div>
           <div>
-            <h1 className="text-lg md:text-xl font-bold text-[#241811] flex items-center gap-2">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-[#8F6E2B]">
+              {isNazra ? t.nazraPortalTitle : t.studentPortalTitle}
+            </div>
+            <h1 className="text-lg md:text-xl font-bold text-[#241811] flex flex-wrap items-center gap-2">
               <span>{state.language === 'ur' ? student.urduName : student.name}</span>
+              <StudentTypeBadge
+                type={student.studentType || 'hifz'}
+                language={state.language}
+                size="sm"
+              />
               <span className="text-[#C5A059] text-xs">۞</span>
             </h1>
             <div className="text-xs text-[#7A6C60] mt-0.5">
               {student.halqaName} ·{' '}
               {state.language === 'ur' ? `پارہ ${student.currentJuz}` : `Juz ${student.currentJuz}`} ·{' '}
-              <span className="text-[#1F4E3D] font-bold">
-                {student.completedParas?.length || 0} Paras Done
+              <span className={isNazra ? 'text-[#16365D] font-bold' : 'text-[#1F4E3D] font-bold'}>
+                {isNazra
+                  ? state.language === 'ur'
+                    ? `${displayedParasCount} ناظرہ پارے پڑھے`
+                    : `${displayedParasCount} Nazra Paras Read`
+                  : `${displayedParasCount} Paras Done`}
               </span>
             </div>
           </div>
@@ -290,8 +331,8 @@ export const StudentView: React.FC<StudentViewProps> = ({
         </div>
       </div>
 
-      {/* Sabaq Frozen Notice Banner */}
-      {todayPlan?.sabaqFrozenDueToRevisionFail && (
+      {/* Sabaq Frozen Notice Banner (Hifz only) */}
+      {!isNazra && todayPlan?.sabaqFrozenDueToRevisionFail && (
         <div className="bg-[#FEF3C7] border-2 border-[#D97706] rounded-2xl p-4 flex items-start gap-3 shadow-xs">
           <AlertTriangle className="w-5 h-5 text-[#B45309] shrink-0 mt-0.5" />
           <div>
@@ -303,53 +344,55 @@ export const StudentView: React.FC<StudentViewProps> = ({
         </div>
       )}
 
-      {/* Requirement E: Dedicated "My Sabqi" Card */}
-      <button
-        type="button"
-        onClick={handleOpenMySabqi}
-        className={`w-full text-left rounded-2xl border p-4 shadow-xs transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-          activePart === 'sabqi' && previewParaNum === null
-            ? 'bg-[#FDFCF9] border-[#C5A059] ring-2 ring-[#C5A059]/40'
-            : 'bg-[#FCFAF6] border-[#E8DCC4] hover:border-[#C5A059]'
-        }`}
-      >
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#F8F4EC] border border-[#C5A059] flex items-center justify-center shrink-0">
-            <Layers className="w-5 h-5 text-[#8F6E2B]" />
-          </div>
-          <div>
-            <h2 className="text-sm md:text-base font-bold text-[#241811] flex items-center gap-2">
-              <span>{t.mySabqiTitle}</span>
-              <span className="text-[11px] font-mono bg-[#E8F0EC] text-[#1F4E3D] px-2 py-0.5 rounded">
-                Para {student.currentJuz}
-              </span>
-            </h2>
-            <p className="text-xs text-[#7A6C60] mt-0.5">{t.mySabqiHelp}</p>
-            {effectiveSabqiRange ? (
-              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs font-mono font-bold text-[#143429]">
-                <span className="bg-[#EBF3EE] border border-[#2E6A54]/40 px-2.5 py-0.5 rounded-md">
-                  Page {effectiveSabqiRange.start.page} line {effectiveSabqiRange.start.line} to Page{' '}
-                  {effectiveSabqiRange.end.page} line {effectiveSabqiRange.end.line}
+      {/* Requirement E: Dedicated "My Sabqi" Card (Hifz only) */}
+      {!isNazra && (
+        <button
+          type="button"
+          onClick={handleOpenMySabqi}
+          className={`w-full text-left rounded-2xl border p-4 shadow-xs transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+            effectivePart === 'sabqi' && previewParaNum === null
+              ? 'bg-[#FDFCF9] border-[#C5A059] ring-2 ring-[#C5A059]/40'
+              : 'bg-[#FCFAF6] border-[#E8DCC4] hover:border-[#C5A059]'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#F8F4EC] border border-[#C5A059] flex items-center justify-center shrink-0">
+              <Layers className="w-5 h-5 text-[#8F6E2B]" />
+            </div>
+            <div>
+              <h2 className="text-sm md:text-base font-bold text-[#241811] flex items-center gap-2">
+                <span>{t.mySabqiTitle}</span>
+                <span className="text-[11px] font-mono bg-[#E8F0EC] text-[#1F4E3D] px-2 py-0.5 rounded">
+                  Para {student.currentJuz}
                 </span>
-                <span className="text-[#8F6E2B]">
-                  ({effectiveSabqiRange.linesCount} lines · {currentParaSabqi?.passedCount || 0} passed lessons)
-                </span>
-              </div>
-            ) : (
-              <div className="mt-1.5 text-xs text-[#B45309] font-semibold">
-                {t.noPassedSabqiYet}
-              </div>
-            )}
+              </h2>
+              <p className="text-xs text-[#7A6C60] mt-0.5">{t.mySabqiHelp}</p>
+              {effectiveSabqiRange ? (
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs font-mono font-bold text-[#143429]">
+                  <span className="bg-[#EBF3EE] border border-[#2E6A54]/40 px-2.5 py-0.5 rounded-md">
+                    Page {effectiveSabqiRange.start.page} line {effectiveSabqiRange.start.line} to Page{' '}
+                    {effectiveSabqiRange.end.page} line {effectiveSabqiRange.end.line}
+                  </span>
+                  <span className="text-[#8F6E2B]">
+                    ({effectiveSabqiRange.linesCount} lines · {currentParaSabqi?.passedCount || 0} passed lessons)
+                  </span>
+                </div>
+              ) : (
+                <div className="mt-1.5 text-xs text-[#B45309] font-semibold">
+                  {t.noPassedSabqiYet}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-1.5 text-xs font-bold text-[#8F6E2B] shrink-0">
-          <span>{effectiveSabqiRange ? 'Open Sabqi on Mushaf' : 'View Para Start'}</span>
-          <ArrowRight className="w-4 h-4" />
-        </div>
-      </button>
+          <div className="flex items-center gap-1.5 text-xs font-bold text-[#8F6E2B] shrink-0">
+            <span>{effectiveSabqiRange ? 'Open Sabqi on Mushaf' : 'View Para Start'}</span>
+            <ArrowRight className="w-4 h-4" />
+          </div>
+        </button>
+      )}
 
-      {/* 1. Assigned Work Cards: Sabaq, Sabqi, Manzil */}
+      {/* 1. Assigned Work Cards: Sabaq (plus Sabqi & Manzil for Hifz) */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-bold text-[#241811] flex items-center gap-2">
@@ -367,10 +410,10 @@ export const StudentView: React.FC<StudentViewProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {(['sabaq', 'sabqi', 'manzil'] as PartType[]).map(partKey => {
+        <div className={isNazra ? 'grid grid-cols-1 gap-4' : 'grid grid-cols-1 md:grid-cols-3 gap-4'}>
+          {(isNazra ? (['sabaq'] as PartType[]) : (['sabaq', 'sabqi', 'manzil'] as PartType[])).map(partKey => {
             const plan = todayPlan ? todayPlan[partKey] : null;
-            const isSelected = activePart === partKey && previewParaNum === null;
+            const isSelected = effectivePart === partKey && previewParaNum === null;
             const status = plan?.status || 'pending';
 
             let statusBadge = (
@@ -573,21 +616,31 @@ export const StudentView: React.FC<StudentViewProps> = ({
         </div>
       </div>
 
-      {/* Requirement D: "My Completed Paras" 30-Tile Grid */}
+      {/* Requirement D: 30-Tile Para Grid */}
       <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-3.5 sm:p-5 shadow-xs space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-base font-bold text-[#241811] flex items-center gap-2">
-              <Grid className="w-4 h-4 text-[#1F4E3D]" />
-              <span>{t.myCompletedParasTitle}</span>
-              <span className="text-xs font-mono bg-[#E8F0EC] text-[#1F4E3D] px-2 py-0.5 rounded font-bold">
-                {student.completedParas?.length || 0} / 30
+              <Grid className={`w-4 h-4 ${isNazra ? 'text-[#16365D]' : 'text-[#1F4E3D]'}`} />
+              <span>{isNazra ? t.parasReadInNazra : t.myCompletedParasTitle}</span>
+              <span
+                className={`text-xs font-mono px-2 py-0.5 rounded font-bold ${
+                  isNazra ? 'bg-[#E8EEF6] text-[#16365D]' : 'bg-[#E8F0EC] text-[#1F4E3D]'
+                }`}
+              >
+                {displayedParasCount} / 30
               </span>
             </h2>
-            <p className="text-xs text-[#7A6C60] mt-0.5">{t.myCompletedParasHelp}</p>
+            <p className="text-xs text-[#7A6C60] mt-0.5">
+              {isNazra
+                ? state.language === 'ur'
+                  ? '۳۰ پارے · ناظرہ میں پڑھے گئے پارے نیلے رنگ میں ہیں۔ مصحف میں کھولنے کے لیے کلک کریں۔'
+                  : 'All 30 Paras · Paras read in Nazra are filled in blue. Tap any Para to open it in the Mushaf.'
+                : t.myCompletedParasHelp}
+            </p>
           </div>
 
-          {manzilAssignedParas.length > 0 && (
+          {!isNazra && manzilAssignedParas.length > 0 && (
             <div className="px-3 py-1 rounded-lg bg-[#FEF3C7] border border-[#D97706] text-[#78350F] text-xs font-bold">
               {t.manzilDuePrefix}: {activeDate} — Para {manzilAssignedParas.join(', ')}
             </div>
@@ -595,14 +648,15 @@ export const StudentView: React.FC<StudentViewProps> = ({
         </div>
 
         <ParaProgressGrid
-          completedParas={student.completedParas || []}
+          completedParas={isNazra ? student.nazraCompletedParas || [] : student.completedParas || []}
           currentJuz={student.currentJuz}
-          manzilAssignedParas={manzilAssignedParas}
+          manzilAssignedParas={isNazra ? [] : manzilAssignedParas}
           currentDate={activeDate}
           language={state.language}
           manzilDuePrefix={t.manzilDuePrefix}
           previewParaNum={previewParaNum}
           onTapPara={handleTapParaTile}
+          isNazra={isNazra}
         />
       </div>
 
@@ -637,7 +691,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
               <span className="text-[#7A6C60] text-xs font-normal">/ {targetRepeats} target</span>
             </div>
             <div className="text-[#7A6C60] text-[11px]">
-              {t.practiceCounter} for {t.parts[activePart]}
+              {t.practiceCounter} for {t.parts[effectivePart]}
               {isPastDate && (
                 <span className="ml-1.5 text-[#8F6E2B] font-semibold">
                   ({state.language === 'ur' ? 'صرف مطالعہ' : 'Read-only'})
@@ -683,7 +737,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
                 Para {previewParaNum}
               </span>
               <span>
-                Viewing Para {previewParaNum} ({getParaSurahName(previewParaNum)}) from Completed Paras grid.
+                Viewing Para {previewParaNum} ({getParaSurahName(previewParaNum)}) from {isNazra ? t.parasReadInNazra : 'Completed Paras'} grid.
               </span>
             </div>
             <button
@@ -694,18 +748,18 @@ export const StudentView: React.FC<StudentViewProps> = ({
               }}
               className="underline font-bold text-[#DFCFA8] hover:text-white cursor-pointer"
             >
-              Return to Today's {t.parts[activePart]}
+              Return to Today's {t.parts[effectivePart]}
             </button>
           </div>
         ) : (
-          (currentPartPlan || activePart === 'sabaq') && (
+          (currentPartPlan || effectivePart === 'sabaq') && (
             <div className="w-full max-w-4xl bg-[#241811] text-[#FCFAF6] border-2 border-[#C5A059] px-4 py-2.5 rounded-xl text-xs flex flex-wrap items-center justify-between gap-2 shadow-xs">
               <div className="flex items-center gap-2">
                 <span className="font-bold uppercase tracking-wider bg-[#C5A059] text-[#241811] px-2 py-0.5 rounded text-[10px]">
-                  {t.parts[activePart]}
+                  {t.parts[effectivePart]}
                 </span>
                 <span>
-                  {activePart === 'sabaq' &&
+                  {effectivePart === 'sabaq' &&
                     (currentPartPlan?.range ? (
                       <>
                         {t.showingAssignedOnly}:{' '}
@@ -719,7 +773,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
                     ) : (
                       <>{t.sabaqNotAssignedYet} — wait for your Ustaad to assign today's Sabaq.</>
                     ))}
-                  {activePart === 'sabqi' &&
+                  {effectivePart === 'sabqi' &&
                     (effectiveSabqiRange ? (
                       <>
                         My Sabqi (Para {student.currentJuz} passed Sabaqs): Page{' '}
@@ -730,7 +784,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
                     ) : (
                       <>{t.noPassedSabqiYet}</>
                     ))}
-                  {activePart === 'manzil' &&
+                  {effectivePart === 'manzil' &&
                     (currentPartPlan?.range ? (
                       <>
                         {t.manzilDuePrefix} ({activeDate}):{' '}
@@ -764,7 +818,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
           highlightRange={activeRange || undefined}
           highlightRanges={
             previewParaNum === null &&
-            activePart === 'manzil' &&
+            effectivePart === 'manzil' &&
             currentPartPlan?.assignedParas &&
             currentPartPlan.assignedParas.length > 0
               ? getManzilParaRanges(currentPartPlan.assignedParas, currentPartPlan.range)
@@ -775,7 +829,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
           hideAndRevealActive={hideAndRevealActive}
           targetPulseWordId={pulsingWordId}
           language={state.language}
-          mushafLayout={state.settings.mushafLayout || 'madinah'}
+          mushafLayout={student.mushafLayout || state.settings.mushafLayout || 'madinah'}
           onLayoutChange={l => handleUpdateMushafSettings({ mushafLayout: l })}
           mushafScript={state.settings.mushafScript || 'indopak'}
           onScriptChange={s => handleUpdateMushafSettings({ mushafScript: s })}

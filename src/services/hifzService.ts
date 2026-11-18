@@ -96,6 +96,24 @@ function didSabaqReachParaEnd(sabaqRange: AssignmentRange, paraNumber: number): 
   return false;
 }
 
+function isSabaqBeforeHifzFreshBoundary(
+  student: StudentProfile,
+  dpDate: string,
+  sabaq: { completedAt?: string; isNazraSabaq?: boolean }
+): boolean {
+  if (student.studentType === 'hifz') {
+    if (sabaq.isNazraSabaq === true) return true;
+    if (sabaq.isNazraSabaq === false) return false;
+    if (student.hifzFreshFromIso) {
+      if (sabaq.completedAt) {
+        return sabaq.completedAt < student.hifzFreshFromIso;
+      }
+      return dpDate < student.hifzFreshFromIso.slice(0, 10);
+    }
+  }
+  return false;
+}
+
 /**
  * Inspects all assigned Sabaqs in the student's current Para to determine completion and blockers.
  * Safely ignores empty/unassigned Sabaq slots (range === null).
@@ -115,6 +133,7 @@ export function getParaCompletionStatus(
         dp.date >= startDateBoundary &&
         dp.sabaq &&
         dp.sabaq.range !== null &&
+        !isSabaqBeforeHifzFreshBoundary(student, dp.date, dp.sabaq) &&
         doesSabaqBelongToPara(dp.sabaq.range, dp.sabaq.juzNumber, currentJuz)
     )
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -182,12 +201,17 @@ export function getParaCompletionStatus(
 
 /**
  * Sabqi = all PASSED Sabaq of the CURRENT Para. Repeat/pending/empty Sabaqs never enter Sabqi.
+ * Returns null for Nazra students (Sabqi is hidden and not tracked in Nazra).
  */
 export function computeCurrentParaSabqiRange(
   student: StudentProfile,
   state: MadrasaState,
   upToDate?: string
 ): CurrentParaSabqiInfo | null {
+  if (student.studentType === 'nazra') {
+    return null;
+  }
+
   const currentJuz = student.currentJuz || 1;
   const maxDate = upToDate || state.currentDate;
   const startDateBoundary = student.currentParaStartDate || '';
@@ -201,6 +225,7 @@ export function computeCurrentParaSabqiRange(
         dp.sabaq &&
         dp.sabaq.range !== null &&
         dp.sabaq.status === 'passed' &&
+        !isSabaqBeforeHifzFreshBoundary(student, dp.date, dp.sabaq) &&
         doesSabaqBelongToPara(dp.sabaq.range, dp.sabaq.juzNumber, currentJuz)
     )
     .sort((a, b) => a.date.localeCompare(b.date));

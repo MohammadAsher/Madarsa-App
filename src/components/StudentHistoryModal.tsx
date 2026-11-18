@@ -22,6 +22,7 @@ import {
 import { MadrasaState, StudentProfile, SessionResult, MistakeMark, DayPlan, PartStatus } from '../types/hifz';
 import { translations } from '../i18n/translations';
 import { getFutureDatedRecordsSummary } from '../services/storageService';
+import { StudentTypeBadge } from './StudentTypeBadge';
 
 interface StudentHistoryModalProps {
   state: MadrasaState;
@@ -37,6 +38,7 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
   onJumpToWord,
 }) => {
   const t = translations[state.language];
+  const isNazra = student.studentType === 'nazra';
   const [activeTab, setActiveTab] = useState<'lessons' | 'weak_words' | 'sessions'>('lessons');
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>('');
 
@@ -133,10 +135,16 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
               <span>{t.historyModalTitle}</span>
               <span className="text-[#C5A059] text-xs">۞</span>
             </h2>
-            <div className="text-xs text-[#DFCFA8] mt-0.5">
-              {state.language === 'ur' ? student.urduName : student.name} · {student.halqaName}
+            <div className="text-xs text-[#DFCFA8] mt-0.5 flex flex-wrap items-center gap-1.5">
+              <span>{state.language === 'ur' ? student.urduName : student.name}</span>
+              <StudentTypeBadge
+                type={student.studentType || 'hifz'}
+                language={state.language}
+                size="xs"
+              />
+              <span>· {student.halqaName}</span>
               {student.memorizedPortionDesc && (
-                <span className="text-[#DFCFA8] font-bold ml-2">
+                <span className="text-[#DFCFA8] font-bold">
                   · {student.memorizedPortionDesc}
                 </span>
               )}
@@ -238,6 +246,37 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
                 </div>
               </div>
 
+              {student.typeChangeHistory && student.typeChangeHistory.length > 0 && (
+                <div className="p-3 rounded-xl bg-[#F8F4EC] border border-[#DFCFA8] space-y-1.5">
+                  <div className="text-xs font-bold text-[#241811] flex items-center gap-1.5">
+                    <History className="w-3.5 h-3.5 text-[#8F6E2B]" />
+                    <span>
+                      {state.language === 'ur' ? 'قسم تبدیلی کا ریکارڈ' : 'Student Type Change Audit Log'}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {[...student.typeChangeHistory].reverse().map(log => (
+                      <div
+                        key={log.id}
+                        className="text-[11px] text-[#42362E] flex flex-wrap items-center justify-between gap-2 bg-white/80 px-2.5 py-1.5 rounded-lg border border-[#E8DCC4]"
+                      >
+                        <div>
+                          <span className="font-bold uppercase text-[#1F4E3D]">{log.fromType}</span>
+                          <span className="mx-1.5 text-[#8F6E2B]">→</span>
+                          <span className="font-bold uppercase text-[#16365D]">{log.toType}</span>
+                          <span className="text-[#7A6C60] ml-2">
+                            by <strong>{state.language === 'ur' && log.changedByUrdu ? log.changedByUrdu : log.changedBy}</strong>
+                          </span>
+                        </div>
+                        <div className="font-mono text-[10px] text-[#7A6C60]">
+                          {new Date(log.changedAt).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {(futureDatedPlansCount > 0 || halqaFutureSummary.totalCount > 0) && (
                 <div className="px-3 py-2 rounded-xl bg-[#F8F4EC] border border-[#DFCFA8] text-[11px] text-[#5A4333] space-y-0.5">
                   <div>
@@ -274,6 +313,11 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
                     const sabqiStartAyah = sabqi.range?.startAyah || sabqi.startAyah;
                     const sabqiEndAyah = sabqi.range?.endAyah || sabqi.endAyah;
 
+                    const showSabqiInDay =
+                      !isNazra || Boolean(sabqi.range) || sabqi.status !== 'pending';
+                    const showManzilInDay =
+                      !isNazra || Boolean(manzil.range) || manzil.status !== 'pending';
+
                     return (
                       <div
                         key={day.date}
@@ -301,7 +345,7 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
                               </span>
                             )}
                           </div>
-                          {day.sabaqFrozenDueToRevisionFail && (
+                          {!isNazra && day.sabaqFrozenDueToRevisionFail && (
                             <span className="text-[10px] font-bold text-[#92400E] bg-[#FEF3C7] border border-[#F59E0B] px-2 py-0.5 rounded">
                               Sabaq Frozen (Revision Focus)
                             </span>
@@ -309,7 +353,13 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
                         </div>
 
                         {/* Part Cards Grid: Sabaq | Sabqi | Manzil */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div
+                          className={
+                            showSabqiInDay || showManzilInDay
+                              ? 'grid grid-cols-1 md:grid-cols-3 gap-3'
+                              : 'grid grid-cols-1 gap-3'
+                          }
+                        >
                           {/* 1. SABAQ RECORD */}
                           <div className="bg-[#FCFAF6] border border-[#DFCFA8] rounded-xl p-3 flex flex-col justify-between">
                             <div>
@@ -367,6 +417,7 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
                           </div>
 
                           {/* 2. SABQI RECORD */}
+                          {showSabqiInDay && (
                           <div className="bg-[#FCFAF6] border border-[#DFCFA8] rounded-xl p-3 flex flex-col justify-between">
                             <div>
                               <div className="flex items-center justify-between mb-1.5">
@@ -412,8 +463,10 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
                               </button>
                             )}
                           </div>
+                          )}
 
                           {/* 3. MANZIL RECORD */}
+                          {showManzilInDay && (
                           <div className="bg-[#FCFAF6] border border-[#DFCFA8] rounded-xl p-3 flex flex-col justify-between">
                             <div>
                               <div className="flex items-center justify-between mb-1.5">
@@ -455,6 +508,7 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
                               </button>
                             )}
                           </div>
+                          )}
                         </div>
                       </div>
                     );

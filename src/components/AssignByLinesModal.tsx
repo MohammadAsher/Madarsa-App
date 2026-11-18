@@ -29,6 +29,7 @@ import {
 } from '../data/quranData';
 import { computePreviewRangeByLines } from '../services/hifzService';
 import { MushafViewer } from './MushafViewer';
+import { StudentTypeBadge } from './StudentTypeBadge';
 import { translations } from '../i18n/translations';
 
 interface AssignByLinesModalProps {
@@ -295,7 +296,7 @@ export const AssignByLinesModal: React.FC<AssignByLinesModalProps> = ({
                 interactiveMode="assigning"
                 onWordClick={handleEditWordClick}
                 language={state.language}
-                mushafLayout={state.settings.mushafLayout || 'madinah'}
+                mushafLayout={editingStudent.mushafLayout || state.settings.mushafLayout || 'madinah'}
                 onLayoutChange={l => onUpdateMushafSettings?.({ mushafLayout: l })}
                 mushafScript={state.settings.mushafScript || 'indopak'}
                 onScriptChange={s => onUpdateMushafSettings?.({ mushafScript: s })}
@@ -399,6 +400,11 @@ export const AssignByLinesModal: React.FC<AssignByLinesModalProps> = ({
                             <span className="font-bold text-sm text-[#241811]">
                               {state.language === 'ur' ? student.urduName : student.name}
                             </span>
+                            <StudentTypeBadge
+                              type={student.studentType || 'hifz'}
+                              language={state.language}
+                              size="xs"
+                            />
                             <span className="text-[11px] font-medium text-[#5A4333] bg-[#F8F4EC] px-2 py-0.5 rounded border border-[#DFCFA8]">
                               Para {student.currentJuz}
                             </span>

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { MadrasaState, RoleId } from '../types/hifz';
 import { translations } from '../i18n/translations';
+import { StudentTypeBadge } from './StudentTypeBadge';
 
 interface HeaderProps {
   state: MadrasaState;
@@ -40,8 +41,29 @@ export const Header: React.FC<HeaderProps> = ({
   const [showRoleMenu, setShowRoleMenu] = useState(false);
 
   const getRoleDisplayName = (roleId: RoleId) => {
-    return t.roles[roleId] || roleId;
+    if (roleId === 'ustaad_a' || roleId === 'ustaad_b') {
+      return t.roles[roleId] || state.ustaads[roleId]?.name || roleId;
+    }
+    const st = state.students[roleId];
+    if (st) {
+      const halqaTag =
+        st.ustaadId === 'ustaad_a'
+          ? state.language === 'ur'
+            ? 'حلقہ الف'
+            : 'Halqa A'
+          : state.language === 'ur'
+          ? 'حلقہ ب'
+          : 'Halqa B';
+      const displayName = state.language === 'ur' ? st.urduName : st.name;
+      return state.language === 'ur'
+        ? `طالب علم: ${displayName} (${halqaTag})`
+        : `Student: ${displayName} (${halqaTag})`;
+    }
+    return t.roles[roleId as keyof typeof t.roles] || roleId;
   };
+
+  const halqaAStudentIds = state.ustaads.ustaad_a?.studentIds || [];
+  const halqaBStudentIds = state.ustaads.ustaad_b?.studentIds || [];
 
   return (
     <header className="sticky top-0 z-40 w-full bg-[#241811] text-[#FCFAF6] border-b-2 border-[#C5A059] shadow-md">
@@ -96,7 +118,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             {showRoleMenu && (
               <div 
-                className="absolute left-0 right-0 sm:left-auto sm:right-0 mt-2 sm:w-72 bg-[#FCFAF6] text-[#241811] rounded-xl shadow-2xl border-2 border-[#C5A059] py-1.5 z-50 text-xs divide-y divide-[#EADEC7] animate-in fade-in zoom-in-95 duration-100 max-h-[75vh] overflow-y-auto"
+                className="absolute left-0 right-0 sm:left-auto sm:right-0 mt-2 sm:w-80 bg-[#FCFAF6] text-[#241811] rounded-xl shadow-2xl border-2 border-[#C5A059] py-1.5 z-50 text-xs divide-y divide-[#EADEC7] animate-in fade-in zoom-in-95 duration-100 max-h-[75vh] overflow-y-auto"
                 onClick={() => setShowRoleMenu(false)}
               >
                 {/* Ustaad Section */}
@@ -128,21 +150,29 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>{state.language === 'ur' ? 'طلبہ حلقہ الف (استاد احمد)' : 'Students: Halqa A (Ustaad A)'}</span>
                     <span className="text-[#C5A059]">✦</span>
                   </div>
-                  {(['student_1', 'student_2', 'student_3'] as RoleId[]).map(roleId => (
-                    <button
-                      key={roleId}
-                      type="button"
-                      onClick={() => onSelectRole(roleId)}
-                      className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-[#F3ECE1] transition-colors cursor-pointer ${
-                        state.currentRole === roleId ? 'bg-[#F3ECE1] text-[#241811] font-bold border-l-3 border-[#C5A059]' : 'text-[#3E2B20]'
-                      }`}
-                    >
-                      <span>{getRoleDisplayName(roleId)}</span>
-                      {state.currentRole === roleId && (
-                        <span className="w-2 h-2 rounded-full bg-[#C5A059]" />
-                      )}
-                    </button>
-                  ))}
+                  {halqaAStudentIds.map(sid => {
+                    const roleId = sid as RoleId;
+                    const studentObj = state.students[sid];
+                    if (!studentObj) return null;
+                    return (
+                      <button
+                        key={sid}
+                        type="button"
+                        onClick={() => onSelectRole(roleId)}
+                        className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2 hover:bg-[#F3ECE1] transition-colors cursor-pointer ${
+                          state.currentRole === roleId ? 'bg-[#F3ECE1] text-[#241811] font-bold border-l-3 border-[#C5A059]' : 'text-[#3E2B20]'
+                        }`}
+                      >
+                        <span className="truncate">{getRoleDisplayName(roleId)}</span>
+                        <span className="flex items-center gap-1.5 shrink-0">
+                          <StudentTypeBadge type={studentObj.studentType || 'hifz'} language={state.language} />
+                          {state.currentRole === roleId && (
+                            <span className="w-2 h-2 rounded-full bg-[#C5A059]" />
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {/* Halqa B Students */}
@@ -151,21 +181,29 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>{state.language === 'ur' ? 'طلبہ حلقہ ب (استاد بلال)' : 'Students: Halqa B (Ustaad B)'}</span>
                     <span className="text-[#C5A059]">✦</span>
                   </div>
-                  {(['student_4', 'student_5'] as RoleId[]).map(roleId => (
-                    <button
-                      key={roleId}
-                      type="button"
-                      onClick={() => onSelectRole(roleId)}
-                      className={`w-full text-left px-3 py-2 flex items-center justify-between hover:bg-[#F3ECE1] transition-colors cursor-pointer ${
-                        state.currentRole === roleId ? 'bg-[#F3ECE1] text-[#241811] font-bold border-l-3 border-[#C5A059]' : 'text-[#3E2B20]'
-                      }`}
-                    >
-                      <span>{getRoleDisplayName(roleId)}</span>
-                      {state.currentRole === roleId && (
-                        <span className="w-2 h-2 rounded-full bg-[#C5A059]" />
-                      )}
-                    </button>
-                  ))}
+                  {halqaBStudentIds.map(sid => {
+                    const roleId = sid as RoleId;
+                    const studentObj = state.students[sid];
+                    if (!studentObj) return null;
+                    return (
+                      <button
+                        key={sid}
+                        type="button"
+                        onClick={() => onSelectRole(roleId)}
+                        className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2 hover:bg-[#F3ECE1] transition-colors cursor-pointer ${
+                          state.currentRole === roleId ? 'bg-[#F3ECE1] text-[#241811] font-bold border-l-3 border-[#C5A059]' : 'text-[#3E2B20]'
+                        }`}
+                      >
+                        <span className="truncate">{getRoleDisplayName(roleId)}</span>
+                        <span className="flex items-center gap-1.5 shrink-0">
+                          <StudentTypeBadge type={studentObj.studentType || 'hifz'} language={state.language} />
+                          {state.currentRole === roleId && (
+                            <span className="w-2 h-2 rounded-full bg-[#C5A059]" />
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}

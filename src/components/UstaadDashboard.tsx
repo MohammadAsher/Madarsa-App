@@ -21,11 +21,15 @@ import {
   ArrowRight,
   ListChecks,
   Grid,
+  UserPlus,
+  ArrowLeftRight,
 } from 'lucide-react';
 import {
   MadrasaState,
   UstaadProfile,
   StudentProfile,
+  StudentType,
+  StudentTypeChangeLog,
   PartType,
   SessionResult,
   MistakeMark,
@@ -39,6 +43,9 @@ import { AssignByLinesModal } from './AssignByLinesModal';
 import { LimitsModal } from './LimitsModal';
 import { StudentHistoryModal } from './StudentHistoryModal';
 import { StartNewParaModal } from './StartNewParaModal';
+import { AddStudentModal } from './AddStudentModal';
+import { ChangeStudentTypeModal } from './ChangeStudentTypeModal';
+import { StudentTypeBadge } from './StudentTypeBadge';
 import { ParaProgressGrid } from './ParaProgressGrid';
 import { DateNavigator } from './DateNavigator';
 import {
@@ -117,6 +124,9 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
   const [limitsStudent, setLimitsStudent] = useState<StudentProfile | null>(null);
   const [historyStudent, setHistoryStudent] = useState<StudentProfile | null>(null);
   const [startingParaStudent, setStartingParaStudent] = useState<StudentProfile | null>(null);
+  const [showAddStudentModal, setShowAddStudentModal] = useState<boolean>(false);
+  const [changingTypeStudent, setChangingTypeStudent] = useState<StudentProfile | null>(null);
+  const [typeFilter, setTypeFilter] = useState<'all' | StudentType>('all');
   const [pastDateByStudent, setPastDateByStudent] = useState<Record<string, string | undefined>>({});
 
   const getStudentViewedDate = (studentId: string): string => {
@@ -140,13 +150,162 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
     .map(id => state.students[id])
     .filter(Boolean);
 
+  const hifzCount = halqaStudents.filter(s => (s.studentType || 'hifz') === 'hifz').length;
+  const nazraCount = halqaStudents.filter(s => s.studentType === 'nazra').length;
+  const filteredHalqaStudents = halqaStudents.filter(s =>
+    typeFilter === 'all' ? true : (s.studentType || 'hifz') === typeFilter
+  );
+
+  const handleAddStudent = (newStudent: StudentProfile) => {
+    onUpdateState(prev => {
+      const targetUstaad = prev.ustaads[newStudent.ustaadId];
+      const nextUstaads = targetUstaad
+        ? {
+            ...prev.ustaads,
+            [newStudent.ustaadId]: {
+              ...targetUstaad,
+              studentIds: [...targetUstaad.studentIds, newStudent.id],
+            },
+          }
+        : prev.ustaads;
+
+      return {
+        ...prev,
+        students: {
+          ...prev.students,
+          [newStudent.id]: newStudent,
+        },
+        ustaads: nextUstaads,
+        dailyPlans: {
+          ...prev.dailyPlans,
+          [newStudent.id]: {
+            [prev.currentDate]: createEmptyDayPlan(prev.currentDate),
+          },
+        },
+      };
+    });
+  };
+
+  const handleChangeStudentType = (studentId: string, newType: StudentType) => {
+    onUpdateState(prev => {
+      const student = prev.students[studentId];
+      if (!student) return prev;
+      const fromType: StudentType = student.studentType || 'hifz';
+      if (fromType === newType) return prev;
+
+      const nowIso = new Date().toISOString();
+      const logEntry: StudentTypeChangeLog = {
+        id: `tc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        fromType,
+        toType: newType,
+        changedBy: ustaad.name,
+        changedByUrdu: ustaad.urduName,
+        changedById: ustaad.id,
+        changedAt: nowIso,
+      };
+      const nextHistory = [...(student.typeChangeHistory || []), logEntry];
+
+      // Hifz -> Nazra: hide Sabqi & Manzil in UI, keep ALL Hifz data (completedParas, sabqi, manzil, marks, results) stored untouched!
+      if (fromType === 'hifz' && newType === 'nazra') {
+        return {
+          ...prev,
+          students: {
+            ...prev.students,
+            [studentId]: {
+              ...student,
+              studentType: 'nazra',
+              hasStoredHifzProgress: true,
+              typeChangeHistory: nextHistory,
+            },
+          },
+        };
+      }
+
+      // Nazra -> Hifz:
+      const hadPriorHifz =
+        Boolean(student.hasStoredHifzProgress) ||
+        (student.completedParas && student.completedParas.length > 0);
+
+      if (hadPriorHifz) {
+        // Restore stored Hifz progress seamlessly; Nazra-read paras remain separate and are NOT moved into Manzil
+        return {
+          ...prev,
+          students: {
+            ...prev.students,
+            [studentId]: {
+              ...student,
+              studentType: 'hifz',
+              typeChangeHistory: nextHistory,
+            },
+          },
+        };
+      }
+
+      // Pure Nazra -> Hifz: start Hifz tracking fresh!
+      // Sabqi and Manzil start empty; Nazra paras are NOT moved into completedParas/Manzil; history & marks kept.
+      const existingStudentPlans = { ...(prev.dailyPlans[studentId] || {}) };
+      for (const d of Object.keys(existingStudentPlans)) {
+        const dp = existingStudentPlans[d];
+        if (dp?.sabaq?.range && !dp.sabaq.isNazraSabaq) {
+          existingStudentPlans[d] = {
+            ...dp,
+            sabaq: {
+              ...dp.sabaq,
+              isNazraSabaq: true,
+            },
+          };
+        }
+      }
+
+      const emptyToday = createEmptyDayPlan(prev.currentDate);
+      const todayExisting = existingStudentPlans[prev.currentDate];
+      existingStudentPlans[prev.currentDate] = {
+        ...(todayExisting || emptyToday),
+        sabqi: emptyToday.sabqi,
+        manzil: emptyToday.manzil,
+        sabaqFrozenDueToRevisionFail: false,
+      };
+
+      return {
+        ...prev,
+        students: {
+          ...prev.students,
+          [studentId]: {
+            ...student,
+            studentType: 'hifz',
+            currentParaStartDate: prev.currentDate,
+            hifzFreshFromIso: nowIso,
+            completedParas: [], // Paras read in Nazra are NOT moved into Manzil
+            typeChangeHistory: nextHistory,
+          },
+        },
+        dailyPlans: {
+          ...prev.dailyPlans,
+          [studentId]: existingStudentPlans,
+        },
+      };
+    });
+  };
+
   const handleUpdateMushafSettings = (patch: {
     mushafLayout?: 'hafizi' | 'madinah';
     mushafScript?: 'indopak' | 'uthmani';
     highContrastMushaf?: boolean;
   }) => {
+    const activeStudentId =
+      currentMarking?.student.id || assignModalTarget?.student.id || null;
     onUpdateState(prev => ({
       ...prev,
+      students:
+        patch.mushafLayout && activeStudentId && prev.students[activeStudentId]
+          ? {
+              ...prev.students,
+              [activeStudentId]: {
+                ...prev.students[activeStudentId],
+                mushafLayout: patch.mushafLayout,
+              },
+            }
+          : prev.students,
       settings: {
         ...prev.settings,
         ...patch,
@@ -186,11 +345,15 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
         ? { ...studentPlans[result.date] }
         : createEmptyDayPlan(result.date);
 
+      const studentObj = prev.students[result.studentId];
+      const isNazraStudent = studentObj?.studentType === 'nazra';
+
       currentDayPlan[result.part] = {
         ...currentDayPlan[result.part],
         status: result.finalResult,
         completedAt: new Date().toISOString(),
         sessionResultId: result.id,
+        ...(isNazraStudent && result.part === 'sabaq' ? { isNazraSabaq: true } : {}),
       };
       studentPlans[result.date] = currentDayPlan;
 
@@ -204,9 +367,8 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
         },
       };
 
-      // Whenever a Sabaq is graded, recompute current Para's Sabqi for this date & later dates
-      if (result.part === 'sabaq' && prev.students[result.studentId]) {
-        const studentObj = prev.students[result.studentId];
+      // Whenever a Hifz Sabaq is graded, recompute current Para's Sabqi for this date & later dates
+      if (result.part === 'sabaq' && studentObj && !isNazraStudent) {
         const datesToSync = Object.keys(studentPlans)
           .filter(d => d >= result.date)
           .sort();
@@ -249,13 +411,47 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
     handleCloseMarkingScreen();
   };
 
-  // Start New Para: move finished Para to Manzil pool, reset Sabqi, leave new Para Sabaq EMPTY until Ustaad assigns!
+  // Start New Para: for Hifz move finished Para to Manzil pool & reset Sabqi; for Nazra record in nazraCompletedParas only (NEVER into Manzil)
   const handleConfirmStartNewPara = (studentId: string, chosenNextPara: number) => {
     onUpdateState(prev => {
       const student = prev.students[studentId];
       if (!student) return prev;
 
       const finishedPara = student.currentJuz;
+      const isNazra = student.studentType === 'nazra';
+      const studentHistory = { ...(prev.dailyPlans[studentId] || {}) };
+      const todayPlan =
+        studentHistory[prev.currentDate] || createEmptyDayPlan(prev.currentDate);
+
+      if (isNazra) {
+        const updatedNazraParas = Array.from(
+          new Set([...(student.nazraCompletedParas || []), finishedPara])
+        ).sort((a, b) => a - b);
+
+        studentHistory[prev.currentDate] = {
+          ...todayPlan,
+          sabaq: createEmptySabaqPlan(),
+        };
+
+        return {
+          ...prev,
+          students: {
+            ...prev.students,
+            [studentId]: {
+              ...student,
+              currentJuz: chosenNextPara,
+              currentParaStartDate: prev.currentDate,
+              nazraCompletedParas: updatedNazraParas,
+              memorizedPortionDesc: `Nazra: Read ${updatedNazraParas.length} Paras · Starting Para ${chosenNextPara}`,
+            },
+          },
+          dailyPlans: {
+            ...prev.dailyPlans,
+            [studentId]: studentHistory,
+          },
+        };
+      }
+
       const updatedCompleted = Array.from(
         new Set([...(student.completedParas || []), finishedPara])
       ).sort((a, b) => a - b);
@@ -275,10 +471,6 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
         startAyah: emptySabqiMeta.startAyah,
         endAyah: emptySabqiMeta.endAyah,
       };
-
-      const studentHistory = { ...(prev.dailyPlans[studentId] || {}) };
-      const todayPlan =
-        studentHistory[prev.currentDate] || createEmptyDayPlan(prev.currentDate);
 
       studentHistory[prev.currentDate] = {
         ...todayPlan,
@@ -340,7 +532,11 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
   ) => {
     onUpdateState(prev => {
       const saveDate = extraMetadata?.targetDate || prev.currentDate;
-      const studentIdsToUpdate = applyToAllHalqa ? ustaad.studentIds : [targetStudentId];
+      const studentIdsToUpdate = applyToAllHalqa
+        ? ustaad.studentIds.filter(
+            sid => part === 'sabaq' || prev.students[sid]?.studentType !== 'nazra'
+          )
+        : [targetStudentId];
       const newDailyPlans = { ...prev.dailyPlans };
       const newStudents = { ...prev.students };
 
@@ -355,6 +551,9 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
             ...existingDayPlan[part],
             range,
             status: 'pending',
+            ...(part === 'sabaq'
+              ? { isNazraSabaq: newStudents[sid]?.studentType === 'nazra' }
+              : {}),
             surahName: range.surahName,
             juzNumber: range.juzNumber,
             startPage: range.startPage,
@@ -371,7 +570,11 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
         };
         newDailyPlans[sid] = studentHistory;
 
-        if (extraMetadata?.updatedCompletedParas && newStudents[sid]) {
+        if (
+          extraMetadata?.updatedCompletedParas &&
+          newStudents[sid] &&
+          sid === targetStudentId
+        ) {
           newStudents[sid] = {
             ...newStudents[sid],
             completedParas: extraMetadata.updatedCompletedParas,
@@ -402,6 +605,7 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
             range,
             status: 'pending',
             repeatPracticeCount: 0,
+            isNazraSabaq: prev.students[sid]?.studentType === 'nazra',
             surahName: range.surahName,
             juzNumber: range.juzNumber,
             startPage: range.startPage,
@@ -540,24 +744,93 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
             <span className="text-xs text-[#7A6C60]">{t.halqaSubtitle}</span>
           </div>
 
-          {/* Optional "Assign by lines" button for the whole Halqa or selected students */}
-          <button
-            type="button"
-            onClick={() => setShowAssignByLinesModal(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#C5A059] bg-[#F8F4EC] hover:bg-[#F3ECE1] text-[#241811] text-xs font-bold shadow-2xs transition-colors cursor-pointer"
-          >
-            <ListChecks className="w-4 h-4 text-[#1F4E3D]" />
-            <span>{t.assignByLinesButton}</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Student Type Filter: All | Hifz | Nazra */}
+            <div
+              role="group"
+              aria-label={t.studentTypeLabel}
+              className="flex items-center p-0.5 bg-[#EAE0CE] rounded-xl border border-[#DFCFA8]"
+            >
+              {(
+                [
+                  { id: 'all', label: t.filterAll, count: halqaStudents.length },
+                  { id: 'hifz', label: t.filterHifz, count: hifzCount },
+                  { id: 'nazra', label: t.filterNazra, count: nazraCount },
+                ] as const
+              ).map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setTypeFilter(opt.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                    typeFilter === opt.id
+                      ? 'bg-[#241811] text-[#FCFAF6] shadow-2xs'
+                      : 'text-[#42362E] hover:text-[#241811]'
+                  }`}
+                >
+                  <span>{opt.label}</span>
+                  <span
+                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                      typeFilter === opt.id
+                        ? 'bg-[#C5A059] text-[#241811]'
+                        : 'bg-white/75 text-[#5A4333]'
+                    }`}
+                  >
+                    {opt.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Add Student Button */}
+            <button
+              type="button"
+              onClick={() => setShowAddStudentModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#C5A059] bg-[#1F4E3D] hover:bg-[#16382C] text-white text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4 text-[#DFCFA8]" />
+              <span>{t.addStudentButton}</span>
+            </button>
+
+            {/* Optional "Assign by lines" button for the whole Halqa or selected students */}
+            <button
+              type="button"
+              onClick={() => setShowAssignByLinesModal(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#C5A059] bg-[#F8F4EC] hover:bg-[#F3ECE1] text-[#241811] text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+            >
+              <ListChecks className="w-4 h-4 text-[#1F4E3D]" />
+              <span>{t.assignByLinesButton}</span>
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4">
-          {halqaStudents.map(student => {
+          {filteredHalqaStudents.length === 0 && (
+            <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-6 text-center text-xs text-[#7A6C60]">
+              {state.language === 'ur'
+                ? 'اس زمرے میں کوئی طالب علم موجود نہیں ہے۔'
+                : `No ${typeFilter === 'all' ? '' : typeFilter === 'hifz' ? 'Hifz ' : 'Nazra '}students in this Halqa yet.`}
+            </div>
+          )}
+
+          {filteredHalqaStudents.map(student => {
+            const isNazra = student.studentType === 'nazra';
+            const studentType: StudentType = isNazra ? 'nazra' : 'hifz';
             const viewedDate = getStudentViewedDate(student.id);
             const viewedPlan = state.dailyPlans[student.id]?.[viewedDate];
             const hasOverriddenLimits = Boolean(state.studentLimitsOverride[student.id]);
             const paraStatus = getParaCompletionStatus(student, state);
-            const currentParaSabqi = computeCurrentParaSabqiRange(student, state, viewedDate);
+            const currentParaSabqi = !isNazra
+              ? computeCurrentParaSabqiRange(student, state, viewedDate)
+              : null;
+            const lastTypeChange =
+              student.typeChangeHistory && student.typeChangeHistory.length > 0
+                ? student.typeChangeHistory[student.typeChangeHistory.length - 1]
+                : null;
+            const visibleParts: PartType[] = isNazra ? ['sabaq'] : ['sabaq', 'sabqi', 'manzil'];
+            const displayedParaList = isNazra
+              ? student.nazraCompletedParas || []
+              : student.completedParas || [];
 
             return (
               <div
@@ -568,14 +841,27 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
 
                 {/* Card Date Bar: defaults to today; supports navigating to past dates cleanly */}
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[#E8DCC4]/70">
-                  <div className="text-[11px] font-semibold text-[#7A6C60]">
-                    {viewedDate === state.currentDate
-                      ? state.language === 'ur'
-                        ? 'آج کا ریکارڈ'
-                        : "Today's record"
-                      : state.language === 'ur'
-                      ? `سابقہ ریکارڈ: ${viewedDate}`
-                      : `Viewing record: ${viewedDate}`}
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[#7A6C60]">
+                    <span>
+                      {viewedDate === state.currentDate
+                        ? state.language === 'ur'
+                          ? 'آج کا ریکارڈ'
+                          : "Today's record"
+                        : state.language === 'ur'
+                        ? `سابقہ ریکارڈ: ${viewedDate}`
+                        : `Viewing record: ${viewedDate}`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setChangingTypeStudent(student)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-[#DFCFA8] bg-[#F8F4EC] hover:bg-[#F3ECE1] hover:border-[#C5A059] text-[#3E2B20] text-[10px] font-bold transition-colors cursor-pointer"
+                      title={t.changeTypeButton}
+                    >
+                      <ArrowLeftRight className="w-3 h-3 text-[#8F6E2B]" />
+                      <span>
+                        {t.changeTypeButton} ({isNazra ? t.studentTypeHifz : t.studentTypeNazra})
+                      </span>
+                    </button>
                   </div>
                   <DateNavigator
                     selectedDate={viewedDate}
@@ -589,14 +875,17 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
                   {/* Student Info */}
                   <div className="md:w-1/4">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-start gap-3">
                       <div className="w-10 h-10 rounded-full bg-[#2A1D15] text-[#DFCFA8] font-bold flex items-center justify-center text-sm shrink-0 border border-[#C5A059] shadow-2xs">
                         {student.name.charAt(0)}
                       </div>
-                      <div>
-                        <h3 className="font-bold text-[#241811] text-sm md:text-base">
-                          {state.language === 'ur' ? student.urduName : student.name}
-                        </h3>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <h3 className="font-bold text-[#241811] text-sm md:text-base">
+                            {state.language === 'ur' ? student.urduName : student.name}
+                          </h3>
+                          <StudentTypeBadge type={studentType} language={state.language} />
+                        </div>
                         <div className="text-xs text-[#7A6C60] flex flex-wrap items-center gap-1.5 mt-0.5">
                           <span className="text-[#3E2B20] font-medium">
                             {state.language === 'ur'
@@ -604,9 +893,21 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                               : `Current: Para ${student.currentJuz}`}
                           </span>
                           <span className="text-[#C5A059]">·</span>
-                          <span className="text-[#1F4E3D] font-bold bg-[#E8F0EC] px-1.5 py-0.5 rounded text-[11px]">
-                            {student.completedParas?.length || 0}{' '}
-                            {state.language === 'ur' ? 'پارے مکمل' : 'Paras Done'}
+                          <span
+                            className={`font-bold px-1.5 py-0.5 rounded text-[11px] ${
+                              isNazra
+                                ? 'text-[#16365D] bg-[#E8EEF6]'
+                                : 'text-[#1F4E3D] bg-[#E8F0EC]'
+                            }`}
+                          >
+                            {displayedParaList.length}{' '}
+                            {isNazra
+                              ? state.language === 'ur'
+                                ? 'ناظرہ پارے'
+                                : 'Nazra Read'
+                              : state.language === 'ur'
+                              ? 'پارے مکمل'
+                              : 'Paras Done'}
                           </span>
                           {hasOverriddenLimits && (
                             <span className="text-[10px] text-[#8F6E2B] font-semibold bg-[#F5EFEB] px-1.5 py-0.5 rounded">
@@ -614,7 +915,7 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                             </span>
                           )}
                         </div>
-                        {currentParaSabqi && (
+                        {!isNazra && currentParaSabqi && (
                           <div className="text-[10px] text-[#5A4333] font-mono mt-1">
                             Sabqi: P{currentParaSabqi.range.start.page}:L
                             {currentParaSabqi.range.start.line}–P
@@ -623,13 +924,26 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                             passed)
                           </div>
                         )}
+                        {lastTypeChange && (
+                          <div className="text-[10px] text-[#7A6C60] mt-1">
+                            {state.language === 'ur'
+                              ? `تبدیلی (${lastTypeChange.fromType === 'hifz' ? 'حفظ' : 'ناظرہ'} ← ${
+                                  lastTypeChange.toType === 'hifz' ? 'حفظ' : 'ناظرہ'
+                                }): ${lastTypeChange.changedByUrdu || lastTypeChange.changedBy} · ${lastTypeChange.changedAt.slice(0, 10)}`
+                              : `Changed ${lastTypeChange.fromType}→${lastTypeChange.toType} by ${lastTypeChange.changedBy} (${lastTypeChange.changedAt.slice(0, 10)})`}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Daily Work Status: Sabaq, Sabqi, Manzil */}
-                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    {(['sabaq', 'sabqi', 'manzil'] as PartType[]).map(partKey => {
+                  {/* Daily Work Status: Sabaq, Sabqi, Manzil (Hifz) or Sabaq only (Nazra) */}
+                  <div
+                    className={`flex-1 grid grid-cols-1 gap-2.5 ${
+                      isNazra ? 'sm:grid-cols-1' : 'sm:grid-cols-3'
+                    }`}
+                  >
+                    {visibleParts.map(partKey => {
                       const plan = viewedPlan ? viewedPlan[partKey] : null;
                       const range = plan?.range || null;
                       const status = plan?.status || 'pending';
@@ -825,22 +1139,31 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                   </div>
                 </div>
 
-                {/* Student 30-Para Progress & Manzil Status Grid (matches Student view colors) */}
+                {/* Student 30-Para Progress Grid (Hifz shows Completed Paras & Manzil; Nazra hides Manzil and shows Nazra-read Paras) */}
                 <div className="bg-[#F8F4EC]/75 border border-[#E2D4B7] rounded-xl p-3 sm:p-3.5 space-y-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="text-xs font-bold text-[#241811] flex items-center gap-1.5">
-                      <Grid className="w-3.5 h-3.5 text-[#1F4E3D]" />
+                      <Grid className={`w-3.5 h-3.5 ${isNazra ? 'text-[#16365D]' : 'text-[#1F4E3D]'}`} />
                       <span>
-                        {state.language === 'ur'
+                        {isNazra
+                          ? t.parasReadInNazra
+                          : state.language === 'ur'
                           ? 'مکمل شدہ پارے اور منزل'
                           : 'Completed Paras & Manzil'}
                       </span>
-                      <span className="text-[11px] font-mono bg-[#E8F0EC] text-[#1F4E3D] px-1.5 py-0.5 rounded font-bold">
-                        {student.completedParas?.length || 0} / 30
+                      <span
+                        className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                          isNazra
+                            ? 'bg-[#E8EEF6] text-[#16365D]'
+                            : 'bg-[#E8F0EC] text-[#1F4E3D]'
+                        }`}
+                      >
+                        {displayedParaList.length} / 30
                       </span>
                     </div>
 
-                    {viewedPlan?.manzil?.assignedParas &&
+                    {!isNazra &&
+                      viewedPlan?.manzil?.assignedParas &&
                       viewedPlan.manzil.assignedParas.length > 0 && (
                         <span className="px-2.5 py-0.5 rounded-md bg-[#F59E0B] border border-[#B45309] text-[#1C120C] text-[11px] font-bold">
                           {t.manzilDuePrefix}: {viewedDate} — Para{' '}
@@ -850,18 +1173,22 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                   </div>
 
                   <ParaProgressGrid
-                    completedParas={student.completedParas || []}
+                    completedParas={displayedParaList}
                     currentJuz={student.currentJuz}
-                    manzilAssignedParas={viewedPlan?.manzil?.assignedParas || []}
+                    manzilAssignedParas={isNazra ? [] : viewedPlan?.manzil?.assignedParas || []}
                     currentDate={viewedDate}
                     language={state.language}
                     manzilDuePrefix={t.manzilDuePrefix}
-                    onTapPara={() =>
-                      setAssignModalTarget({
-                        student,
-                        initialPart: 'manzil',
-                        targetDate: viewedDate,
-                      })
+                    isNazra={isNazra}
+                    onTapPara={
+                      isNazra
+                        ? undefined
+                        : () =>
+                            setAssignModalTarget({
+                              student,
+                              initialPart: 'manzil',
+                              targetDate: viewedDate,
+                            })
                     }
                     compact
                   />
@@ -890,8 +1217,9 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                           </span>
                           {paraStatus.canStartNewPara ? (
                             <span className="text-[#143429]">
-                              All {paraStatus.passedCountInPara} Sabaqs in Para{' '}
-                              {paraStatus.currentJuz} passed. Ready to move to Manzil!
+                              {isNazra
+                                ? `All ${paraStatus.passedCountInPara} Sabaqs in Para ${paraStatus.currentJuz} passed. Ready to move to next Para in Nazra.`
+                                : `All ${paraStatus.passedCountInPara} Sabaqs in Para ${paraStatus.currentJuz} passed. Ready to move to Manzil!`}
                             </span>
                           ) : (
                             <span className="text-[#78350F]">{t.cannotStartParaUnpassed}</span>
@@ -945,6 +1273,28 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
         </div>
       </div>
 
+      {/* Add Student Modal */}
+      {showAddStudentModal && (
+        <AddStudentModal
+          state={state}
+          ustaad={ustaad}
+          onClose={() => setShowAddStudentModal(false)}
+          onAddStudent={handleAddStudent}
+        />
+      )}
+
+      {/* Change Student Type Confirmation Modal */}
+      {changingTypeStudent && (
+        <ChangeStudentTypeModal
+          student={changingTypeStudent}
+          ustaad={ustaad}
+          language={state.language}
+          currentDate={state.currentDate}
+          onClose={() => setChangingTypeStudent(null)}
+          onConfirm={handleChangeStudentType}
+        />
+      )}
+
       {/* Assign Work Modal */}
       {assignModalTarget && (
         <AssignWorkModal
@@ -962,7 +1312,7 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
       {showAssignByLinesModal && (
         <AssignByLinesModal
           state={state}
-          students={halqaStudents}
+          students={filteredHalqaStudents.length > 0 ? filteredHalqaStudents : halqaStudents}
           onClose={() => setShowAssignByLinesModal(false)}
           onConfirmBatch={handleConfirmAssignByLines}
           onUpdateMushafSettings={handleUpdateMushafSettings}

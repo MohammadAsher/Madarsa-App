@@ -119,60 +119,75 @@ export function createInitialDemoState(timeZone: string = DEFAULT_SCHOOL_TIMEZON
       id: 'student_1',
       name: 'Zayd ibn Haritha',
       urduName: 'زید بن حارثہ',
+      studentType: 'hifz' as const,
+      mushafLayout: 'madinah' as const,
       ustaadId: 'ustaad_a' as const,
       halqaName: 'Halqa Al-Baqarah (Ustaad A)',
       enrollmentDate: '2026-01-15',
       currentJuz: 1,
       currentParaStartDate: yesterday,
       completedParas: [],
+      nazraCompletedParas: [],
       memorizedPortionDesc: 'In Para 1 (Al-Fatihah & Al-Baqarah)',
     },
     student_2: {
       id: 'student_2',
       name: "Abdullah ibn Mas'ud",
       urduName: 'عبد اللہ بن مسعود',
+      studentType: 'hifz' as const,
+      mushafLayout: 'madinah' as const,
       ustaadId: 'ustaad_a' as const,
       halqaName: 'Halqa Al-Baqarah (Ustaad A)',
       enrollmentDate: '2026-02-01',
       currentJuz: 5,
       currentParaStartDate: yesterday,
       completedParas: [1, 2, 3, 4],
+      nazraCompletedParas: [],
       memorizedPortionDesc: 'Completed Paras 1 - 4 · Finishing Para 5',
     },
     student_3: {
       id: 'student_3',
       name: 'Hamza ibn Abdul-Muttalib',
       urduName: 'حمزہ بن عبد المطلب',
+      studentType: 'hifz' as const,
+      mushafLayout: 'madinah' as const,
       ustaadId: 'ustaad_a' as const,
       halqaName: 'Halqa Al-Baqarah (Ustaad A)',
       enrollmentDate: '2026-03-10',
       currentJuz: 1,
       currentParaStartDate: yesterday,
       completedParas: [],
+      nazraCompletedParas: [],
       memorizedPortionDesc: 'In Para 1 (Opening Pages)',
     },
     student_4: {
       id: 'student_4',
       name: 'Ibrahim Al-Khalil',
       urduName: 'ابراہیم الخلیل',
+      studentType: 'hifz' as const,
+      mushafLayout: 'madinah' as const,
       ustaadId: 'ustaad_b' as const,
       halqaName: "Halqa Ali 'Imran (Ustaad B)",
       enrollmentDate: '2026-01-20',
       currentJuz: 12,
       currentParaStartDate: yesterday,
       completedParas: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+      nazraCompletedParas: [],
       memorizedPortionDesc: 'Completed Paras 1 - 11 · Finished Para 12',
     },
     student_5: {
       id: 'student_5',
       name: 'Umar ibn Al-Khattab',
       urduName: 'عمر بن الخطاب',
+      studentType: 'hifz' as const,
+      mushafLayout: 'madinah' as const,
       ustaadId: 'ustaad_b' as const,
       halqaName: "Halqa Ali 'Imran (Ustaad B)",
       enrollmentDate: '2026-02-15',
       currentJuz: 16,
       currentParaStartDate: yesterday,
       completedParas: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+      nazraCompletedParas: [],
       memorizedPortionDesc: 'Completed 15 Paras (Half Quran)',
     },
   };
@@ -810,83 +825,89 @@ export function syncStateToRealDate(
       continue;
     }
 
-    const sabqiStatus = priorPlan.sabqi?.status;
-    const manzilStatus = priorPlan.manzil?.status;
-    const revisionFailed = sabqiStatus === 'repeat' || manzilStatus === 'repeat';
-    const shouldFreezeNewSabaq =
-      Boolean(currentState.settings?.freezeSabaqOnSabqiOrManzilFail) && revisionFailed;
+    let todayPlan: DayPlan;
+    if (student.studentType === 'nazra') {
+      // Nazra students only track Sabaq; Sabqi and Manzil stay hidden/empty
+      todayPlan = createEmptyDayPlan(realToday);
+    } else {
+      const sabqiStatus = priorPlan.sabqi?.status;
+      const manzilStatus = priorPlan.manzil?.status;
+      const revisionFailed = sabqiStatus === 'repeat' || manzilStatus === 'repeat';
+      const shouldFreezeNewSabaq =
+        Boolean(currentState.settings?.freezeSabaqOnSabqiOrManzilFail) && revisionFailed;
 
-    const computedSabqi = computeCurrentParaSabqiRange(
-      student,
-      currentState,
-      latestPriorDate || realToday
-    );
-    const nextSabqiRange: AssignmentRange | null = computedSabqi
-      ? computedSabqi.range
-      : priorPlan.sabqi?.range
-      ? { ...priorPlan.sabqi.range }
-      : null;
-    const nextSabqiLabel = computedSabqi
-      ? `Passed Sabaqs in Para ${student.currentJuz} (P${computedSabqi.range.start.page}:L${computedSabqi.range.start.line} - P${computedSabqi.range.end.page}:L${computedSabqi.range.end.line})`
-      : priorPlan.sabqi?.portionLabel;
+      const computedSabqi = computeCurrentParaSabqiRange(
+        student,
+        currentState,
+        latestPriorDate || realToday
+      );
+      const nextSabqiRange: AssignmentRange | null = computedSabqi
+        ? computedSabqi.range
+        : priorPlan.sabqi?.range
+        ? { ...priorPlan.sabqi.range }
+        : null;
+      const nextSabqiLabel = computedSabqi
+        ? `Passed Sabaqs in Para ${student.currentJuz} (P${computedSabqi.range.start.page}:L${computedSabqi.range.start.line} - P${computedSabqi.range.end.page}:L${computedSabqi.range.end.line})`
+        : priorPlan.sabqi?.portionLabel;
 
-    let nextManzilRange: AssignmentRange | null = priorPlan.manzil?.range
-      ? { ...priorPlan.manzil.range }
-      : null;
-    let nextAssignedParas = priorPlan.manzil?.assignedParas
-      ? [...priorPlan.manzil.assignedParas]
-      : [];
-    if (
-      manzilStatus === 'passed' &&
-      student.completedParas &&
-      student.completedParas.length > 0
-    ) {
-      const sortedCompleted = [...student.completedParas].sort((a, b) => a - b);
-      const currAssigned = nextAssignedParas[0];
-      const currIdx = sortedCompleted.indexOf(currAssigned);
-      const nextPara = sortedCompleted[(currIdx + 1) % sortedCompleted.length];
-      nextAssignedParas = [nextPara];
-      nextManzilRange = getFullParaRange(nextPara);
+      let nextManzilRange: AssignmentRange | null = priorPlan.manzil?.range
+        ? { ...priorPlan.manzil.range }
+        : null;
+      let nextAssignedParas = priorPlan.manzil?.assignedParas
+        ? [...priorPlan.manzil.assignedParas]
+        : [];
+      if (
+        manzilStatus === 'passed' &&
+        student.completedParas &&
+        student.completedParas.length > 0
+      ) {
+        const sortedCompleted = [...student.completedParas].sort((a, b) => a - b);
+        const currAssigned = nextAssignedParas[0];
+        const currIdx = sortedCompleted.indexOf(currAssigned);
+        const nextPara = sortedCompleted[(currIdx + 1) % sortedCompleted.length];
+        nextAssignedParas = [nextPara];
+        nextManzilRange = getFullParaRange(nextPara);
+      }
+
+      todayPlan = {
+        date: realToday,
+        sabaq: createEmptySabaqPlan(),
+        sabqi: {
+          part: 'sabqi',
+          range: nextSabqiRange,
+          status: 'pending',
+          repeatPracticeCount: 0,
+          targetRepeats: 7,
+          surahName: nextSabqiRange?.surahName,
+          juzNumber: nextSabqiRange?.juzNumber,
+          startPage: nextSabqiRange?.startPage,
+          endPage: nextSabqiRange?.endPage,
+          startLine: nextSabqiRange?.startLine,
+          endLine: nextSabqiRange?.endLine,
+          startAyah: nextSabqiRange?.startAyah,
+          endAyah: nextSabqiRange?.endAyah,
+          portionType: computedSabqi ? 'current_para_passed' : priorPlan.sabqi?.portionType,
+          portionLabel: nextSabqiLabel,
+        },
+        manzil: {
+          part: 'manzil',
+          range: nextManzilRange,
+          status: 'pending',
+          repeatPracticeCount: 0,
+          targetRepeats: 5,
+          surahName: nextManzilRange?.surahName,
+          juzNumber: nextManzilRange?.juzNumber,
+          startPage: nextManzilRange?.startPage,
+          endPage: nextManzilRange?.endPage,
+          startLine: nextManzilRange?.startLine,
+          endLine: nextManzilRange?.endLine,
+          startAyah: nextManzilRange?.startAyah,
+          endAyah: nextManzilRange?.endAyah,
+          assignedParas: nextAssignedParas,
+        },
+        sabaqFrozenDueToRevisionFail: shouldFreezeNewSabaq,
+      };
     }
-
-    const todayPlan: DayPlan = {
-      date: realToday,
-      sabaq: createEmptySabaqPlan(),
-      sabqi: {
-        part: 'sabqi',
-        range: nextSabqiRange,
-        status: 'pending',
-        repeatPracticeCount: 0,
-        targetRepeats: 7,
-        surahName: nextSabqiRange?.surahName,
-        juzNumber: nextSabqiRange?.juzNumber,
-        startPage: nextSabqiRange?.startPage,
-        endPage: nextSabqiRange?.endPage,
-        startLine: nextSabqiRange?.startLine,
-        endLine: nextSabqiRange?.endLine,
-        startAyah: nextSabqiRange?.startAyah,
-        endAyah: nextSabqiRange?.endAyah,
-        portionType: computedSabqi ? 'current_para_passed' : priorPlan.sabqi?.portionType,
-        portionLabel: nextSabqiLabel,
-      },
-      manzil: {
-        part: 'manzil',
-        range: nextManzilRange,
-        status: 'pending',
-        repeatPracticeCount: 0,
-        targetRepeats: 5,
-        surahName: nextManzilRange?.surahName,
-        juzNumber: nextManzilRange?.juzNumber,
-        startPage: nextManzilRange?.startPage,
-        endPage: nextManzilRange?.endPage,
-        startLine: nextManzilRange?.startLine,
-        endLine: nextManzilRange?.endLine,
-        startAyah: nextManzilRange?.startAyah,
-        endAyah: nextManzilRange?.endAyah,
-        assignedParas: nextAssignedParas,
-      },
-      sabaqFrozenDueToRevisionFail: shouldFreezeNewSabaq,
-    };
 
     newDailyPlans[studentId] = {
       ...studentHistory,
@@ -915,6 +936,37 @@ export function syncStateToRealDate(
   };
 }
 
+/**
+ * Migrates any existing persisted students lacking studentType to 'hifz' by default,
+ * preserving all historical records, assignments, marks, and completed paras untouched.
+ */
+export function migrateMadrasaState(currentState: MadrasaState): MadrasaState {
+  let changed = false;
+  const updatedStudents = { ...currentState.students };
+  const defaultLayout = currentState.settings?.mushafLayout || 'madinah';
+
+  for (const [id, student] of Object.entries(updatedStudents)) {
+    if (!student) continue;
+    const needsType = student.studentType !== 'hifz' && student.studentType !== 'nazra';
+    const needsLayout = !student.mushafLayout;
+    if (needsType || needsLayout) {
+      updatedStudents[id] = {
+        ...student,
+        studentType: needsType ? 'hifz' : student.studentType,
+        mushafLayout: student.mushafLayout || defaultLayout,
+        completedParas: Array.isArray(student.completedParas) ? student.completedParas : [],
+      };
+      changed = true;
+    }
+  }
+
+  if (!changed) return currentState;
+  return {
+    ...currentState,
+    students: updatedStudents,
+  };
+}
+
 export function loadState(): MadrasaState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -924,7 +976,8 @@ export function loadState(): MadrasaState {
       return initial;
     }
     const parsed = JSON.parse(raw) as MadrasaState;
-    const synced = syncStateToRealDate(parsed);
+    const migrated = migrateMadrasaState(parsed);
+    const synced = syncStateToRealDate(migrated);
     if (synced !== parsed) {
       saveState(synced);
     }

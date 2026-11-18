@@ -8,11 +8,19 @@ import { WordLocation } from '../data/quranData';
 export type RoleId = 
   | 'ustaad_a' 
   | 'ustaad_b' 
-  | 'student_1' 
-  | 'student_2' 
-  | 'student_3' 
-  | 'student_4' 
-  | 'student_5';
+  | `student_${string}`;
+
+export type StudentType = 'hifz' | 'nazra';
+
+export interface StudentTypeChangeLog {
+  id: string;
+  fromType: StudentType;
+  toType: StudentType;
+  changedBy: string;
+  changedByUrdu?: string;
+  changedById: 'ustaad_a' | 'ustaad_b';
+  changedAt: string; // ISO timestamp
+}
 
 export interface UstaadProfile {
   id: 'ustaad_a' | 'ustaad_b';
@@ -26,13 +34,19 @@ export interface StudentProfile {
   id: string; // 'student_1', etc.
   name: string;
   urduName: string;
+  studentType: StudentType;
+  mushafLayout?: 'hafizi' | 'madinah';
   ustaadId: 'ustaad_a' | 'ustaad_b';
   halqaName: string;
   enrollmentDate: string;
   currentJuz: number;
   currentParaStartDate?: string; // Date when currentJuz was started (used to scope Sabqi to current para)
-  completedParas: number[]; // Array of Para numbers student has completed, e.g. [1, 2, 3, 4, 5]
+  hifzFreshFromIso?: string; // Timestamp boundary when starting Hifz fresh from Nazra
+  hasStoredHifzProgress?: boolean; // Preserved flag if a Hifz student was switched to Nazra so Hifz Sabqi/Manzil restore when switched back
+  completedParas: number[]; // Hifz completed paras (used for Manzil)
+  nazraCompletedParas?: number[]; // Paras read in Nazra (kept separate; never moved into Manzil)
   memorizedPortionDesc?: string; // e.g. "Completed 5 Paras" or "Memorized up to Para 1 Page 10"
+  typeChangeHistory?: StudentTypeChangeLog[];
 }
 
 export type PartType = 'sabaq' | 'sabqi' | 'manzil';
@@ -71,6 +85,7 @@ export interface DailyPartPlan {
   lastPracticedAt?: string;
   completedAt?: string;
   sessionResultId?: string;
+  isNazraSabaq?: boolean; // Stamped when graded while studentType === 'nazra' so it never leaks into Hifz Sabqi
   // Specific assignment metadata for teacher control
   surahName?: string;
   juzNumber?: number;

@@ -16,6 +16,7 @@ export interface ParaProgressGridProps {
   previewParaNum?: number | null;
   onTapPara?: (paraNum: number) => void;
   compact?: boolean;
+  isNazra?: boolean;
 }
 
 export const ParaProgressGrid: React.FC<ParaProgressGridProps> = ({
@@ -28,6 +29,7 @@ export const ParaProgressGrid: React.FC<ParaProgressGridProps> = ({
   previewParaNum = null,
   onTapPara,
   compact = false,
+  isNazra = false,
 }) => {
   const isUr = language === 'ur';
 
@@ -43,13 +45,13 @@ export const ParaProgressGrid: React.FC<ParaProgressGridProps> = ({
         {Array.from({ length: 30 }, (_, i) => i + 1).map(paraNum => {
           const isCompleted = completedParas.includes(paraNum);
           const isCurrent = currentJuz === paraNum && !isCompleted;
-          const isManzilDue = manzilAssignedParas.includes(paraNum);
+          const isManzilDue = !isNazra && manzilAssignedParas.includes(paraNum);
           const isPreviewing = previewParaNum === paraNum;
           const { startPage, endPage } = getParaPageRange(paraNum);
 
           // Color states:
-          // 1. Manzil due -> solid amber/orange fill (#F59E0B) with dark text (#1C120C)
-          // 2. Completed -> dark green (#1F4E3D) with white text
+          // 1. Manzil due (Hifz only) -> solid amber/orange fill (#F59E0B) with dark text (#1C120C)
+          // 2. Completed -> dark green (#1F4E3D) (or deep blue #16365D in Nazra) with white text
           // 3. Current para -> white (#FFFFFF) with dark brown text (#241811)
           // 4. Not started -> grey (#E5E7EB) with charcoal text (#4B5563)
           let tileColorClasses =
@@ -58,8 +60,9 @@ export const ParaProgressGrid: React.FC<ParaProgressGridProps> = ({
             tileColorClasses =
               'bg-[#F59E0B] text-[#1C120C] border-2 border-[#B45309] hover:bg-[#D97706] shadow-md';
           } else if (isCompleted) {
-            tileColorClasses =
-              'bg-[#1F4E3D] text-white border-[#C5A059] hover:bg-[#16382C] shadow-xs';
+            tileColorClasses = isNazra
+              ? 'bg-[#16365D] text-white border-[#C5A059] hover:bg-[#102946] shadow-xs'
+              : 'bg-[#1F4E3D] text-white border-[#C5A059] hover:bg-[#16382C] shadow-xs';
           } else if (isCurrent) {
             tileColorClasses =
               'bg-white text-[#241811] border-2 border-[#C5A059] hover:bg-[#FAF6EF] shadow-2xs';
@@ -107,15 +110,29 @@ export const ParaProgressGrid: React.FC<ParaProgressGridProps> = ({
       {/* Colour Legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1 text-xs text-[#42362E]">
         <div className="flex items-center gap-1.5">
-          <span className="w-3.5 h-3.5 rounded bg-[#1F4E3D] border border-[#C5A059] inline-block shrink-0" />
-          <span className="font-medium">{isUr ? 'سبز = مکمل شدہ' : 'Green = Completed'}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3.5 h-3.5 rounded bg-[#F59E0B] border border-[#B45309] inline-block shrink-0" />
-          <span className="font-semibold text-[#78350F]">
-            {isUr ? 'عنبری (نارنجی) = منزل مقرر' : 'Amber = Manzil due'}
+          <span
+            className={`w-3.5 h-3.5 rounded border border-[#C5A059] inline-block shrink-0 ${
+              isNazra ? 'bg-[#16365D]' : 'bg-[#1F4E3D]'
+            }`}
+          />
+          <span className="font-medium">
+            {isNazra
+              ? isUr
+                ? 'نیلا = ناظرہ مکمل'
+                : 'Blue = Read in Nazra'
+              : isUr
+              ? 'سبز = مکمل شدہ'
+              : 'Green = Completed'}
           </span>
         </div>
+        {!isNazra && (
+          <div className="flex items-center gap-1.5">
+            <span className="w-3.5 h-3.5 rounded bg-[#F59E0B] border border-[#B45309] inline-block shrink-0" />
+            <span className="font-semibold text-[#78350F]">
+              {isUr ? 'عنبری (نارنجی) = منزل مقرر' : 'Amber = Manzil due'}
+            </span>
+          </div>
+        )}
         <div className="flex items-center gap-1.5">
           <span className="w-3.5 h-3.5 rounded bg-white border border-[#C5A059] inline-block shrink-0" />
           <span className="font-medium">{isUr ? 'سفید = موجودہ پارہ' : 'White = Current para'}</span>

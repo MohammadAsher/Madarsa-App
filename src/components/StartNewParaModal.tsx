@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { X, Award, Check, BookOpen, ArrowRight } from 'lucide-react';
 import { MadrasaState, StudentProfile } from '../types/hifz';
 import { getJuzMetadata, getParaSurahName } from '../data/quranData';
+import { StudentTypeBadge } from './StudentTypeBadge';
 import { translations } from '../i18n/translations';
 
 interface StartNewParaModalProps {
@@ -23,11 +24,16 @@ export const StartNewParaModal: React.FC<StartNewParaModalProps> = ({
   onConfirm,
 }) => {
   const t = translations[state.language];
+  const isNazra = student.studentType === 'nazra';
   const finishedPara = student.currentJuz;
   const defaultNextPara = finishedPara < 30 ? finishedPara + 1 : 1;
 
+  const existingDoneParas = isNazra
+    ? student.nazraCompletedParas || []
+    : student.completedParas || [];
+
   // Pick first uncompleted Para if defaultNextPara is already completed
-  const completedSet = new Set([...(student.completedParas || []), finishedPara]);
+  const completedSet = new Set([...existingDoneParas, finishedPara]);
   const firstAvailable =
     !completedSet.has(defaultNextPara)
       ? defaultNextPara
@@ -47,9 +53,14 @@ export const StartNewParaModal: React.FC<StartNewParaModalProps> = ({
               <h2 className="text-base md:text-lg font-bold">
                 {t.startNewParaTitle}
               </h2>
-              <p className="text-xs text-[#DFCFA8]">
-                {state.language === 'ur' ? student.urduName : student.name}
-              </p>
+              <div className="text-xs text-[#DFCFA8] flex items-center gap-1.5 mt-0.5">
+                <span>{state.language === 'ur' ? student.urduName : student.name}</span>
+                <StudentTypeBadge
+                  type={student.studentType || 'hifz'}
+                  language={state.language}
+                  size="xs"
+                />
+              </div>
             </div>
           </div>
           <button
@@ -64,9 +75,15 @@ export const StartNewParaModal: React.FC<StartNewParaModalProps> = ({
         {/* Body */}
         <div className="p-5 space-y-4 overflow-y-auto max-h-[75vh]">
           {/* Completed Para Summary */}
-          <div className="p-3.5 rounded-xl bg-[#EBF3EE] border border-[#2E6A54] text-[#143429] text-xs space-y-1">
+          <div
+            className={`p-3.5 rounded-xl border text-xs space-y-1 ${
+              isNazra
+                ? 'bg-[#E8EEF6] border-[#16365D]/40 text-[#16365D]'
+                : 'bg-[#EBF3EE] border-[#2E6A54] text-[#143429]'
+            }`}
+          >
             <div className="font-bold flex items-center gap-1.5">
-              <Check className="w-4 h-4 text-[#1F4E3D]" />
+              <Check className={`w-4 h-4 ${isNazra ? 'text-[#16365D]' : 'text-[#1F4E3D]'}`} />
               <span>
                 {state.language === 'ur'
                   ? `پارہ ${finishedPara} (${getParaSurahName(finishedPara)}) کے تمام اسباق پاس ہو چکے ہیں`
@@ -74,7 +91,11 @@ export const StartNewParaModal: React.FC<StartNewParaModalProps> = ({
               </span>
             </div>
             <p className="text-[11px] opacity-90">
-              {state.language === 'ur'
+              {isNazra
+                ? state.language === 'ur'
+                  ? `پارہ ${finishedPara} ناظرہ میں پڑھے گئے پاروں میں درج ہو جائے گا (منزل میں شامل نہیں ہوگا) اور نئے پارے کا آغاز ہوگا۔`
+                  : `Para ${finishedPara} will be logged under ${student.name.split(' ')[0]}'s Paras Read in Nazra (never moved into Manzil), and reading will continue in the selected Para.`
+                : state.language === 'ur'
                 ? `پارہ ${finishedPara} اب طالب علم کے مکمل شدہ پاروں (منزل) میں شامل کر دیا جائے گا اور نئے پارے کا پہلا سبق مقرر ہو جائے گا۔`
                 : `Para ${finishedPara} will move to ${student.name.split(' ')[0]}'s completed Paras pool (Manzil), Sabqi will reset for the new Para, and the first Sabaq of the selected Para will be assigned.`}
             </p>
@@ -88,7 +109,7 @@ export const StartNewParaModal: React.FC<StartNewParaModalProps> = ({
             <div className="grid grid-cols-5 sm:grid-cols-6 gap-1.5">
               {Array.from({ length: 30 }, (_, i) => i + 1).map(pNum => {
                 const isJustFinished = pNum === finishedPara;
-                const isAlreadyDone = student.completedParas?.includes(pNum);
+                const isAlreadyDone = existingDoneParas.includes(pNum);
                 const isSelected = selectedNextPara === pNum;
 
                 return (
@@ -100,7 +121,9 @@ export const StartNewParaModal: React.FC<StartNewParaModalProps> = ({
                       isSelected
                         ? 'bg-[#241811] text-[#FCFAF6] border-[#C5A059] ring-2 ring-[#C5A059] scale-[1.03]'
                         : isJustFinished || isAlreadyDone
-                        ? 'bg-[#E8F0EC] text-[#1F4E3D] border-[#2E6A54]/40 hover:border-[#C5A059]'
+                        ? isNazra
+                          ? 'bg-[#E8EEF6] text-[#16365D] border-[#16365D]/40 hover:border-[#C5A059]'
+                          : 'bg-[#E8F0EC] text-[#1F4E3D] border-[#2E6A54]/40 hover:border-[#C5A059]'
                         : 'bg-[#F8F4EC] text-[#241811] border-[#DFCFA8] hover:bg-[#F3ECE1]'
                     }`}
                     title={`Para ${pNum} (${getParaSurahName(pNum)})`}
