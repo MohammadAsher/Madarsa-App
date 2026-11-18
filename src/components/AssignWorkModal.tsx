@@ -14,6 +14,7 @@ import {
   BookmarkCheck,
   CheckSquare,
   Square,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   MadrasaState,
@@ -35,8 +36,11 @@ import {
 import {
   buildManzilCombinedRange,
   computeCurrentParaSabqiRange,
+  computeManzilParaStates,
   getFullParaRange,
+  getLatestUnpassedRepeatSabaq,
   getManzilParaRanges,
+  getNewSabaqPauseStatus,
 } from '../services/hifzService';
 import { translations } from '../i18n/translations';
 
@@ -86,19 +90,30 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
   const currentPlan = todayPlan?.[effectivePart];
   const currentRange = currentPlan?.range || null;
 
+  const pauseStatus = getNewSabaqPauseStatus(student, state, activeDate);
+  const isSabaqBlocked = effectivePart === 'sabaq' && pauseStatus.isPaused;
+  const priorRepeatSabaq =
+    !isSabaqBlocked && !todayPlan?.sabaq?.range
+      ? getLatestUnpassedRepeatSabaq(student, state, activeDate)
+      : null;
+
+  const initialSabaqRange =
+    effectivePart === 'sabaq'
+      ? currentRange || priorRepeatSabaq?.range || null
+      : currentRange;
+
   const currentParaSabqi = computeCurrentParaSabqiRange(student, state, activeDate);
 
-  // If no Sabaq is assigned yet, open on student's current Para page for browsing ONLY,
-  // with selectionStart & selectionEnd STRICTLY null (nothing pre-selected or pre-marked!)
+  // If no Sabaq is assigned yet (and no prior Repeat Sabaq), open on student's current Para page for browsing ONLY
   const defaultBrowsePage =
-    currentRange?.start.page || getParaPageRange(student.currentJuz || 1).startPage;
+    initialSabaqRange?.start.page || getParaPageRange(student.currentJuz || 1).startPage;
 
   const [pageNumber, setPageNumber] = useState<number>(defaultBrowsePage);
   const [selectionStart, setSelectionStart] = useState<WordLocation | null>(
-    currentRange ? currentRange.start : null
+    initialSabaqRange ? initialSabaqRange.start : null
   );
   const [selectionEnd, setSelectionEnd] = useState<WordLocation | null>(
-    currentRange ? currentRange.end : null
+    initialSabaqRange ? initialSabaqRange.end : null
   );
 
   // Sabqi specific state
@@ -113,9 +128,23 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
   const [completedParasState, setCompletedParasState] = useState<number[]>(
     student.completedParas ? [...student.completedParas] : []
   );
+  const manzilState = isNazra
+    ? { dueParas: [], repeatParas: {} }
+    : computeManzilParaStates(student, state, activeDate);
+  const repeatParaNums = Object.keys(manzilState.repeatParas)
+    .map(k => parseInt(k, 10))
+    .filter(n => !Number.isNaN(n))
+    .sort((a, b) => a - b);
+
   const savedManzilParas = todayPlan?.manzil?.assignedParas;
+  const isManzilPendingOrActive =
+    todayPlan?.manzil?.status === 'pending' || todayPlan?.manzil?.status === 'in_progress';
   const [assignedManzilParas, setAssignedManzilParas] = useState<number[]>(
-    savedManzilParas && savedManzilParas.length > 0
+    isManzilPendingOrActive && savedManzilParas && savedManzilParas.length > 0
+      ? [...savedManzilParas].sort((a, b) => a - b)
+      : repeatParaNums.length > 0
+      ? repeatParaNums
+      : savedManzilParas && savedManzilParas.length > 0
       ? [...savedManzilParas].sort((a, b) => a - b)
       : completedParasState.slice(0, 1)
   );
@@ -125,6 +154,8 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
 
   // Tap handler on mushaf words: first tap sets start, second tap sets end!
   const handleWordClick = (word: MushafWord) => {
+    if (isSabaqBlocked) return;
+
     const loc: WordLocation = {
       page: word.pageNumber,
       line: word.lineNumber,
@@ -215,7 +246,7 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
   const switchPartTab = (partKey: PartType) => {
     setSelectedPart(partKey);
     if (partKey === 'sabaq') {
-      const existingSabaq = todayPlan?.sabaq?.range || null;
+      const existingSabaq = todayPlan?.sabaq?.range || priorRepeatSabaq?.range || null;
       if (existingSabaq) {
         setSelectionStart(existingSabaq.start);
         setSelectionEnd(existingSabaq.end);
@@ -281,7 +312,7 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
       : null;
 
   const handleConfirm = (applyToAll: boolean) => {
-    if (!hasValidRange) return;
+    if (!hasValidRange || isSabaqBlocked) return;
 
     let range: AssignmentRange | null = null;
     if (selectedPart === 'manzil' && !manzilUsingCustomRange) {
@@ -403,52 +434,95 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
 
         {/* Section 1: Controls for Selected Part */}
         <div className="px-5 py-3 border-b border-[#DFCFA8] bg-[#FCFAF6]">
-          {/* A. SABAQ CONTROLS: Pure manual selection (no defaults, no auto-start-from-last-end) */}
+          {/* A. SABAQ CONTROLS */}
           {selectedPart === 'sabaq' && (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                {!selectionStart && !selectionEnd && (
-                  <span className="font-bold text-[#78350F] bg-[#FEF3C7] border border-[#F59E0B]/50 px-2.5 py-1 rounded-lg">
-                    {t.sabaqNotAssignedYet} — Tap the FIRST word, then the LAST word on the Mushaf.
-                  </span>
-                )}
-                {selectionStart && !selectionEnd && (
-                  <span className="font-bold text-[#143429] bg-[#EBF3EE] border border-[#2E6A54] px-2.5 py-1 rounded-lg">
-                    First word selected (P{selectionStart.page}:L{selectionStart.line}:W
-                    {selectionStart.wordIndex}) — now tap the LAST word.
-                  </span>
-                )}
-                {(selectionStart || selectionEnd) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectionStart(null);
-                      setSelectionEnd(null);
-                    }}
-                    className="px-2.5 py-1 rounded-lg border border-[#DFCFA8] bg-[#F8F4EC] hover:bg-[#F3ECE1] text-[#5A4333] font-semibold cursor-pointer"
-                  >
-                    Clear Selection
-                  </button>
+            isSabaqBlocked ? (
+              <div className="p-3 rounded-xl bg-[#FEF2F2] border-2 border-[#B91C1C]/60 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-start gap-2.5 text-xs">
+                  <AlertTriangle className="w-4 h-4 text-[#B91C1C] shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <div className="font-bold text-[#7F1D1D]">
+                      {pauseStatus.detailedReasons.join(' ')}
+                    </div>
+                    <div className="text-[11px] font-semibold text-[#991B1B]">
+                      {pauseStatus.reasons.join(' · ')}
+                    </div>
+                  </div>
+                </div>
+                {!isNazra && (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {pauseStatus.sabqiPaused && (
+                      <button
+                        type="button"
+                        onClick={() => switchPartTab('sabqi')}
+                        className="px-2.5 py-1.5 rounded-lg bg-white border border-[#DFCFA8] hover:bg-[#F8F4EC] text-xs font-bold text-[#241811] cursor-pointer"
+                      >
+                        {t.parts.sabqi}
+                      </button>
+                    )}
+                    {pauseStatus.manzilPaused && (
+                      <button
+                        type="button"
+                        onClick={() => switchPartTab('manzil')}
+                        className="px-2.5 py-1.5 rounded-lg bg-[#1F4E3D] text-white hover:bg-[#16382C] text-xs font-bold cursor-pointer"
+                      >
+                        {t.parts.manzil}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-
-              {metadata && (
-                <div className="bg-[#EBF3EE] border border-[#2E6A54] px-3 py-1.5 rounded-lg text-xs font-mono text-[#143429] flex items-center gap-2 font-medium">
-                  <span className="font-bold">{metadata.surahName}</span>
-                  <span>·</span>
-                  <span>Para {metadata.juzNumber}</span>
-                  <span>·</span>
-                  <span>
-                    P{metadata.startPage}:L{metadata.startLine} to P{metadata.endPage}:L
-                    {metadata.endLine}
-                  </span>
-                  <span>·</span>
-                  <span className="font-bold bg-[#1F4E3D] text-[#FCFAF6] px-1.5 py-0.5 rounded text-[10px]">
-                    {metadata.linesCount} Lines
-                  </span>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {priorRepeatSabaq && (
+                    <span className="font-bold text-[#991B1B] bg-[#FEE2E2] border border-[#B91C1C]/40 px-2.5 py-1 rounded-lg">
+                      {t.sameSabaqRepeatNote}
+                    </span>
+                  )}
+                  {!selectionStart && !selectionEnd && (
+                    <span className="font-bold text-[#78350F] bg-[#FEF3C7] border border-[#F59E0B]/50 px-2.5 py-1 rounded-lg">
+                      {t.sabaqNotAssignedYet} — Tap the FIRST word, then the LAST word on the Mushaf.
+                    </span>
+                  )}
+                  {selectionStart && !selectionEnd && (
+                    <span className="font-bold text-[#143429] bg-[#EBF3EE] border border-[#2E6A54] px-2.5 py-1 rounded-lg">
+                      First word selected (P{selectionStart.page}:L{selectionStart.line}:W
+                      {selectionStart.wordIndex}) — now tap the LAST word.
+                    </span>
+                  )}
+                  {(selectionStart || selectionEnd) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectionStart(null);
+                        setSelectionEnd(null);
+                      }}
+                      className="px-2.5 py-1 rounded-lg border border-[#DFCFA8] bg-[#F8F4EC] hover:bg-[#F3ECE1] text-[#5A4333] font-semibold cursor-pointer"
+                    >
+                      Clear Selection
+                    </button>
+                  )}
                 </div>
-              )}
-            </div>
+
+                {metadata && (
+                  <div className="bg-[#EBF3EE] border border-[#2E6A54] px-3 py-1.5 rounded-lg text-xs font-mono text-[#143429] flex items-center gap-2 font-medium">
+                    <span className="font-bold">{metadata.surahName}</span>
+                    <span>·</span>
+                    <span>Para {metadata.juzNumber}</span>
+                    <span>·</span>
+                    <span>
+                      P{metadata.startPage}:L{metadata.startLine} to P{metadata.endPage}:L
+                      {metadata.endLine}
+                    </span>
+                    <span>·</span>
+                    <span className="font-bold bg-[#1F4E3D] text-[#FCFAF6] px-1.5 py-0.5 rounded text-[10px]">
+                      {metadata.linesCount} Lines
+                    </span>
+                  </div>
+                )}
+              </div>
+            )
           )}
 
           {/* B. SABQI CONTROLS */}
@@ -638,40 +712,57 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
-                  {completedParasState.length === 0 ? (
+                  {completedParasState.length === 0 && repeatParaNums.length === 0 ? (
                     <div className="text-xs text-[#7A6C60] italic">
                       {t.noParasCompleted}. Finish a Para or click "{t.manageCompletedParas}".
                     </div>
                   ) : (
-                    completedParasState.map(paraNum => {
-                      const isAssigned = !manzilUsingCustomRange && assignedManzilParas.includes(paraNum);
-                      return (
-                        <button
-                          key={paraNum}
-                          type="button"
-                          onClick={() => toggleManzilPara(paraNum)}
-                          className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                            isAssigned
-                              ? 'bg-[#F59E0B] hover:bg-[#D97706] text-[#1C120C] border-2 border-[#B45309] shadow-md'
-                              : 'bg-[#1F4E3D] hover:bg-[#16382C] text-white border border-[#C5A059] shadow-xs'
-                          }`}
-                        >
-                          {isAssigned ? (
-                            <CheckSquare className="w-4 h-4 text-[#1C120C]" />
-                          ) : (
-                            <Square className="w-4 h-4 text-[#DFCFA8]" />
-                          )}
-                          <span>Para {paraNum}</span>
-                          <span
-                            className={`text-[10px] font-normal ${
-                              isAssigned ? 'text-[#451A03]' : 'text-[#DFCFA8]'
+                    Array.from(new Set([...completedParasState, ...repeatParaNums]))
+                      .sort((a, b) => a - b)
+                      .map(paraNum => {
+                        const isAssigned =
+                          !manzilUsingCustomRange && assignedManzilParas.includes(paraNum);
+                        const repeatDate = manzilState.repeatParas[paraNum];
+                        const isRepeat = Boolean(repeatDate);
+
+                        return (
+                          <button
+                            key={paraNum}
+                            type="button"
+                            onClick={() => toggleManzilPara(paraNum)}
+                            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                              isAssigned
+                                ? 'bg-[#F59E0B] hover:bg-[#D97706] text-[#1C120C] border-2 border-[#B45309] shadow-md'
+                                : isRepeat
+                                ? 'bg-[#B91C1C] hover:bg-[#991B1B] text-white border-2 border-[#7F1D1D] shadow-md'
+                                : 'bg-[#1F4E3D] hover:bg-[#16382C] text-white border border-[#C5A059] shadow-xs'
                             }`}
                           >
-                            ({getParaSurahName(paraNum)})
-                          </span>
-                        </button>
-                      );
-                    })
+                            {isAssigned ? (
+                              <CheckSquare className="w-4 h-4 text-[#1C120C]" />
+                            ) : (
+                              <Square className="w-4 h-4 text-[#DFCFA8]" />
+                            )}
+                            <span>Para {paraNum}</span>
+                            <span
+                              className={`text-[10px] font-normal ${
+                                isAssigned
+                                  ? 'text-[#451A03]'
+                                  : isRepeat
+                                  ? 'text-rose-100'
+                                  : 'text-[#DFCFA8]'
+                              }`}
+                            >
+                              ({getParaSurahName(paraNum)})
+                            </span>
+                            {isRepeat && repeatDate && (
+                              <span className="ml-0.5 px-1.5 py-0.5 rounded bg-[#FEF2F2] text-[#7F1D1D] border border-[#7F1D1D]/40 text-[9px] font-extrabold">
+                                {t.repeatPrefix}: {repeatDate}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })
                   )}
                 </div>
               )}
@@ -778,10 +869,12 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
           <MushafViewer
             pageNumber={pageNumber}
             onPageChange={setPageNumber}
-            selectionStart={manzilHighlightRanges ? null : selectionStart}
-            selectionEnd={manzilHighlightRanges ? null : selectionEnd}
+            selectionStart={
+              isSabaqBlocked ? null : manzilHighlightRanges ? null : selectionStart
+            }
+            selectionEnd={isSabaqBlocked ? null : manzilHighlightRanges ? null : selectionEnd}
             highlightRanges={manzilHighlightRanges}
-            interactiveMode="assigning"
+            interactiveMode={isSabaqBlocked ? 'view' : 'assigning'}
             onWordClick={handleWordClick}
             language={state.language}
             mushafLayout={student.mushafLayout || state.settings.mushafLayout || 'madinah'}
@@ -821,9 +914,9 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
 
             <button
               type="button"
-              disabled={!hasValidRange}
+              disabled={!hasValidRange || isSabaqBlocked}
               onClick={() => handleConfirm(false)}
-              className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#241811] hover:bg-[#38271D] text-[#FCFAF6] border border-[#C5A059] disabled:opacity-40 text-xs md:text-sm font-bold shadow-xs transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#241811] hover:bg-[#38271D] text-[#FCFAF6] border border-[#C5A059] disabled:opacity-40 disabled:cursor-not-allowed text-xs md:text-sm font-bold shadow-xs transition-colors cursor-pointer"
             >
               <Check className="w-4 h-4 text-[#C5A059]" />
               <span>

@@ -485,6 +485,31 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
                                   : 'Not assigned'}
                               </div>
 
+                              {manzil.paraResults &&
+                                Object.keys(manzil.paraResults).length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-1.5">
+                                    {Object.entries(manzil.paraResults)
+                                      .sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10))
+                                      .map(([pKey, outcome]) => (
+                                        <span
+                                          key={pKey}
+                                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                            outcome === 'passed'
+                                              ? 'bg-[#E8F0EC] text-[#143429] border-[#2E6A54]/50'
+                                              : 'bg-[#FEE2E2] text-[#7F1D1D] border-[#B91C1C]/50'
+                                          }`}
+                                        >
+                                          {state.language === 'ur' ? `پارہ ${pKey}` : `Para ${pKey}`}:{' '}
+                                          {outcome === 'passed'
+                                            ? state.language === 'ur'
+                                              ? 'پاس'
+                                              : 'Pass'
+                                            : t.repeatPrefix}
+                                        </span>
+                                      ))}
+                                  </div>
+                                )}
+
                               {manzil.range && (
                                 <div className="text-[11px] font-mono text-[#5A4333] mt-1.5">
                                   Pages {manzil.range.start.page} to {manzil.range.end.page}
@@ -610,6 +635,32 @@ export const StudentHistoryModal: React.FC<StudentHistoryModalProps> = ({
                           <div className="text-xs text-[#5A4333] font-mono mt-1">
                             Range: P{session.range.start.page}:L{session.range.start.line} to P{session.range.end.page}:L{session.range.end.line} ({session.range.linesCount} {t.linesCount})
                           </div>
+
+                          {session.part === 'manzil' &&
+                            session.paraResults &&
+                            Object.keys(session.paraResults).length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {Object.entries(session.paraResults)
+                                  .sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10))
+                                  .map(([pKey, outcome]) => (
+                                    <span
+                                      key={pKey}
+                                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                        outcome === 'passed'
+                                          ? 'bg-[#E8F0EC] text-[#143429] border-[#2E6A54]/50'
+                                          : 'bg-[#FEE2E2] text-[#7F1D1D] border-[#B91C1C]/50'
+                                      }`}
+                                    >
+                                      {state.language === 'ur' ? `پارہ ${pKey}` : `Para ${pKey}`}:{' '}
+                                      {outcome === 'passed'
+                                        ? state.language === 'ur'
+                                          ? 'پاس'
+                                          : 'Pass'
+                                        : t.repeatPrefix}
+                                    </span>
+                                  ))}
+                              </div>
+                            )}
                         </div>
 
                         {/* Marks vs Limit badge */}

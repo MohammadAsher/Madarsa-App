@@ -10,9 +10,11 @@ export interface ParaProgressGridProps {
   completedParas: number[];
   currentJuz: number;
   manzilAssignedParas: number[];
+  manzilRepeatParas?: Record<number, string>;
   currentDate: string;
   language: 'en' | 'ur';
   manzilDuePrefix: string;
+  repeatPrefix?: string;
   previewParaNum?: number | null;
   onTapPara?: (paraNum: number) => void;
   compact?: boolean;
@@ -23,15 +25,18 @@ export const ParaProgressGrid: React.FC<ParaProgressGridProps> = ({
   completedParas,
   currentJuz,
   manzilAssignedParas,
+  manzilRepeatParas = {},
   currentDate,
   language,
   manzilDuePrefix,
+  repeatPrefix,
   previewParaNum = null,
   onTapPara,
   compact = false,
   isNazra = false,
 }) => {
   const isUr = language === 'ur';
+  const repeatLabel = repeatPrefix || (isUr ? 'دہرائیں' : 'Repeat');
 
   return (
     <div className="space-y-3">
@@ -46,19 +51,25 @@ export const ParaProgressGrid: React.FC<ParaProgressGridProps> = ({
           const isCompleted = completedParas.includes(paraNum);
           const isCurrent = currentJuz === paraNum && !isCompleted;
           const isManzilDue = !isNazra && manzilAssignedParas.includes(paraNum);
+          const repeatDate = !isNazra ? manzilRepeatParas[paraNum] : undefined;
+          const isManzilRepeat = !isNazra && !isManzilDue && Boolean(repeatDate);
           const isPreviewing = previewParaNum === paraNum;
           const { startPage, endPage } = getParaPageRange(paraNum);
 
           // Color states:
-          // 1. Manzil due (Hifz only) -> solid amber/orange fill (#F59E0B) with dark text (#1C120C)
-          // 2. Completed -> dark green (#1F4E3D) (or deep blue #16365D in Nazra) with white text
-          // 3. Current para -> white (#FFFFFF) with dark brown text (#241811)
-          // 4. Not started -> grey (#E5E7EB) with charcoal text (#4B5563)
+          // 1. Manzil due (Hifz pending) -> solid amber/orange fill (#F59E0B) with dark text (#1C120C)
+          // 2. Repeat (failed Manzil, awaiting re-pass) -> solid crimson red (#B91C1C) with white text
+          // 3. Completed -> dark green (#1F4E3D) (or deep blue #16365D in Nazra) with white text
+          // 4. Current para -> white (#FFFFFF) with dark brown text (#241811)
+          // 5. Not started -> grey (#E5E7EB) with charcoal text (#4B5563)
           let tileColorClasses =
             'bg-[#E5E7EB] text-[#4B5563] border-[#D1D5DB] hover:bg-[#D1D5DB]/80';
           if (isManzilDue) {
             tileColorClasses =
               'bg-[#F59E0B] text-[#1C120C] border-2 border-[#B45309] hover:bg-[#D97706] shadow-md';
+          } else if (isManzilRepeat) {
+            tileColorClasses =
+              'bg-[#B91C1C] text-white border-2 border-[#7F1D1D] hover:bg-[#991B1B] shadow-md';
           } else if (isCompleted) {
             tileColorClasses = isNazra
               ? 'bg-[#16365D] text-white border-[#C5A059] hover:bg-[#102946] shadow-xs'
@@ -97,7 +108,12 @@ export const ParaProgressGrid: React.FC<ParaProgressGridProps> = ({
                   {manzilDuePrefix}: {currentDate}
                 </span>
               )}
-              {!isManzilDue && isCurrent && (
+              {isManzilRepeat && repeatDate && (
+                <span className="mt-1 px-1.5 py-0.5 rounded bg-[#FEF2F2] border border-[#7F1D1D]/50 text-[#7F1D1D] text-[9px] font-extrabold leading-tight break-words max-w-full">
+                  {repeatLabel}: {repeatDate}
+                </span>
+              )}
+              {!isManzilDue && !isManzilRepeat && isCurrent && (
                 <span className="mt-1 px-1.5 py-0.5 rounded bg-[#F3ECE1] border border-[#C5A059]/60 text-[#241811] text-[9px] font-bold leading-tight">
                   {isUr ? 'موجودہ' : 'Current'}
                 </span>
@@ -126,12 +142,20 @@ export const ParaProgressGrid: React.FC<ParaProgressGridProps> = ({
           </span>
         </div>
         {!isNazra && (
-          <div className="flex items-center gap-1.5">
-            <span className="w-3.5 h-3.5 rounded bg-[#F59E0B] border border-[#B45309] inline-block shrink-0" />
-            <span className="font-semibold text-[#78350F]">
-              {isUr ? 'عنبری (نارنجی) = منزل مقرر' : 'Amber = Manzil due'}
-            </span>
-          </div>
+          <>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded bg-[#F59E0B] border border-[#B45309] inline-block shrink-0" />
+              <span className="font-semibold text-[#78350F]">
+                {isUr ? 'عنبری = منزل مقرر' : 'Amber = Manzil due'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded bg-[#B91C1C] border border-[#7F1D1D] inline-block shrink-0" />
+              <span className="font-semibold text-[#991B1B]">
+                {isUr ? 'سرخ = دہرائیں' : 'Red = Repeat'}
+              </span>
+            </div>
+          </>
         )}
         <div className="flex items-center gap-1.5">
           <span className="w-3.5 h-3.5 rounded bg-white border border-[#C5A059] inline-block shrink-0" />

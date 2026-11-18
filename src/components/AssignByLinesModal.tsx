@@ -14,6 +14,7 @@ import {
   Square,
   RotateCcw,
   ArrowLeft,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   MadrasaState,
@@ -27,7 +28,11 @@ import {
   getFirstWordOnOrAfter,
   getLastWordOnOrBefore,
 } from '../data/quranData';
-import { computePreviewRangeByLines } from '../services/hifzService';
+import {
+  computePreviewRangeByLines,
+  getNewSabaqPauseStatus,
+  NewSabaqPauseStatus,
+} from '../services/hifzService';
 import { MushafViewer } from './MushafViewer';
 import { StudentTypeBadge } from './StudentTypeBadge';
 import { translations } from '../i18n/translations';
@@ -62,13 +67,27 @@ export const AssignByLinesModal: React.FC<AssignByLinesModalProps> = ({
   const [linesInput, setLinesInput] = useState<string>('10');
   const parsedLines = Math.max(1, Math.min(300, parseInt(linesInput, 10) || 1));
 
-  // Selected student IDs (default: all students without an assigned Sabaq, or all if all have one)
+  const pauseByStudent = useMemo(() => {
+    const map: Record<string, NewSabaqPauseStatus> = {};
+    for (const s of students) {
+      map[s.id] = getNewSabaqPauseStatus(s, state, state.currentDate);
+    }
+    return map;
+  }, [students, state]);
+
+  const skippedCount = useMemo(
+    () => students.filter(s => pauseByStudent[s.id]?.isPaused).length,
+    [students, pauseByStudent]
+  );
+
+  // Selected student IDs (default: all non-paused students without an assigned Sabaq, or all non-paused students)
   const initialSelected = useMemo(() => {
-    const unassigned = students.filter(
+    const eligible = students.filter(s => !pauseByStudent[s.id]?.isPaused);
+    const unassigned = eligible.filter(
       s => !state.dailyPlans[s.id]?.[state.currentDate]?.sabaq?.range
     );
-    return new Set((unassigned.length > 0 ? unassigned : students).map(s => s.id));
-  }, [students, state.dailyPlans, state.currentDate]);
+    return new Set((unassigned.length > 0 ? unassigned : eligible).map(s => s.id));
+  }, [students, pauseByStudent, state.dailyPlans, state.currentDate]);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(initialSelected);
   const [customDrafts, setCustomDrafts] = useState<Record<string, StudentPreviewDraft>>({});
@@ -98,6 +117,7 @@ export const AssignByLinesModal: React.FC<AssignByLinesModalProps> = ({
   }, [students, state, parsedLines, customDrafts]);
 
   const toggleStudent = (id: string) => {
+    if (pauseByStudent[id]?.isPaused) return;
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -106,7 +126,10 @@ export const AssignByLinesModal: React.FC<AssignByLinesModalProps> = ({
     });
   };
 
-  const selectAll = () => setSelectedIds(new Set(students.map(s => s.id)));
+  const selectAll = () =>
+    setSelectedIds(
+      new Set(students.filter(s => !pauseByStudent[s.id]?.isPaused).map(s => s.id))
+    );
   const deselectAll = () => setSelectedIds(new Set());
 
   const openMushafEditForStudent = (studentId: string) => {
@@ -205,7 +228,7 @@ export const AssignByLinesModal: React.FC<AssignByLinesModalProps> = ({
   const handleConfirm = () => {
     const batch: Record<string, AssignmentRange> = {};
     selectedIds.forEach(id => {
-      if (previews[id]?.range) {
+      if (!pauseByStudent[id]?.isPaused && previews[id]?.range) {
         batch[id] = previews[id].range;
       }
     });
@@ -365,7 +388,9 @@ export const AssignByLinesModal: React.FC<AssignByLinesModalProps> = ({
             {/* Preview List */}
             <div className="flex-1 overflow-y-auto p-5 space-y-3">
               {students.map(student => {
-                const isSelected = selectedIds.has(student.id);
+                const pauseStatus = pauseByStudent[student.id];
+                const isPaused = Boolean(pauseStatus?.isPaused);
+                const isSelected = !isPaused && selectedIds.has(student.id);
                 const preview = previews[student.id];
                 const existingSabaq =
                   state.dailyPlans[student.id]?.[state.currentDate]?.sabaq?.range;
@@ -374,7 +399,9 @@ export const AssignByLinesModal: React.FC<AssignByLinesModalProps> = ({
                   <div
                     key={student.id}
                     className={`rounded-2xl border p-4 transition-all ${
-                      isSelected
+                      isPaused
+                        ? 'bg-[#FDF2F2]/75 border-[#B91C1C]/40 opacity-90'
+                        : isSelected
                         ? 'bg-white border-[#C5A059] shadow-xs'
                         : 'bg-[#F5F1E9] border-[#E2D8C5] opacity-65'
                     }`}
@@ -384,8 +411,13 @@ export const AssignByLinesModal: React.FC<AssignByLinesModalProps> = ({
                       <div className="flex items-start gap-3">
                         <button
                           type="button"
+                          disabled={isPaused}
                           onClick={() => toggleStudent(student.id)}
-                          className="mt-0.5 text-[#1F4E3D] cursor-pointer shrink-0"
+                          className={`mt-0.5 shrink-0 ${
+                            isPaused
+                              ? 'text-[#B91C1C]/50 cursor-not-allowed'
+                              : 'text-[#1F4E3D] cursor-pointer'
+                          }`}
                           aria-label={`Toggle ${student.name}`}
                         >
                           {isSelected ? (
@@ -408,7 +440,12 @@ export const AssignByLinesModal: React.FC<AssignByLinesModalProps> = ({
                             <span className="text-[11px] font-medium text-[#5A4333] bg-[#F8F4EC] px-2 py-0.5 rounded border border-[#DFCFA8]">
                               Para {student.currentJuz}
                             </span>
-                            {existingSabaq ? (
+                            {isPaused ? (
+                              <span className="text-[11px] font-bold text-[#7F1D1D] bg-[#FEE2E2] border border-[#B91C1C]/50 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3 text-[#B91C1C]" />
+                                <span>{t.skippedRevisionRepeatPending}</span>
+                              </span>
+                            ) : existingSabaq ? (
                               <span className="text-[10px] font-bold text-[#92400E] bg-[#FEF3C7] px-2 py-0.5 rounded">
                                 Today already has P{existingSabaq.start.page}:L{existingSabaq.start.line}–P
                                 {existingSabaq.end.page}:L{existingSabaq.end.line} (will replace if confirmed)
@@ -420,51 +457,63 @@ export const AssignByLinesModal: React.FC<AssignByLinesModalProps> = ({
                             )}
                           </div>
 
-                          <div className="text-[11px] text-[#7A6C60] mt-1">
-                            {preview.basisLabel}
+                          <div
+                            className={`text-[11px] mt-1 ${
+                              isPaused ? 'text-[#991B1B] font-semibold' : 'text-[#7A6C60]'
+                            }`}
+                          >
+                            {isPaused
+                              ? `${pauseStatus.detailedReasons.join(' ')} (${pauseStatus.reasons.join(' · ')})`
+                              : preview.basisLabel}
                           </div>
                         </div>
                       </div>
 
-                      {/* Right: Preview Range + Edit actions */}
-                      <div className="flex flex-wrap items-center gap-2.5 justify-end">
-                        <div className="bg-[#EBF3EE] border border-[#2E6A54]/60 px-3 py-1.5 rounded-xl text-xs font-mono text-[#143429]">
-                          <div className="font-bold">
-                            {preview.range.surahName} · P{preview.range.start.page}:L
-                            {preview.range.start.line} → P{preview.range.end.page}:L
-                            {preview.range.end.line}
-                          </div>
-                          <div className="text-[10px] text-[#1F4E3D]">
-                            {preview.range.linesCount} lines
-                            {preview.range.startAyah && preview.range.endAyah
-                              ? ` · Ayat ${preview.range.startAyah}–${preview.range.endAyah}`
-                              : ''}
-                          </div>
+                      {/* Right: Preview Range + Edit actions (hidden when paused/skipped) */}
+                      {isPaused ? (
+                        <div className="px-3 py-1.5 rounded-xl bg-[#FEE2E2] border border-[#B91C1C]/40 text-xs font-bold text-[#7F1D1D] shrink-0">
+                          {t.skippedRevisionRepeatPending}
                         </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-2.5 justify-end">
+                          <div className="bg-[#EBF3EE] border border-[#2E6A54]/60 px-3 py-1.5 rounded-xl text-xs font-mono text-[#143429]">
+                            <div className="font-bold">
+                              {preview.range.surahName} · P{preview.range.start.page}:L
+                              {preview.range.start.line} → P{preview.range.end.page}:L
+                              {preview.range.end.line}
+                            </div>
+                            <div className="text-[10px] text-[#1F4E3D]">
+                              {preview.range.linesCount} lines
+                              {preview.range.startAyah && preview.range.endAyah
+                                ? ` · Ayat ${preview.range.startAyah}–${preview.range.endAyah}`
+                                : ''}
+                            </div>
+                          </div>
 
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => openMushafEditForStudent(student.id)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#C5A059] bg-[#F8F4EC] hover:bg-[#F3ECE1] text-[#241811] text-xs font-bold cursor-pointer"
-                            title="Pick exact first and last word on Mushaf"
-                          >
-                            <BookOpen className="w-3.5 h-3.5 text-[#8F6E2B]" />
-                            <span>{t.editRangeButton}</span>
-                          </button>
-
-                          {preview.isEdited && (
+                          <div className="flex items-center gap-1.5">
                             <button
                               type="button"
-                              onClick={() => resetStudentPreview(student.id)}
-                              className="p-1.5 rounded-lg border border-[#DFCFA8] bg-white hover:bg-[#F3ECE1] text-[#7A6C60] cursor-pointer"
-                              title="Reset to computed lines"
+                              onClick={() => openMushafEditForStudent(student.id)}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#C5A059] bg-[#F8F4EC] hover:bg-[#F3ECE1] text-[#241811] text-xs font-bold cursor-pointer"
+                              title="Pick exact first and last word on Mushaf"
                             >
-                              <RotateCcw className="w-3.5 h-3.5" />
+                              <BookOpen className="w-3.5 h-3.5 text-[#8F6E2B]" />
+                              <span>{t.editRangeButton}</span>
                             </button>
-                          )}
+
+                            {preview.isEdited && (
+                              <button
+                                type="button"
+                                onClick={() => resetStudentPreview(student.id)}
+                                className="p-1.5 rounded-lg border border-[#DFCFA8] bg-white hover:bg-[#F3ECE1] text-[#7A6C60] cursor-pointer"
+                                title="Reset to computed lines"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
 
                     {/* Quick inline Page/Line fine-tuning inputs */}
@@ -548,7 +597,8 @@ export const AssignByLinesModal: React.FC<AssignByLinesModalProps> = ({
             <div className="px-5 py-3.5 border-t border-[#DFCFA8] bg-[#FCFAF6] flex flex-wrap items-center justify-between gap-3">
               <div className="text-xs text-[#7A6C60]">
                 Nothing is saved until you tap Confirm. ({selectedIds.size} of {students.length}{' '}
-                students selected)
+                students selected
+                {skippedCount > 0 ? ` · ${skippedCount} ${t.skippedRevisionRepeatPending}` : ''})
               </div>
 
               <div className="flex items-center gap-2">

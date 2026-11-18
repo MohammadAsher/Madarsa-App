@@ -45,6 +45,7 @@ export interface StudentProfile {
   hasStoredHifzProgress?: boolean; // Preserved flag if a Hifz student was switched to Nazra so Hifz Sabqi/Manzil restore when switched back
   completedParas: number[]; // Hifz completed paras (used for Manzil)
   nazraCompletedParas?: number[]; // Paras read in Nazra (kept separate; never moved into Manzil)
+  manzilRepeatParas?: Record<number, string>; // Para number -> ISO date marked Repeat (red until passed)
   memorizedPortionDesc?: string; // e.g. "Completed 5 Paras" or "Memorized up to Para 1 Page 10"
   typeChangeHistory?: StudentTypeChangeLog[];
 }
@@ -96,6 +97,7 @@ export interface DailyPartPlan {
   startAyah?: number;
   endAyah?: number;
   assignedParas?: number[]; // For Manzil: only the Paras specifically selected by teacher
+  paraResults?: Record<number, 'passed' | 'repeat'>; // Per-Para Manzil grading outcomes
   portionType?: 'custom' | 'quarter_para' | 'half_para' | 'full_para' | 'current_para_passed'; // For Sabqi
   portionLabel?: string; // e.g. "Half Para (Pages 2-11)"
   sabqiCustomOverride?: boolean; // True if Ustaad manually narrowed Sabqi for this day
@@ -137,14 +139,22 @@ export interface SessionResult {
   suggestedResult: 'passed' | 'repeat';
   finalResult: 'passed' | 'repeat';
   isOverridden: boolean;
+  paraResults?: Record<number, 'passed' | 'repeat'>;
   marks: MistakeMark[];
   range: AssignmentRange;
   timestamp: number;
 }
 
+export interface StudentPauseOverride {
+  pauseNewSabaqOnSabqiRepeat?: boolean;
+  pauseNewSabaqOnManzilRepeat?: boolean;
+}
+
 export interface AppSettings {
   timeZone?: string; // School time zone (IANA, e.g. 'Asia/Karachi')
   freezeSabaqOnSabqiOrManzilFail: boolean;
+  pauseNewSabaqOnSabqiRepeat?: boolean;
+  pauseNewSabaqOnManzilRepeat?: boolean;
   halqaDefaultLimits: StudentLimits;
   mushafLayout?: 'hafizi' | 'madinah';
   mushafScript?: 'indopak' | 'uthmani';
@@ -160,6 +170,7 @@ export interface MadrasaState {
   students: Record<string, StudentProfile>;
   ustaads: Record<string, UstaadProfile>;
   studentLimitsOverride: Record<string, Partial<StudentLimits>>;
+  studentPauseOverride?: Record<string, StudentPauseOverride>;
   dailyPlans: Record<string, Record<string, DayPlan>>; // [studentId][date] -> DayPlan
   marksHistory: MistakeMark[];
   sessionResults: SessionResult[];

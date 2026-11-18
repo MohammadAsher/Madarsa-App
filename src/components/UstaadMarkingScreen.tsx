@@ -10,7 +10,8 @@ import {
   CheckCircle2, 
   XCircle, 
   AlertTriangle, 
-  BookOpen
+  BookOpen,
+  X
 } from 'lucide-react';
 import { 
   MadrasaState, 
@@ -23,8 +24,12 @@ import {
 import { getEffectiveLimits } from '../services/storageService';
 import { MushafViewer } from './MushafViewer';
 import { StudentTypeBadge } from './StudentTypeBadge';
-import { MushafWord } from '../data/quranData';
-import { getManzilParaRanges } from '../services/hifzService';
+import { MushafWord, getParaSurahName, getParaPageRange } from '../data/quranData';
+import {
+  getManzilParaRanges,
+  getManzilParasFromPlan,
+  getMarkParaNumber,
+} from '../services/hifzService';
 import { translations } from '../i18n/translations';
 
 interface UstaadMarkingScreenProps {
@@ -99,6 +104,43 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
   const isLimitReached = ghaltiCount >= ghaltiLimit || atkanCount >= atkanLimit;
   const suggestedResult: 'passed' | 'repeat' = isLimitReached ? 'repeat' : 'passed';
 
+  // Per-para breakdown when grading Manzil
+  const manzilParas =
+    effectivePart === 'manzil'
+      ? getManzilParasFromPlan(currentPartPlan?.assignedParas, currentPartPlan?.range)
+      : [];
+  const isMultiParaManzil = effectivePart === 'manzil' && manzilParas.length > 1;
+
+  const getParaStats = (paraNum: number) => {
+    const marksInPara = sessionMarks.filter(m => getMarkParaNumber(m) === paraNum);
+    const paraGhalti = marksInPara.filter(m => m.type === 'ghalti').length;
+    const paraAtkan = marksInPara.filter(m => m.type === 'atkan').length;
+    const suggested: 'passed' | 'repeat' =
+      paraGhalti >= ghaltiLimit || paraAtkan >= atkanLimit ? 'repeat' : 'passed';
+    return {
+      paraNum,
+      ghaltiCount: paraGhalti,
+      atkanCount: paraAtkan,
+      suggested,
+    };
+  };
+
+  const [showManzilSummaryModal, setShowManzilSummaryModal] = useState(false);
+  const [draftParaResults, setDraftParaResults] = useState<Record<number, 'passed' | 'repeat'>>({});
+
+  useEffect(() => {
+    setShowManzilSummaryModal(false);
+  }, [effectivePart, student.id, activeDate]);
+
+  const handleOpenManzilSummary = () => {
+    const initialDraft: Record<number, 'passed' | 'repeat'> = {};
+    for (const p of manzilParas) {
+      initialDraft[p] = getParaStats(p).suggested;
+    }
+    setDraftParaResults(initialDraft);
+    setShowManzilSummaryModal(true);
+  };
+
   // Toggle word mark
   const handleWordClick = (word: MushafWord) => {
     const existingIndex = sessionMarks.findIndex(m => m.wordId === word.id);
@@ -138,9 +180,14 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
     setSessionMarks(prev => prev.slice(0, prev.length - 1));
   };
 
-  // Finalize session with result (Pass or Repeat)
+  // Finalize session with result (Pass or Repeat) for Sabaq, Sabqi, or 1-Para Manzil
   const handleFinalize = (chosenResult: 'passed' | 'repeat') => {
     if (!currentPartPlan || !currentPartPlan.range) return;
+
+    const singleParaResults: Record<number, 'passed' | 'repeat'> | undefined =
+      effectivePart === 'manzil' && manzilParas.length === 1
+        ? { [manzilParas[0]]: chosenResult }
+        : undefined;
 
     const sessionResult: SessionResult = {
       id: `res_${student.id}_${activeDate}_${effectivePart}_${Date.now()}`,
@@ -156,9 +203,54 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
       isOverridden: chosenResult !== suggestedResult,
       marks: sessionMarks,
       range: currentPartPlan.range,
+      ...(singleParaResults ? { paraResults: singleParaResults } : {}),
       timestamp: Date.now(),
     };
 
+    onSaveSession(sessionResult, sessionMarks);
+  };
+
+  // Finalize multi-para Manzil with per-para Pass / Repeat decisions
+  const handleConfirmManzilResults = () => {
+    if (!currentPartPlan || !currentPartPlan.range || manzilParas.length === 0) return;
+
+    const perParaStats = manzilParas.map(getParaStats);
+    const overallSuggested: 'passed' | 'repeat' = perParaStats.some(
+      s => s.suggested === 'repeat'
+    )
+      ? 'repeat'
+      : 'passed';
+
+    const finalizedParaResults: Record<number, 'passed' | 'repeat'> = {};
+    for (const p of manzilParas) {
+      finalizedParaResults[p] = draftParaResults[p] || 'passed';
+    }
+
+    const anyRepeat = manzilParas.some(p => finalizedParaResults[p] === 'repeat');
+    const chosenResult: 'passed' | 'repeat' = anyRepeat ? 'repeat' : 'passed';
+    const isOverridden = perParaStats.some(
+      s => finalizedParaResults[s.paraNum] !== s.suggested
+    );
+
+    const sessionResult: SessionResult = {
+      id: `res_${student.id}_${activeDate}_${effectivePart}_${Date.now()}`,
+      studentId: student.id,
+      date: activeDate,
+      part: effectivePart,
+      ghaltiCount,
+      atkanCount,
+      ghaltiLimit,
+      atkanLimit,
+      suggestedResult: overallSuggested,
+      finalResult: chosenResult,
+      isOverridden,
+      marks: sessionMarks,
+      range: currentPartPlan.range,
+      paraResults: finalizedParaResults,
+      timestamp: Date.now(),
+    };
+
+    setShowManzilSummaryModal(false);
     onSaveSession(sessionResult, sessionMarks);
   };
 
@@ -291,6 +383,43 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Subheader quick bar for Multi-Para Manzil navigation & per-para live count */}
+      {isMultiParaManzil && (
+        <div className="bg-[#FAF6EF] border-b border-[#DFCFA8] px-3 sm:px-4 py-1.5">
+          <div className="max-w-6xl mx-auto flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="font-bold text-[#5A4333] mr-1">
+              {state.language === 'ur' ? 'مقررہ پارے:' : 'Assigned Paras:'}
+            </span>
+            {manzilParas.map(pNum => {
+              const stats = getParaStats(pNum);
+              const { startPage, endPage } = getParaPageRange(pNum);
+              const isInPara = currentPage >= startPage && currentPage <= endPage;
+              return (
+                <button
+                  key={pNum}
+                  type="button"
+                  onClick={() => setCurrentPage(startPage)}
+                  className={`px-2 py-0.5 rounded-md border font-mono text-[11px] font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                    isInPara
+                      ? 'bg-[#241811] text-[#FCFAF6] border-[#C5A059]'
+                      : stats.suggested === 'repeat'
+                      ? 'bg-rose-50 text-[#991B1B] border-rose-300 hover:bg-rose-100'
+                      : 'bg-[#FCFAF6] text-[#1F4E3D] border-[#DFCFA8] hover:bg-[#F3ECE1]'
+                  }`}
+                >
+                  <span>
+                    {state.language === 'ur' ? `پارہ ${pNum}` : `Para ${pNum}`}
+                  </span>
+                  <span className="opacity-80">
+                    ({stats.ghaltiCount}G · {stats.atkanCount}A)
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Main Mushaf Listening Workspace */}
       <main className="flex-1 w-full max-w-5xl mx-auto px-1.5 sm:px-3 py-2 flex flex-col items-center">
@@ -434,44 +563,186 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
             </button>
           </div>
 
-          {/* Right Group: Finalize Actions (Repeat, Passed) */}
+          {/* Right Group: Finalize Actions */}
           <div className="flex items-center gap-1 sm:gap-2">
-            {/* Mark Repeat Button */}
-            <button
-              type="button"
-              disabled={!currentPartPlan?.range}
-              onClick={() => handleFinalize('repeat')}
-              className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs min-h-[34px] sm:min-h-[36px] ${
-                suggestedResult === 'repeat'
-                  ? 'bg-[#B91C1C] text-white hover:bg-[#991B1B] ring-2 ring-rose-400'
-                  : 'bg-[#2E2017] border border-rose-700/80 text-rose-300 hover:bg-rose-950/60'
-              }`}
-              title="Mark Repeat"
-            >
-              <XCircle className="w-3.5 h-3.5 shrink-0" />
-              <span className="sm:hidden whitespace-nowrap">{t.status.repeat}</span>
-              <span className="hidden sm:inline whitespace-nowrap">{t.repeatButton}</span>
-            </button>
+            {isMultiParaManzil ? (
+              <button
+                type="button"
+                disabled={!currentPartPlan?.range}
+                onClick={handleOpenManzilSummary}
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs min-h-[34px] sm:min-h-[36px] bg-[#1F4E3D] text-white hover:bg-[#16382C] ring-2 ring-[#C5A059]"
+                title={t.finishManzilButton}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-[#DFCFA8] shrink-0" />
+                <span className="whitespace-nowrap">
+                  {t.finishManzilButton} ({manzilParas.length})
+                </span>
+              </button>
+            ) : (
+              <>
+                {/* Mark Repeat Button */}
+                <button
+                  type="button"
+                  disabled={!currentPartPlan?.range}
+                  onClick={() => handleFinalize('repeat')}
+                  className={`flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs min-h-[34px] sm:min-h-[36px] ${
+                    suggestedResult === 'repeat'
+                      ? 'bg-[#B91C1C] text-white hover:bg-[#991B1B] ring-2 ring-rose-400'
+                      : 'bg-[#2E2017] border border-rose-700/80 text-rose-300 hover:bg-rose-950/60'
+                  }`}
+                  title="Mark Repeat"
+                >
+                  <XCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span className="sm:hidden whitespace-nowrap">{t.status.repeat}</span>
+                  <span className="hidden sm:inline whitespace-nowrap">{t.repeatButton}</span>
+                </button>
 
-            {/* Mark Passed Button */}
-            <button
-              type="button"
-              disabled={!currentPartPlan?.range}
-              onClick={() => handleFinalize('passed')}
-              className={`flex items-center gap-1 px-2 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs min-h-[34px] sm:min-h-[36px] ${
-                suggestedResult === 'passed'
-                  ? 'bg-[#1F4E3D] text-white hover:bg-[#16382C] ring-2 ring-emerald-400 border border-[#C5A059]'
-                  : 'bg-[#2E2017] border border-[#2E6A54] text-emerald-300 hover:bg-emerald-950/60'
-              }`}
-              title="Mark Passed"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 text-[#DFCFA8] shrink-0" />
-              <span className="sm:hidden whitespace-nowrap">{state.language === 'ur' ? 'پاس' : 'Pass'}</span>
-              <span className="hidden sm:inline whitespace-nowrap">{t.passButton}</span>
-            </button>
+                {/* Mark Passed Button */}
+                <button
+                  type="button"
+                  disabled={!currentPartPlan?.range}
+                  onClick={() => handleFinalize('passed')}
+                  className={`flex items-center gap-1 px-2 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs min-h-[34px] sm:min-h-[36px] ${
+                    suggestedResult === 'passed'
+                      ? 'bg-[#1F4E3D] text-white hover:bg-[#16382C] ring-2 ring-emerald-400 border border-[#C5A059]'
+                      : 'bg-[#2E2017] border border-[#2E6A54] text-emerald-300 hover:bg-emerald-950/60'
+                  }`}
+                  title="Mark Passed"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#DFCFA8] shrink-0" />
+                  <span className="sm:hidden whitespace-nowrap">{state.language === 'ur' ? 'پاس' : 'Pass'}</span>
+                  <span className="hidden sm:inline whitespace-nowrap">{t.passButton}</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Multi-Para Manzil Para-by-Para Grading Modal */}
+      {showManzilSummaryModal && isMultiParaManzil && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-[#FCFAF6] rounded-2xl shadow-2xl border-2 border-[#C5A059] w-full max-w-xl overflow-hidden my-auto">
+            <div className="px-5 py-3.5 bg-[#241811] text-[#FCFAF6] border-b-2 border-[#C5A059] flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold flex items-center gap-2">
+                  <span>{t.manzilPerParaTitle}</span>
+                  <span className="text-[#C5A059] text-xs">۞</span>
+                </h3>
+                <p className="text-[11px] text-[#DFCFA8] mt-0.5">{t.manzilPerParaHelp}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowManzilSummaryModal(false)}
+                className="p-1.5 text-[#DFCFA8] hover:text-[#FCFAF6] hover:bg-[#3E2B20] rounded-xl cursor-pointer"
+                aria-label={t.close}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 sm:p-5 space-y-2.5 max-h-[65vh] overflow-y-auto">
+              {manzilParas.map(pNum => {
+                const stats = getParaStats(pNum);
+                const chosen = draftParaResults[pNum] || stats.suggested;
+                const isRepeatChosen = chosen === 'repeat';
+
+                return (
+                  <div
+                    key={pNum}
+                    className={`p-3 rounded-xl border-2 flex flex-wrap items-center justify-between gap-3 transition-colors ${
+                      isRepeatChosen
+                        ? 'bg-[#FDF2F2] border-[#B91C1C]/60'
+                        : 'bg-[#EBF3EE] border-[#2E6A54]/60'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-bold text-sm text-[#241811]">
+                          {state.language === 'ur' ? `پارہ ${pNum}` : `Para ${pNum}`}
+                        </span>
+                        <span className="text-xs text-[#5A4333]">
+                          ({getParaSurahName(pNum)})
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                            stats.suggested === 'repeat'
+                              ? 'bg-rose-100 text-[#991B1B] border-rose-300'
+                              : 'bg-emerald-100 text-[#143429] border-emerald-300'
+                          }`}
+                        >
+                          {t.systemSuggested}:{' '}
+                          {stats.suggested === 'repeat'
+                            ? state.language === 'ur'
+                              ? 'دہرائیں'
+                              : 'Repeat'
+                            : state.language === 'ur'
+                            ? 'پاس'
+                            : 'Pass'}
+                        </span>
+                      </div>
+                      <div className="text-[11px] font-mono text-[#42362E] mt-1">
+                        {t.ghaltiShort}: <strong>{stats.ghaltiCount}</strong>/{ghaltiLimit} ·{' '}
+                        {t.atkanShort}: <strong>{stats.atkanCount}</strong>/{atkanLimit}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDraftParaResults(prev => ({ ...prev, [pNum]: 'passed' }))
+                        }
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-all min-h-[36px] ${
+                          chosen === 'passed'
+                            ? 'bg-[#1F4E3D] text-white border border-[#143429] shadow-xs ring-2 ring-emerald-400/70'
+                            : 'bg-white text-[#1F4E3D] border border-[#2E6A54]/40 hover:bg-emerald-50'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{state.language === 'ur' ? 'پاس' : 'Pass'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDraftParaResults(prev => ({ ...prev, [pNum]: 'repeat' }))
+                        }
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-all min-h-[36px] ${
+                          chosen === 'repeat'
+                            ? 'bg-[#B91C1C] text-white border border-[#7F1D1D] shadow-xs ring-2 ring-rose-400/70'
+                            : 'bg-white text-[#B91C1C] border border-[#B91C1C]/40 hover:bg-rose-50'
+                        }`}
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        <span>{t.status.repeat}</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="px-5 py-3.5 border-t border-[#DFCFA8] bg-[#F8F4EC] flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setShowManzilSummaryModal(false)}
+                className="px-4 py-2 rounded-xl border border-[#DFCFA8] bg-[#FCFAF6] hover:bg-[#F3ECE1] text-xs font-semibold text-[#42362E] cursor-pointer"
+              >
+                {t.close}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmManzilResults}
+                className="px-5 py-2 rounded-xl bg-[#241811] hover:bg-[#38271D] text-[#FCFAF6] border border-[#C5A059] text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <CheckCircle2 className="w-4 h-4 text-[#C5A059]" />
+                <span>{t.saveManzilResults}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

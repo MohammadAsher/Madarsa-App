@@ -5,8 +5,14 @@
 
 import React, { useState } from 'react';
 import { X, Sliders, RotateCcw, Check, ShieldAlert } from 'lucide-react';
-import { MadrasaState, StudentProfile, StudentLimits } from '../types/hifz';
+import {
+  MadrasaState,
+  StudentProfile,
+  StudentLimits,
+  StudentPauseOverride,
+} from '../types/hifz';
 import { getEffectiveLimits } from '../services/storageService';
+import { getEffectivePauseSettings } from '../services/hifzService';
 import { StudentTypeBadge } from './StudentTypeBadge';
 import { translations } from '../i18n/translations';
 
@@ -16,6 +22,14 @@ interface LimitsModalProps {
   onClose: () => void;
   onSaveStudentLimits: (studentId: string, limits: Partial<StudentLimits>) => void;
   onSaveHalqaDefaultLimits: (limits: StudentLimits) => void;
+  onSaveStudentPauseOverride?: (
+    studentId: string,
+    pause: Partial<StudentPauseOverride>
+  ) => void;
+  onSaveSchoolPauseDefaults?: (pause: {
+    pauseNewSabaqOnSabqiRepeat: boolean;
+    pauseNewSabaqOnManzilRepeat: boolean;
+  }) => void;
   onResetToDefaults: (studentId: string) => void;
 }
 
@@ -25,13 +39,26 @@ export const LimitsModal: React.FC<LimitsModalProps> = ({
   onClose,
   onSaveStudentLimits,
   onSaveHalqaDefaultLimits,
+  onSaveStudentPauseOverride,
+  onSaveSchoolPauseDefaults,
   onResetToDefaults,
 }) => {
   const t = translations[state.language];
   const isNazra = student.studentType === 'nazra';
   const effective = getEffectiveLimits(student.id, state);
   const halqaDefaults = state.settings.halqaDefaultLimits;
-  const isOverridden = Boolean(state.studentLimitsOverride[student.id]);
+  const effectivePause = getEffectivePauseSettings(student.id, state);
+  const schoolSabqiPause =
+    state.settings.pauseNewSabaqOnSabqiRepeat ??
+    state.settings.freezeSabaqOnSabqiOrManzilFail ??
+    true;
+  const schoolManzilPause =
+    state.settings.pauseNewSabaqOnManzilRepeat ??
+    state.settings.freezeSabaqOnSabqiOrManzilFail ??
+    true;
+  const isOverridden = Boolean(
+    state.studentLimitsOverride[student.id] || state.studentPauseOverride?.[student.id]
+  );
 
   const [mode, setMode] = useState<'student' | 'halqa'>('student');
 
@@ -42,6 +69,12 @@ export const LimitsModal: React.FC<LimitsModalProps> = ({
   const [sabqiAtkan, setSabqiAtkan] = useState<number>(effective.sabqiAtkanLimit);
   const [manzilGhalti, setManzilGhalti] = useState<number>(effective.manzilGhaltiLimit);
   const [manzilAtkan, setManzilAtkan] = useState<number>(effective.manzilAtkanLimit);
+  const [pauseOnSabqiRepeat, setPauseOnSabqiRepeat] = useState<boolean>(
+    effectivePause.pauseNewSabaqOnSabqiRepeat
+  );
+  const [pauseOnManzilRepeat, setPauseOnManzilRepeat] = useState<boolean>(
+    effectivePause.pauseNewSabaqOnManzilRepeat
+  );
 
   const handleSave = () => {
     if (mode === 'student') {
@@ -60,6 +93,12 @@ export const LimitsModal: React.FC<LimitsModalProps> = ({
           manzilGhaltiLimit: Math.max(1, manzilGhalti),
           manzilAtkanLimit: Math.max(1, manzilAtkan),
         });
+        if (onSaveStudentPauseOverride) {
+          onSaveStudentPauseOverride(student.id, {
+            pauseNewSabaqOnSabqiRepeat: pauseOnSabqiRepeat,
+            pauseNewSabaqOnManzilRepeat: pauseOnManzilRepeat,
+          });
+        }
       }
     } else {
       onSaveHalqaDefaultLimits({
@@ -70,15 +109,21 @@ export const LimitsModal: React.FC<LimitsModalProps> = ({
         manzilGhaltiLimit: Math.max(1, manzilGhalti),
         manzilAtkanLimit: Math.max(1, manzilAtkan),
       });
+      if (onSaveSchoolPauseDefaults) {
+        onSaveSchoolPauseDefaults({
+          pauseNewSabaqOnSabqiRepeat: pauseOnSabqiRepeat,
+          pauseNewSabaqOnManzilRepeat: pauseOnManzilRepeat,
+        });
+      }
     }
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-xs p-4">
-      <div className="bg-[#FCFAF6] rounded-2xl shadow-2xl border-2 border-[#C5A059] w-full max-w-lg overflow-hidden">
+      <div className="bg-[#FCFAF6] rounded-2xl shadow-2xl border-2 border-[#C5A059] w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
         {/* Modal Header with Islamic dark coffee identity */}
-        <div className="px-5 py-4 border-b-2 border-[#C5A059] flex items-center justify-between bg-[#241811] text-[#FCFAF6]">
+        <div className="px-5 py-4 border-b-2 border-[#C5A059] flex items-center justify-between bg-[#241811] text-[#FCFAF6] shrink-0">
           <div>
             <h2 className="text-lg font-bold flex items-center gap-2">
               <Sliders className="w-5 h-5 text-[#C5A059]" />
@@ -99,7 +144,7 @@ export const LimitsModal: React.FC<LimitsModalProps> = ({
         </div>
 
         {/* Scope Selector: Student Override vs Halqa Defaults */}
-        <div className="p-4 bg-[#F8F4EC] border-b border-[#DFCFA8] flex items-center justify-between">
+        <div className="p-4 bg-[#F8F4EC] border-b border-[#DFCFA8] flex flex-wrap items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-1 p-1 bg-[#FAF6EF] rounded-xl border border-[#DFCFA8]">
             <button
               type="button"
@@ -111,6 +156,8 @@ export const LimitsModal: React.FC<LimitsModalProps> = ({
                 setSabqiAtkan(effective.sabqiAtkanLimit);
                 setManzilGhalti(effective.manzilGhaltiLimit);
                 setManzilAtkan(effective.manzilAtkanLimit);
+                setPauseOnSabqiRepeat(effectivePause.pauseNewSabaqOnSabqiRepeat);
+                setPauseOnManzilRepeat(effectivePause.pauseNewSabaqOnManzilRepeat);
               }}
               className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
                 mode === 'student'
@@ -135,6 +182,8 @@ export const LimitsModal: React.FC<LimitsModalProps> = ({
                 setSabqiAtkan(halqaDefaults.sabqiAtkanLimit);
                 setManzilGhalti(halqaDefaults.manzilGhaltiLimit);
                 setManzilAtkan(halqaDefaults.manzilAtkanLimit);
+                setPauseOnSabqiRepeat(schoolSabqiPause);
+                setPauseOnManzilRepeat(schoolManzilPause);
               }}
               className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                 mode === 'halqa'
@@ -161,8 +210,8 @@ export const LimitsModal: React.FC<LimitsModalProps> = ({
           )}
         </div>
 
-        {/* 6 Limits Form */}
-        <div className="p-5 space-y-4">
+        {/* 6 Limits Form + Pause Rules */}
+        <div className="p-5 space-y-4 overflow-y-auto">
           {/* Sabaq Limits */}
           <div className="p-3.5 rounded-xl border border-[#DFCFA8] bg-[#F8F4EC]">
             <div className="text-sm font-bold text-[#241811] mb-2 flex items-center justify-between">
@@ -272,6 +321,56 @@ export const LimitsModal: React.FC<LimitsModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Pause New Sabaq Rules (School Default / Per-Student Override) */}
+              <div className="p-3.5 rounded-xl border border-[#C5A059]/70 bg-[#FAF6EF] space-y-2.5">
+                <div className="text-sm font-bold text-[#241811] flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-[#8F6E2B]" />
+                  <span>
+                    {mode === 'student'
+                      ? state.language === 'ur'
+                        ? 'اس طالب علم کے لیے نیا سبق روکنے کے اصول'
+                        : 'Student Override: New Sabaq Pause Rules'
+                      : state.language === 'ur'
+                      ? 'مدرسہ ڈیفالٹ: نیا سبق روکنے کے اصول'
+                      : 'School Default: New Sabaq Pause Rules'}
+                  </span>
+                </div>
+
+                <label className="flex items-center justify-between gap-3 cursor-pointer">
+                  <span className="text-xs font-semibold text-[#241811]">
+                    {t.pauseOnSabqiRepeatLabel}
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={pauseOnSabqiRepeat}
+                    onClick={() => setPauseOnSabqiRepeat(prev => !prev)}
+                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer shrink-0 ${
+                      pauseOnSabqiRepeat ? 'bg-[#1F4E3D] justify-end' : 'bg-[#CDBE9F] justify-start'
+                    }`}
+                  >
+                    <span className="w-4 h-4 rounded-full bg-[#FCFAF6] shadow-md" />
+                  </button>
+                </label>
+
+                <label className="flex items-center justify-between gap-3 cursor-pointer pt-2 border-t border-[#DFCFA8]/70">
+                  <span className="text-xs font-semibold text-[#241811]">
+                    {t.pauseOnManzilRepeatLabel}
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={pauseOnManzilRepeat}
+                    onClick={() => setPauseOnManzilRepeat(prev => !prev)}
+                    className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer shrink-0 ${
+                      pauseOnManzilRepeat ? 'bg-[#1F4E3D] justify-end' : 'bg-[#CDBE9F] justify-start'
+                    }`}
+                  >
+                    <span className="w-4 h-4 rounded-full bg-[#FCFAF6] shadow-md" />
+                  </button>
+                </label>
+              </div>
             </>
           ) : (
             <div className="p-3 rounded-xl border border-[#16365D]/30 bg-[#E8EEF6] text-xs text-[#16365D]">
@@ -283,7 +382,7 @@ export const LimitsModal: React.FC<LimitsModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-5 py-3.5 border-t border-[#DFCFA8] bg-[#FCFAF6] flex items-center justify-end gap-2.5">
+        <div className="px-5 py-3.5 border-t border-[#DFCFA8] bg-[#FCFAF6] flex items-center justify-end gap-2.5 shrink-0">
           <button
             type="button"
             onClick={onClose}

@@ -30,6 +30,7 @@ import {
   StudentProfile,
   StudentType,
   StudentTypeChangeLog,
+  StudentPauseOverride,
   PartType,
   SessionResult,
   MistakeMark,
@@ -51,6 +52,9 @@ import { DateNavigator } from './DateNavigator';
 import {
   getParaCompletionStatus,
   computeCurrentParaSabqiRange,
+  computeManzilParaStates,
+  getManzilParasFromPlan,
+  getNewSabaqPauseStatus,
 } from '../services/hifzService';
 import {
   createEmptyDayPlan,
@@ -353,12 +357,55 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
         status: result.finalResult,
         completedAt: new Date().toISOString(),
         sessionResultId: result.id,
+        ...(result.part === 'manzil' ? { paraResults: result.paraResults } : {}),
         ...(isNazraStudent && result.part === 'sabaq' ? { isNazraSabaq: true } : {}),
       };
       studentPlans[result.date] = currentDayPlan;
 
+      let updatedStudents = prev.students;
+      if (result.part === 'manzil' && studentObj && !isNazraStudent) {
+        const nextRepeatMap = { ...(studentObj.manzilRepeatParas || {}) };
+        const manzilPlan = currentDayPlan.manzil;
+        const gradedParaResults: Record<number, 'passed' | 'repeat'> =
+          result.paraResults && Object.keys(result.paraResults).length > 0
+            ? result.paraResults
+            : Object.fromEntries(
+                getManzilParasFromPlan(manzilPlan?.assignedParas, manzilPlan?.range).map(p => [
+                  p,
+                  result.finalResult,
+                ])
+              );
+
+        if (!manzilPlan.paraResults && Object.keys(gradedParaResults).length > 0) {
+          currentDayPlan.manzil = {
+            ...manzilPlan,
+            paraResults: gradedParaResults,
+          };
+          studentPlans[result.date] = currentDayPlan;
+        }
+
+        for (const [pKey, outcome] of Object.entries(gradedParaResults)) {
+          const pNum = parseInt(pKey, 10);
+          if (Number.isNaN(pNum)) continue;
+          if (outcome === 'passed') {
+            delete nextRepeatMap[pNum];
+          } else if (outcome === 'repeat') {
+            nextRepeatMap[pNum] = result.date;
+          }
+        }
+
+        updatedStudents = {
+          ...prev.students,
+          [result.studentId]: {
+            ...studentObj,
+            manzilRepeatParas: nextRepeatMap,
+          },
+        };
+      }
+
       const draftState: MadrasaState = {
         ...prev,
+        students: updatedStudents,
         sessionResults: newResults,
         marksHistory: newMarksHistory,
         dailyPlans: {
@@ -367,8 +414,10 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
         },
       };
 
+      const draftStudent = updatedStudents[result.studentId];
+
       // Whenever a Hifz Sabaq is graded, recompute current Para's Sabqi for this date & later dates
-      if (result.part === 'sabaq' && studentObj && !isNazraStudent) {
+      if (result.part === 'sabaq' && draftStudent && !isNazraStudent) {
         const datesToSync = Object.keys(studentPlans)
           .filter(d => d >= result.date)
           .sort();
@@ -376,7 +425,7 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
         for (const d of datesToSync) {
           const dp = studentPlans[d];
           if (!dp || dp.sabqi?.sabqiCustomOverride) continue;
-          const sabqiInfo = computeCurrentParaSabqiRange(studentObj, draftState, d);
+          const sabqiInfo = computeCurrentParaSabqiRange(draftStudent, draftState, d);
           if (sabqiInfo) {
             studentPlans[d] = {
               ...dp,
@@ -392,10 +441,33 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                 startAyah: sabqiInfo.range.startAyah,
                 endAyah: sabqiInfo.range.endAyah,
                 portionType: 'current_para_passed',
-                portionLabel: `Passed Sabaqs in Para ${studentObj.currentJuz} (P${sabqiInfo.range.start.page}:L${sabqiInfo.range.start.line} - P${sabqiInfo.range.end.page}:L${sabqiInfo.range.end.line})`,
+                portionLabel: `Passed Sabaqs in Para ${draftStudent.currentJuz} (P${sabqiInfo.range.start.page}:L${sabqiInfo.range.start.line} - P${sabqiInfo.range.end.page}:L${sabqiInfo.range.end.line})`,
               },
             };
           }
+        }
+      }
+
+      // Sync / clear sabaqFrozenDueToRevisionFail across result.date and subsequent plans
+      if (draftStudent && !isNazraStudent) {
+        const syncedStateForPause: MadrasaState = {
+          ...draftState,
+          dailyPlans: {
+            ...draftState.dailyPlans,
+            [result.studentId]: studentPlans,
+          },
+        };
+        const datesToRefreshPause = Object.keys(studentPlans)
+          .filter(d => d >= result.date)
+          .sort();
+        for (const d of datesToRefreshPause) {
+          const dp = studentPlans[d];
+          if (!dp) continue;
+          const pauseStatus = getNewSabaqPauseStatus(draftStudent, syncedStateForPause, d);
+          studentPlans[d] = {
+            ...dp,
+            sabaqFrozenDueToRevisionFail: pauseStatus.isPaused,
+          };
         }
       }
 
@@ -532,11 +604,23 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
   ) => {
     onUpdateState(prev => {
       const saveDate = extraMetadata?.targetDate || prev.currentDate;
-      const studentIdsToUpdate = applyToAllHalqa
+      const candidateIds = applyToAllHalqa
         ? ustaad.studentIds.filter(
             sid => part === 'sabaq' || prev.students[sid]?.studentType !== 'nazra'
           )
         : [targetStudentId];
+      // Enforce pause rule: never allow assigning a new Sabaq if Sabqi or Manzil Repeat is blocking
+      const studentIdsToUpdate = candidateIds.filter(sid => {
+        const st = prev.students[sid];
+        if (!st) return false;
+        if (part === 'sabaq' && getNewSabaqPauseStatus(st, prev, saveDate).isPaused) {
+          return false;
+        }
+        return true;
+      });
+      if (studentIdsToUpdate.length === 0) {
+        return prev;
+      }
       const newDailyPlans = { ...prev.dailyPlans };
       const newStudents = { ...prev.students };
 
@@ -547,10 +631,14 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
 
         studentHistory[saveDate] = {
           ...existingDayPlan,
+          ...(part === 'sabaq' ? { sabaqFrozenDueToRevisionFail: false } : {}),
           [part]: {
             ...existingDayPlan[part],
             range,
             status: 'pending',
+            completedAt: undefined,
+            sessionResultId: undefined,
+            ...(part === 'manzil' ? { paraResults: undefined } : {}),
             ...(part === 'sabaq'
               ? { isNazraSabaq: newStudents[sid]?.studentType === 'nazra' }
               : {}),
@@ -595,17 +683,22 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
     onUpdateState(prev => {
       const newDailyPlans = { ...prev.dailyPlans };
       Object.entries(assignments).forEach(([sid, range]) => {
+        const st = prev.students[sid];
+        if (!st || getNewSabaqPauseStatus(st, prev, prev.currentDate).isPaused) {
+          return;
+        }
         const studentHistory = { ...(newDailyPlans[sid] || {}) };
         const dayPlan =
           studentHistory[prev.currentDate] || createEmptyDayPlan(prev.currentDate);
         studentHistory[prev.currentDate] = {
           ...dayPlan,
+          sabaqFrozenDueToRevisionFail: false,
           sabaq: {
             ...dayPlan.sabaq,
             range,
             status: 'pending',
             repeatPracticeCount: 0,
-            isNazraSabaq: prev.students[sid]?.studentType === 'nazra',
+            isNazraSabaq: st.studentType === 'nazra',
             surahName: range.surahName,
             juzNumber: range.juzNumber,
             startPage: range.startPage,
@@ -645,13 +738,45 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
     }));
   };
 
+  const handleSaveStudentPauseOverride = (
+    studentId: string,
+    pause: Partial<StudentPauseOverride>
+  ) => {
+    onUpdateState(prev => ({
+      ...prev,
+      studentPauseOverride: {
+        ...(prev.studentPauseOverride || {}),
+        [studentId]: pause,
+      },
+    }));
+  };
+
+  const handleSaveSchoolPauseDefaults = (pause: {
+    pauseNewSabaqOnSabqiRepeat: boolean;
+    pauseNewSabaqOnManzilRepeat: boolean;
+  }) => {
+    onUpdateState(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        pauseNewSabaqOnSabqiRepeat: pause.pauseNewSabaqOnSabqiRepeat,
+        pauseNewSabaqOnManzilRepeat: pause.pauseNewSabaqOnManzilRepeat,
+        freezeSabaqOnSabqiOrManzilFail:
+          pause.pauseNewSabaqOnSabqiRepeat || pause.pauseNewSabaqOnManzilRepeat,
+      },
+    }));
+  };
+
   const handleResetToDefaults = (studentId: string) => {
     onUpdateState(prev => {
-      const copy = { ...prev.studentLimitsOverride };
-      delete copy[studentId];
+      const limitsCopy = { ...prev.studentLimitsOverride };
+      delete limitsCopy[studentId];
+      const pauseCopy = { ...(prev.studentPauseOverride || {}) };
+      delete pauseCopy[studentId];
       return {
         ...prev,
-        studentLimitsOverride: copy,
+        studentLimitsOverride: limitsCopy,
+        studentPauseOverride: pauseCopy,
       };
     });
   };
@@ -702,33 +827,91 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center justify-between sm:justify-start gap-3 bg-[#F8F4EC] border border-[#DFCFA8] p-2.5 sm:p-3 rounded-xl">
-            <div className="text-left sm:text-right">
-              <div className="text-xs font-bold text-[#241811]">{t.freezeRuleLabel}</div>
-              <div className="text-[11px] text-[#7A6C60] max-w-xs">
-                {t.freezeRuleDescription} ({realTomorrow})
+          <div className="flex flex-col gap-2 bg-[#F8F4EC] border border-[#DFCFA8] p-3 rounded-xl">
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <div className="text-left">
+                <div className="text-xs font-bold text-[#241811]">
+                  {t.pauseOnSabqiRepeatLabel}
+                </div>
+                <div className="text-[10px] text-[#7A6C60]">
+                  {state.language === 'ur'
+                    ? `مدرسہ ڈیفالٹ · آئندہ یوم: ${realTomorrow}`
+                    : `School default (override per student in Limits) · Next day: ${realTomorrow}`}
+                </div>
               </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                onUpdateState(prev => ({
-                  ...prev,
-                  settings: {
-                    ...prev.settings,
-                    freezeSabaqOnSabqiOrManzilFail:
-                      !prev.settings.freezeSabaqOnSabqiOrManzilFail,
-                  },
-                }));
-              }}
-              className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer shrink-0 ${
-                state.settings.freezeSabaqOnSabqiOrManzilFail
-                  ? 'bg-[#1F4E3D] justify-end'
-                  : 'bg-[#CDBE9F] justify-start'
-              }`}
-            >
-              <div className="w-4 h-4 rounded-full bg-[#FCFAF6] shadow-md" />
-            </button>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={
+                  state.settings.pauseNewSabaqOnSabqiRepeat ??
+                  state.settings.freezeSabaqOnSabqiOrManzilFail ??
+                  true
+                }
+                onClick={() => {
+                  const currSabqi =
+                    state.settings.pauseNewSabaqOnSabqiRepeat ??
+                    state.settings.freezeSabaqOnSabqiOrManzilFail ??
+                    true;
+                  const currManzil =
+                    state.settings.pauseNewSabaqOnManzilRepeat ??
+                    state.settings.freezeSabaqOnSabqiOrManzilFail ??
+                    true;
+                  handleSaveSchoolPauseDefaults({
+                    pauseNewSabaqOnSabqiRepeat: !currSabqi,
+                    pauseNewSabaqOnManzilRepeat: currManzil,
+                  });
+                }}
+                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer shrink-0 ${
+                  (state.settings.pauseNewSabaqOnSabqiRepeat ??
+                    state.settings.freezeSabaqOnSabqiOrManzilFail ??
+                    true)
+                    ? 'bg-[#1F4E3D] justify-end'
+                    : 'bg-[#CDBE9F] justify-start'
+                }`}
+              >
+                <span className="w-4 h-4 rounded-full bg-[#FCFAF6] shadow-md" />
+              </button>
+            </label>
+
+            <label className="flex items-center justify-between gap-3 cursor-pointer pt-2 border-t border-[#DFCFA8]/70">
+              <div className="text-left">
+                <div className="text-xs font-bold text-[#241811]">
+                  {t.pauseOnManzilRepeatLabel}
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={
+                  state.settings.pauseNewSabaqOnManzilRepeat ??
+                  state.settings.freezeSabaqOnSabqiOrManzilFail ??
+                  true
+                }
+                onClick={() => {
+                  const currSabqi =
+                    state.settings.pauseNewSabaqOnSabqiRepeat ??
+                    state.settings.freezeSabaqOnSabqiOrManzilFail ??
+                    true;
+                  const currManzil =
+                    state.settings.pauseNewSabaqOnManzilRepeat ??
+                    state.settings.freezeSabaqOnSabqiOrManzilFail ??
+                    true;
+                  handleSaveSchoolPauseDefaults({
+                    pauseNewSabaqOnSabqiRepeat: currSabqi,
+                    pauseNewSabaqOnManzilRepeat: !currManzil,
+                  });
+                }}
+                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer shrink-0 ${
+                  (state.settings.pauseNewSabaqOnManzilRepeat ??
+                    state.settings.freezeSabaqOnSabqiOrManzilFail ??
+                    true)
+                    ? 'bg-[#1F4E3D] justify-end'
+                    : 'bg-[#CDBE9F] justify-start'
+                }`}
+              >
+                <span className="w-4 h-4 rounded-full bg-[#FCFAF6] shadow-md" />
+              </button>
+            </label>
           </div>
         </div>
       </div>
@@ -818,11 +1001,24 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
             const studentType: StudentType = isNazra ? 'nazra' : 'hifz';
             const viewedDate = getStudentViewedDate(student.id);
             const viewedPlan = state.dailyPlans[student.id]?.[viewedDate];
-            const hasOverriddenLimits = Boolean(state.studentLimitsOverride[student.id]);
+            const hasOverriddenLimits = Boolean(
+              state.studentLimitsOverride[student.id] ||
+                state.studentPauseOverride?.[student.id]
+            );
             const paraStatus = getParaCompletionStatus(student, state);
             const currentParaSabqi = !isNazra
               ? computeCurrentParaSabqiRange(student, state, viewedDate)
               : null;
+            const manzilState = isNazra
+              ? { dueParas: [], repeatParas: {} }
+              : computeManzilParaStates(student, state, viewedDate);
+            const manzilRepeatEntries = Object.entries(manzilState.repeatParas)
+              .map(([k, dt]) => [parseInt(k, 10), dt] as [number, string])
+              .sort((a, b) => a[0] - b[0]);
+            const pauseStatus = isNazra
+              ? null
+              : getNewSabaqPauseStatus(student, state, viewedDate);
+            const hasRevisionFailFreeze = Boolean(pauseStatus?.isPaused);
             const lastTypeChange =
               student.typeChangeHistory && student.typeChangeHistory.length > 0
                 ? student.typeChangeHistory[student.typeChangeHistory.length - 1]
@@ -1053,21 +1249,64 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                             </div>
                           )}
 
+                          {partKey === 'manzil' &&
+                            plan?.paraResults &&
+                            Object.keys(plan.paraResults).length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {Object.entries(plan.paraResults)
+                                  .sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10))
+                                  .map(([pKey, outcome]) => (
+                                    <span
+                                      key={pKey}
+                                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                        outcome === 'passed'
+                                          ? 'bg-[#E8F0EC] text-[#143429] border-[#2E6A54]/50'
+                                          : 'bg-[#FEE2E2] text-[#7F1D1D] border-[#B91C1C]/50'
+                                      }`}
+                                    >
+                                      {state.language === 'ur' ? `پارہ ${pKey}` : `P${pKey}`}:{' '}
+                                      {outcome === 'passed'
+                                        ? state.language === 'ur'
+                                          ? 'پاس'
+                                          : 'Pass'
+                                        : t.repeatPrefix}
+                                    </span>
+                                  ))}
+                              </div>
+                            )}
+
                           {partKey === 'sabaq' && !range ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setAssignModalTarget({
-                                  student,
-                                  initialPart: 'sabaq',
-                                  targetDate: viewedDate,
-                                })
-                              }
-                              className="mt-2.5 text-xs font-bold text-[#1F4E3D] hover:text-[#241811] flex items-center gap-1 cursor-pointer pt-1.5 border-t border-[#DFCFA8]/80 transition-colors"
-                            >
-                              <BookOpen className="w-3 h-3 text-[#1F4E3D]" />
-                              <span>{t.assignSabaqButton}</span>
-                            </button>
+                            hasRevisionFailFreeze && pauseStatus ? (
+                              <div className="mt-2.5 pt-1.5 border-t border-[#DFCFA8]/80 space-y-1">
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="text-xs font-bold text-[#9A8B7A] flex items-center gap-1 cursor-not-allowed opacity-70"
+                                  title={pauseStatus.detailedReasons.join(' ')}
+                                >
+                                  <BookOpen className="w-3 h-3" />
+                                  <span>{t.assignSabaqButton}</span>
+                                </button>
+                                <div className="text-[10px] font-bold text-[#92400E] leading-snug">
+                                  {pauseStatus.detailedReasons.join(' ')}
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setAssignModalTarget({
+                                    student,
+                                    initialPart: 'sabaq',
+                                    targetDate: viewedDate,
+                                  })
+                                }
+                                className="mt-2.5 text-xs font-bold text-[#1F4E3D] hover:text-[#241811] flex items-center gap-1 cursor-pointer pt-1.5 border-t border-[#DFCFA8]/80 transition-colors"
+                              >
+                                <BookOpen className="w-3 h-3 text-[#1F4E3D]" />
+                                <span>{t.assignSabaqButton}</span>
+                              </button>
+                            )
                           ) : (
                             <div className="mt-2.5 pt-1.5 border-t border-[#DFCFA8]/80 flex items-center justify-between gap-2">
                               <button
@@ -1083,6 +1322,7 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                               </button>
                               <button
                                 type="button"
+                                disabled={partKey === 'sabaq' && hasRevisionFailFreeze}
                                 onClick={() =>
                                   setAssignModalTarget({
                                     student,
@@ -1090,7 +1330,12 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                                     targetDate: viewedDate,
                                   })
                                 }
-                                className="text-[11px] font-semibold text-[#8F6E2B] hover:text-[#241811] underline cursor-pointer"
+                                title={
+                                  partKey === 'sabaq' && hasRevisionFailFreeze && pauseStatus
+                                    ? pauseStatus.detailedReasons.join(' ')
+                                    : undefined
+                                }
+                                className="text-[11px] font-semibold text-[#8F6E2B] hover:text-[#241811] underline cursor-pointer disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
                               >
                                 {range ? 'Change' : 'Assign'}
                               </button>
@@ -1162,23 +1407,39 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                       </span>
                     </div>
 
-                    {!isNazra &&
-                      viewedPlan?.manzil?.assignedParas &&
-                      viewedPlan.manzil.assignedParas.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {!isNazra && manzilState.dueParas.length > 0 && (
                         <span className="px-2.5 py-0.5 rounded-md bg-[#F59E0B] border border-[#B45309] text-[#1C120C] text-[11px] font-bold">
                           {t.manzilDuePrefix}: {viewedDate} — Para{' '}
-                          {viewedPlan.manzil.assignedParas.join(', ')}
+                          {manzilState.dueParas.join(', ')}
                         </span>
                       )}
+                      {!isNazra && manzilRepeatEntries.length > 0 && (
+                        <span className="px-2.5 py-0.5 rounded-md bg-[#B91C1C] border border-[#7F1D1D] text-white text-[11px] font-bold">
+                          {t.repeatPrefix}:{' '}
+                          {manzilRepeatEntries
+                            .map(([p, dt]) => `Para ${p} (${dt})`)
+                            .join(', ')}
+                        </span>
+                      )}
+                      {hasRevisionFailFreeze && pauseStatus && (
+                        <span className="px-2.5 py-0.5 rounded-md bg-[#FEF3C7] border border-[#D97706] text-[#78350F] text-[11px] font-bold flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3 text-[#B45309]" />
+                          <span>{pauseStatus.reasons.join(' · ')}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <ParaProgressGrid
                     completedParas={displayedParaList}
                     currentJuz={student.currentJuz}
-                    manzilAssignedParas={isNazra ? [] : viewedPlan?.manzil?.assignedParas || []}
+                    manzilAssignedParas={manzilState.dueParas}
+                    manzilRepeatParas={manzilState.repeatParas}
                     currentDate={viewedDate}
                     language={state.language}
                     manzilDuePrefix={t.manzilDuePrefix}
+                    repeatPrefix={t.repeatPrefix}
                     isNazra={isNazra}
                     onTapPara={
                       isNazra
@@ -1337,6 +1598,8 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
           onClose={() => setLimitsStudent(null)}
           onSaveStudentLimits={handleSaveStudentLimits}
           onSaveHalqaDefaultLimits={handleSaveHalqaDefaults}
+          onSaveStudentPauseOverride={handleSaveStudentPauseOverride}
+          onSaveSchoolPauseDefaults={handleSaveSchoolPauseDefaults}
           onResetToDefaults={handleResetToDefaults}
         />
       )}

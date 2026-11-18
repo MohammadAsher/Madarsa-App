@@ -13,7 +13,13 @@ import {
   AssignmentRange,
 } from '../types/hifz';
 import { getRangeMetadata } from '../data/quranData';
-import { computeCurrentParaSabqiRange, getFullParaRange } from './hifzService';
+import {
+  buildManzilCombinedRange,
+  computeCurrentParaSabqiRange,
+  getFullParaRange,
+  getManzilParasFromPlan,
+  getNewSabaqPauseStatus,
+} from './hifzService';
 import {
   DEFAULT_SCHOOL_TIMEZONE,
   getRealTodayDate,
@@ -775,6 +781,8 @@ export function createInitialDemoState(timeZone: string = DEFAULT_SCHOOL_TIMEZON
     settings: {
       timeZone,
       freezeSabaqOnSabqiOrManzilFail: true,
+      pauseNewSabaqOnSabqiRepeat: true,
+      pauseNewSabaqOnManzilRepeat: true,
       halqaDefaultLimits: { ...DEFAULT_HALQA_LIMITS },
       mushafLayout: 'madinah',
       mushafScript: 'indopak',
@@ -783,6 +791,7 @@ export function createInitialDemoState(timeZone: string = DEFAULT_SCHOOL_TIMEZON
     students,
     ustaads,
     studentLimitsOverride,
+    studentPauseOverride: {},
     dailyPlans,
     marksHistory,
     sessionResults,
@@ -830,11 +839,22 @@ export function syncStateToRealDate(
       // Nazra students only track Sabaq; Sabqi and Manzil stay hidden/empty
       todayPlan = createEmptyDayPlan(realToday);
     } else {
-      const sabqiStatus = priorPlan.sabqi?.status;
+      const pauseStatus = getNewSabaqPauseStatus(student, currentState, realToday);
+      const shouldFreezeNewSabaq = pauseStatus.isPaused;
       const manzilStatus = priorPlan.manzil?.status;
-      const revisionFailed = sabqiStatus === 'repeat' || manzilStatus === 'repeat';
-      const shouldFreezeNewSabaq =
-        Boolean(currentState.settings?.freezeSabaqOnSabqiOrManzilFail) && revisionFailed;
+
+      const nextSabaqPlan: DailyPartPlan =
+        !shouldFreezeNewSabaq &&
+        priorPlan.sabaq?.status === 'repeat' &&
+        priorPlan.sabaq.range
+          ? {
+              ...priorPlan.sabaq,
+              status: 'pending',
+              repeatPracticeCount: 0,
+              completedAt: undefined,
+              sessionResultId: undefined,
+            }
+          : createEmptySabaqPlan();
 
       const computedSabqi = computeCurrentParaSabqiRange(
         student,
@@ -857,6 +877,20 @@ export function syncStateToRealDate(
         ? [...priorPlan.manzil.assignedParas]
         : [];
       if (
+        manzilStatus === 'repeat' &&
+        priorPlan.manzil?.paraResults &&
+        Object.keys(priorPlan.manzil.paraResults).length > 0
+      ) {
+        const repeatParas = Object.entries(priorPlan.manzil.paraResults)
+          .filter(([, outcome]) => outcome === 'repeat')
+          .map(([p]) => parseInt(p, 10))
+          .filter(p => !Number.isNaN(p) && p >= 1 && p <= 30)
+          .sort((a, b) => a - b);
+        if (repeatParas.length > 0) {
+          nextAssignedParas = repeatParas;
+          nextManzilRange = buildManzilCombinedRange(repeatParas);
+        }
+      } else if (
         manzilStatus === 'passed' &&
         student.completedParas &&
         student.completedParas.length > 0
@@ -871,7 +905,7 @@ export function syncStateToRealDate(
 
       todayPlan = {
         date: realToday,
-        sabaq: createEmptySabaqPlan(),
+        sabaq: nextSabaqPlan,
         sabqi: {
           part: 'sabqi',
           range: nextSabqiRange,
@@ -938,32 +972,123 @@ export function syncStateToRealDate(
 
 /**
  * Migrates any existing persisted students lacking studentType to 'hifz' by default,
- * preserving all historical records, assignments, marks, and completed paras untouched.
+ * initializes separate Sabqi/Manzil pause settings (ON by default),
+ * and clears stale pause flags / resolved manzilRepeatParas entries when results are Passed.
  */
 export function migrateMadrasaState(currentState: MadrasaState): MadrasaState {
   let changed = false;
   const updatedStudents = { ...currentState.students };
   const defaultLayout = currentState.settings?.mushafLayout || 'madinah';
 
+  const legacyPause = currentState.settings?.freezeSabaqOnSabqiOrManzilFail ?? true;
+  const pauseSabqi = currentState.settings?.pauseNewSabaqOnSabqiRepeat ?? legacyPause;
+  const pauseManzil = currentState.settings?.pauseNewSabaqOnManzilRepeat ?? legacyPause;
+  const needsSettingsUpdate =
+    currentState.settings?.pauseNewSabaqOnSabqiRepeat === undefined ||
+    currentState.settings?.pauseNewSabaqOnManzilRepeat === undefined;
+
+  const updatedSettings = needsSettingsUpdate
+    ? {
+        ...currentState.settings,
+        pauseNewSabaqOnSabqiRepeat: pauseSabqi,
+        pauseNewSabaqOnManzilRepeat: pauseManzil,
+        freezeSabaqOnSabqiOrManzilFail: pauseSabqi || pauseManzil,
+      }
+    : currentState.settings;
+  if (needsSettingsUpdate) changed = true;
+
   for (const [id, student] of Object.entries(updatedStudents)) {
     if (!student) continue;
     const needsType = student.studentType !== 'hifz' && student.studentType !== 'nazra';
     const needsLayout = !student.mushafLayout;
-    if (needsType || needsLayout) {
+
+    // Clean any stale entries from manzilRepeatParas that were subsequently marked 'passed'
+    let cleanedRepeatParas = student.manzilRepeatParas;
+    if (student.manzilRepeatParas && Object.keys(student.manzilRepeatParas).length > 0) {
+      const plans = Object.values(currentState.dailyPlans[id] || {}).sort((a, b) =>
+        a.date.localeCompare(b.date)
+      );
+      const latestOutcomeByPara: Record<number, { date: string; outcome: 'passed' | 'repeat' }> = {};
+      for (const dp of plans) {
+        const m = dp.manzil;
+        if (!m) continue;
+        if (m.paraResults && Object.keys(m.paraResults).length > 0) {
+          for (const [pKey, outcome] of Object.entries(m.paraResults)) {
+            const pNum = parseInt(pKey, 10);
+            if (!Number.isNaN(pNum)) {
+              latestOutcomeByPara[pNum] = { date: dp.date, outcome };
+            }
+          }
+        } else if (m.status === 'passed' || m.status === 'repeat') {
+          for (const pNum of getManzilParasFromPlan(m.assignedParas, m.range)) {
+            latestOutcomeByPara[pNum] = { date: dp.date, outcome: m.status };
+          }
+        }
+      }
+
+      const nextMap: Record<number, string> = {};
+      let mapChanged = false;
+      for (const [pKey, repDate] of Object.entries(student.manzilRepeatParas)) {
+        const pNum = parseInt(pKey, 10);
+        const latest = latestOutcomeByPara[pNum];
+        if (latest && latest.outcome === 'passed' && latest.date >= repDate) {
+          mapChanged = true;
+        } else {
+          nextMap[pNum] = repDate;
+        }
+      }
+      if (mapChanged) {
+        cleanedRepeatParas = nextMap;
+        changed = true;
+      }
+    }
+
+    if (needsType || needsLayout || cleanedRepeatParas !== student.manzilRepeatParas) {
       updatedStudents[id] = {
         ...student,
         studentType: needsType ? 'hifz' : student.studentType,
         mushafLayout: student.mushafLayout || defaultLayout,
         completedParas: Array.isArray(student.completedParas) ? student.completedParas : [],
+        ...(cleanedRepeatParas !== undefined ? { manzilRepeatParas: cleanedRepeatParas } : {}),
       };
       changed = true;
     }
   }
 
+  // Reconcile any stale sabaqFrozenDueToRevisionFail flags against live repeat state
+  const candidateState: MadrasaState = {
+    ...currentState,
+    settings: updatedSettings,
+    students: updatedStudents,
+  };
+  const updatedDailyPlans = { ...currentState.dailyPlans };
+  for (const [sid, plansMap] of Object.entries(updatedDailyPlans)) {
+    const student = updatedStudents[sid];
+    if (!student || !plansMap) continue;
+    let studentPlansChanged = false;
+    const nextPlansMap = { ...plansMap };
+    for (const [d, dp] of Object.entries(plansMap)) {
+      if (dp?.sabaqFrozenDueToRevisionFail) {
+        const livePause = getNewSabaqPauseStatus(student, candidateState, d).isPaused;
+        if (!livePause) {
+          nextPlansMap[d] = {
+            ...dp,
+            sabaqFrozenDueToRevisionFail: false,
+          };
+          studentPlansChanged = true;
+          changed = true;
+        }
+      }
+    }
+    if (studentPlansChanged) {
+      updatedDailyPlans[sid] = nextPlansMap;
+    }
+  }
+
   if (!changed) return currentState;
   return {
-    ...currentState,
-    students: updatedStudents,
+    ...candidateState,
+    dailyPlans: updatedDailyPlans,
   };
 }
 

@@ -219,6 +219,33 @@ export default function App() {
     );
   };
 
+  const handleUpdatePauseSettings = (patch: {
+    pauseNewSabaqOnSabqiRepeat?: boolean;
+    pauseNewSabaqOnManzilRepeat?: boolean;
+  }) => {
+    setState(prev => {
+      const nextSabqi =
+        patch.pauseNewSabaqOnSabqiRepeat ??
+        prev.settings.pauseNewSabaqOnSabqiRepeat ??
+        prev.settings.freezeSabaqOnSabqiOrManzilFail ??
+        true;
+      const nextManzil =
+        patch.pauseNewSabaqOnManzilRepeat ??
+        prev.settings.pauseNewSabaqOnManzilRepeat ??
+        prev.settings.freezeSabaqOnSabqiOrManzilFail ??
+        true;
+      return {
+        ...prev,
+        settings: {
+          ...prev.settings,
+          pauseNewSabaqOnSabqiRepeat: nextSabqi,
+          pauseNewSabaqOnManzilRepeat: nextManzil,
+          freezeSabaqOnSabqiOrManzilFail: nextSabqi || nextManzil,
+        },
+      };
+    });
+  };
+
   const handleResetDemo = () => {
     const fresh = resetDemoState(state.settings?.timeZone || DEFAULT_SCHOOL_TIMEZONE);
     setState(fresh);
@@ -301,6 +328,7 @@ export default function App() {
         <SettingsModal
           state={state}
           onChangeTimeZone={handleChangeTimeZone}
+          onUpdatePauseSettings={handleUpdatePauseSettings}
           onClose={() => setShowSettings(false)}
         />
       )}

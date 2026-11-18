@@ -37,8 +37,10 @@ import { StudentTypeBadge } from './StudentTypeBadge';
 import { translations } from '../i18n/translations';
 import {
   computeCurrentParaSabqiRange,
+  computeManzilParaStates,
   getFullParaRange,
   getManzilParaRanges,
+  getNewSabaqPauseStatus,
 } from '../services/hifzService';
 import { getParaPageRange, getParaSurahName } from '../data/quranData';
 
@@ -153,9 +155,18 @@ export const StudentView: React.FC<StudentViewProps> = ({
     }
   };
 
+  const manzilState = isNazra
+    ? { dueParas: [], repeatParas: {} }
+    : computeManzilParaStates(student, state, activeDate);
+  const pauseStatus = isNazra
+    ? null
+    : getNewSabaqPauseStatus(student, state, activeDate);
+  const manzilRepeatEntries = Object.entries(manzilState.repeatParas)
+    .map(([k, dt]) => [parseInt(k, 10), dt] as [number, string])
+    .sort((a, b) => a[0] - b[0]);
+
   const handleTapParaTile = (paraNum: number) => {
-    const manzilParas = !isNazra ? todayPlan?.manzil?.assignedParas || [] : [];
-    if (!isNazra && manzilParas.includes(paraNum) && todayPlan?.manzil?.range) {
+    if (!isNazra && manzilState.dueParas.includes(paraNum) && todayPlan?.manzil?.range) {
       setPreviewParaNum(null);
       setActivePart('manzil');
       const { startPage } = getParaPageRange(paraNum);
@@ -265,7 +276,6 @@ export const StudentView: React.FC<StudentViewProps> = ({
 
   const repeatCount = currentPartPlan?.repeatPracticeCount || 0;
   const targetRepeats = currentPartPlan?.targetRepeats || 10;
-  const manzilAssignedParas = isNazra ? [] : todayPlan?.manzil?.assignedParas || [];
   const displayedParasCount = isNazra
     ? student.nazraCompletedParas?.length || 0
     : student.completedParas?.length || 0;
@@ -331,14 +341,16 @@ export const StudentView: React.FC<StudentViewProps> = ({
         </div>
       </div>
 
-      {/* Sabaq Frozen Notice Banner (Hifz only) */}
-      {!isNazra && todayPlan?.sabaqFrozenDueToRevisionFail && (
+      {/* Sabaq Paused Notice Banner (Hifz only, shown ONLY while Sabqi/Manzil Repeat is pending) */}
+      {!isNazra && pauseStatus?.isPaused && (
         <div className="bg-[#FEF3C7] border-2 border-[#D97706] rounded-2xl p-4 flex items-start gap-3 shadow-xs">
           <AlertTriangle className="w-5 h-5 text-[#B45309] shrink-0 mt-0.5" />
           <div>
-            <h4 className="text-sm font-bold text-[#78350F]">{t.sabaqFrozenAlert}</h4>
-            <p className="text-xs text-[#92400E] mt-0.5">
-              Focus today on perfecting your Sabqi and Manzil revision before advancing with new lines.
+            <h4 className="text-sm font-bold text-[#78350F]">
+              {pauseStatus.reasons.join(' · ')}
+            </h4>
+            <p className="text-xs text-[#92400E] mt-0.5 font-medium">
+              {pauseStatus.detailedReasons.join(' ')}
             </p>
           </div>
         </div>
@@ -567,7 +579,11 @@ export const StudentView: React.FC<StudentViewProps> = ({
 
                           <div className="pt-1.5 border-t border-[#DFCFA8]">
                             <div className="text-[10px] text-[#7A6C60] uppercase tracking-wide font-semibold">
-                              {t.manzilDuePrefix}: {activeDate}
+                              {status === 'passed'
+                                ? `${t.status.passed}: ${activeDate}`
+                                : status === 'repeat'
+                                ? `${t.repeatPrefix}: ${activeDate}`
+                                : `${t.manzilDuePrefix}: ${activeDate}`}
                             </div>
                             <div className="text-sm font-bold text-[#1F4E3D] mt-0.5">
                               {plan.assignedParas && plan.assignedParas.length > 0
@@ -579,6 +595,30 @@ export const StudentView: React.FC<StudentViewProps> = ({
                                 : 'Not assigned'}
                             </div>
                           </div>
+
+                          {plan.paraResults && Object.keys(plan.paraResults).length > 0 && (
+                            <div className="flex flex-wrap gap-1 pt-0.5">
+                              {Object.entries(plan.paraResults)
+                                .sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10))
+                                .map(([pKey, outcome]) => (
+                                  <span
+                                    key={pKey}
+                                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                      outcome === 'passed'
+                                        ? 'bg-[#E8F0EC] text-[#143429] border-[#2E6A54]/50'
+                                        : 'bg-[#FEE2E2] text-[#7F1D1D] border-[#B91C1C]/50'
+                                    }`}
+                                  >
+                                    {state.language === 'ur' ? `پارہ ${pKey}` : `P${pKey}`}:{' '}
+                                    {outcome === 'passed'
+                                      ? state.language === 'ur'
+                                        ? 'پاس'
+                                        : 'Pass'
+                                      : t.repeatPrefix}
+                                  </span>
+                                ))}
+                            </div>
+                          )}
 
                           {plan.range && (
                             <div className="text-[11px] font-mono text-[#5A4333]">
@@ -640,20 +680,30 @@ export const StudentView: React.FC<StudentViewProps> = ({
             </p>
           </div>
 
-          {!isNazra && manzilAssignedParas.length > 0 && (
-            <div className="px-3 py-1 rounded-lg bg-[#FEF3C7] border border-[#D97706] text-[#78350F] text-xs font-bold">
-              {t.manzilDuePrefix}: {activeDate} — Para {manzilAssignedParas.join(', ')}
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {!isNazra && manzilState.dueParas.length > 0 && (
+              <div className="px-3 py-1 rounded-lg bg-[#FEF3C7] border border-[#D97706] text-[#78350F] text-xs font-bold">
+                {t.manzilDuePrefix}: {activeDate} — Para {manzilState.dueParas.join(', ')}
+              </div>
+            )}
+            {!isNazra && manzilRepeatEntries.length > 0 && (
+              <div className="px-3 py-1 rounded-lg bg-[#B91C1C] border border-[#7F1D1D] text-white text-xs font-bold">
+                {t.repeatPrefix}:{' '}
+                {manzilRepeatEntries.map(([p, dt]) => `Para ${p} (${dt})`).join(', ')}
+              </div>
+            )}
+          </div>
         </div>
 
         <ParaProgressGrid
           completedParas={isNazra ? student.nazraCompletedParas || [] : student.completedParas || []}
           currentJuz={student.currentJuz}
-          manzilAssignedParas={isNazra ? [] : manzilAssignedParas}
+          manzilAssignedParas={manzilState.dueParas}
+          manzilRepeatParas={manzilState.repeatParas}
           currentDate={activeDate}
           language={state.language}
           manzilDuePrefix={t.manzilDuePrefix}
+          repeatPrefix={t.repeatPrefix}
           previewParaNum={previewParaNum}
           onTapPara={handleTapParaTile}
           isNazra={isNazra}
@@ -911,6 +961,32 @@ export const StudentView: React.FC<StudentViewProps> = ({
                       {result.atkanLimit})
                     </span>
                   </div>
+
+                  {result.part === 'manzil' &&
+                    result.paraResults &&
+                    Object.keys(result.paraResults).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {Object.entries(result.paraResults)
+                          .sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10))
+                          .map(([pKey, outcome]) => (
+                            <span
+                              key={pKey}
+                              className={`px-2 py-0.5 rounded-md text-xs font-bold border ${
+                                outcome === 'passed'
+                                  ? 'bg-[#1F4E3D] text-white border-[#143429]'
+                                  : 'bg-[#B91C1C] text-white border-[#7F1D1D]'
+                              }`}
+                            >
+                              {state.language === 'ur' ? `پارہ ${pKey}` : `Para ${pKey}`}:{' '}
+                              {outcome === 'passed'
+                                ? state.language === 'ur'
+                                  ? 'پاس'
+                                  : 'Pass'
+                                : t.repeatPrefix}
+                            </span>
+                          ))}
+                      </div>
+                    )}
 
                   {result.marks.length > 0 ? (
                     <div>
