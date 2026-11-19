@@ -226,6 +226,7 @@ export const translations = {
     newSabaqPausedPrefix: 'New Sabaq paused',
     needsRepeatSuffix: 'needs a repeat',
     sameSabaqRepeatNote: 'Previous Sabaq was marked Repeat — the same Sabaq is assigned again.',
+    noCompletedParasYet: 'No completed paras yet',
   },
 
   ur: {
@@ -450,5 +451,6 @@ export const translations = {
     newSabaqPausedPrefix: 'نیا سبق موقوف ہے',
     needsRepeatSuffix: 'دہرانا باقی ہے',
     sameSabaqRepeatNote: 'پچھلا سبق دہرائیں تھا — وہی سبق دوبارہ مقرر کیا گیا ہے۔',
+    noCompletedParasYet: 'ابھی تک کوئی پارہ مکمل نہیں ہوا',
   },
 };

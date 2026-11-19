@@ -38,9 +38,9 @@ import { translations } from '../i18n/translations';
 import {
   computeCurrentParaSabqiRange,
   computeManzilParaStates,
-  getFullParaRange,
-  getManzilParaRanges,
   getNewSabaqPauseStatus,
+  getValidatedManzilParasForStudent,
+  isWholeParaManzilPlan,
 } from '../services/hifzService';
 import { getParaPageRange, getParaSurahName } from '../data/quranData';
 
@@ -91,8 +91,13 @@ export const StudentView: React.FC<StudentViewProps> = ({
     }
   }, [isNazra, activePart]);
 
-  // Optional Para tile preview when student taps a tile in "My Completed Paras"
+  const activeLayout = student.mushafLayout || state.settings.mushafLayout || 'madinah';
+
+  // Optional Para tile preview when student taps a non-Manzil tile in "My Completed Paras"
   const [previewParaNum, setPreviewParaNum] = useState<number | null>(null);
+  // Active Manzil para switcher state when viewing Manzil (keeps tapped para first when multiple assigned)
+  const [selectedManzilPara, setSelectedManzilPara] = useState<number | null>(null);
+  const [manzilLeadPara, setManzilLeadPara] = useState<number | null>(null);
 
   const currentParaSabqi = isNazra ? null : computeCurrentParaSabqiRange(student, state, activeDate);
 
@@ -103,15 +108,106 @@ export const StudentView: React.FC<StudentViewProps> = ({
     ? todayPlan.sabqi.range
     : currentParaSabqi?.range || null;
 
-  const activeRange: AssignmentRange | null =
+  const completedParasList = student.completedParas || [];
+  const hasCompletedParas = completedParasList.length > 0;
+
+  const manzilState = isNazra
+    ? { dueParas: [], repeatParas: {} as Record<number, string> }
+    : computeManzilParaStates(student, state, activeDate);
+  const pauseStatus = isNazra
+    ? null
+    : getNewSabaqPauseStatus(student, state, activeDate);
+  const manzilRepeatEntries = Object.entries(manzilState.repeatParas)
+    .map(([k, dt]) => [parseInt(k, 10), dt] as [number, string])
+    .sort((a, b) => a[0] - b[0]);
+
+  const planManzilParas =
+    !isNazra && todayPlan?.manzil
+      ? getValidatedManzilParasForStudent(student, todayPlan.manzil)
+      : [];
+  const isWholeParaManzil =
+    !isNazra && Boolean(todayPlan?.manzil) && isWholeParaManzilPlan(todayPlan?.manzil);
+  const hasCustomRangeManzil =
+    !isNazra &&
+    hasCompletedParas &&
+    Boolean(todayPlan?.manzil?.range) &&
+    !isWholeParaManzil &&
+    planManzilParas.length > 0;
+  const hasValidManzilAssignment =
+    !isNazra &&
+    hasCompletedParas &&
+    Boolean(todayPlan?.manzil?.range) &&
+    planManzilParas.length > 0;
+
+  const manzilSwitchParas = React.useMemo(() => {
+    if (isNazra || !hasCompletedParas) return [];
+    const basePool = new Set<number>([
+      ...planManzilParas,
+      ...manzilState.dueParas,
+      ...(selectedManzilPara && Boolean(manzilState.repeatParas[selectedManzilPara])
+        ? [selectedManzilPara]
+        : []),
+      ...(manzilLeadPara && Boolean(manzilState.repeatParas[manzilLeadPara])
+        ? [manzilLeadPara]
+        : []),
+    ]);
+    if (basePool.size === 0 && manzilRepeatEntries.length > 0) {
+      manzilRepeatEntries.forEach(([p]) => basePool.add(p));
+    }
+    const sorted = Array.from(basePool)
+      .filter(p => p >= 1 && p <= 30)
+      .sort((a, b) => a - b);
+    if (manzilLeadPara && sorted.includes(manzilLeadPara)) {
+      return [manzilLeadPara, ...sorted.filter(p => p !== manzilLeadPara)];
+    }
+    return sorted;
+  }, [isNazra, hasCompletedParas, planManzilParas, manzilState.dueParas, manzilState.repeatParas, selectedManzilPara, manzilLeadPara, manzilRepeatEntries]);
+
+  const activeManzilPara =
+    effectivePart === 'manzil' && previewParaNum === null && hasCompletedParas
+      ? selectedManzilPara && manzilSwitchParas.includes(selectedManzilPara)
+        ? selectedManzilPara
+        : manzilSwitchParas[0] || null
+      : null;
+
+  // Highlight ONLY what Ustaad actually assigned (Sabaq range, Sabqi range, or custom from-to Manzil).
+  // Never highlight an entire para on tile tap or whole-para Manzil!
+  const mushafHighlightRange: AssignmentRange | null =
     previewParaNum !== null
-      ? getFullParaRange(previewParaNum)
+      ? null
       : effectivePart === 'sabqi'
       ? effectiveSabqiRange
+      : effectivePart === 'manzil'
+      ? hasCustomRangeManzil
+        ? todayPlan?.manzil?.range || null
+        : null
       : todayPlan?.[effectivePart]?.range || null;
 
+  // Plan range used for repeat counter enablement and header lines count
+  const activePlanRange: AssignmentRange | null =
+    previewParaNum !== null
+      ? null
+      : effectivePart === 'sabqi'
+      ? effectiveSabqiRange
+      : effectivePart === 'manzil'
+      ? hasValidManzilAssignment
+        ? todayPlan?.manzil?.range || null
+        : null
+      : todayPlan?.[effectivePart]?.range || null;
+
+  const manzilHeaderParaBadge: number | null =
+    previewParaNum === null &&
+    effectivePart === 'manzil' &&
+    !hasCustomRangeManzil &&
+    activeManzilPara !== null
+      ? activeManzilPara
+      : null;
+
   const [currentPage, setCurrentPage] = useState<number>(
-    targetJumpWord?.page || activeRange?.start.page || 1
+    targetJumpWord?.page ||
+      mushafHighlightRange?.start.page ||
+      activePlanRange?.start.page ||
+      getParaPageRange(student.currentJuz || 1, activeLayout).startPage
   );
 
   // Keep page synced when switching student roles or dates
@@ -121,12 +217,28 @@ export const StudentView: React.FC<StudentViewProps> = ({
       return;
     }
     setPreviewParaNum(null);
+    setSelectedManzilPara(null);
+    setManzilLeadPara(null);
     const defaultPlan = state.dailyPlans[student.id]?.[activeDate];
-    const startPage = defaultPlan?.[effectivePart]?.range?.start.page;
+    if (effectivePart === 'manzil' && hasCompletedParas && defaultPlan?.manzil) {
+      const mParas = getValidatedManzilParasForStudent(student, defaultPlan.manzil);
+      if (mParas.length > 0) {
+        if (!isWholeParaManzilPlan(defaultPlan.manzil) && defaultPlan.manzil.range) {
+          setSelectedManzilPara(mParas[0]);
+          setCurrentPage(defaultPlan.manzil.range.start.page);
+          return;
+        }
+        setSelectedManzilPara(mParas[0]);
+        setCurrentPage(getParaPageRange(mParas[0], activeLayout).startPage);
+        return;
+      }
+    }
+    const startPage =
+      effectivePart === 'manzil' ? undefined : defaultPlan?.[effectivePart]?.range?.start.page;
     if (startPage) {
       setCurrentPage(startPage);
-    } else if (isNazra) {
-      setCurrentPage(getParaPageRange(student.currentJuz || 1).startPage);
+    } else {
+      setCurrentPage(getParaPageRange(student.currentJuz || 1, activeLayout).startPage);
     }
   }, [student.id, activeDate, isNazra]);
 
@@ -152,28 +264,39 @@ export const StudentView: React.FC<StudentViewProps> = ({
     setActivePart('sabqi');
     if (effectiveSabqiRange) {
       setCurrentPage(effectiveSabqiRange.start.page);
+    } else {
+      setCurrentPage(getParaPageRange(student.currentJuz || 1, activeLayout).startPage);
     }
   };
 
-  const manzilState = isNazra
-    ? { dueParas: [], repeatParas: {} }
-    : computeManzilParaStates(student, state, activeDate);
-  const pauseStatus = isNazra
-    ? null
-    : getNewSabaqPauseStatus(student, state, activeDate);
-  const manzilRepeatEntries = Object.entries(manzilState.repeatParas)
-    .map(([k, dt]) => [parseInt(k, 10), dt] as [number, string])
-    .sort((a, b) => a[0] - b[0]);
+  const handleSwitchManzilPara = (paraNum: number) => {
+    setPreviewParaNum(null);
+    setActivePart('manzil');
+    setSelectedManzilPara(paraNum);
+    setCurrentPage(getParaPageRange(paraNum, activeLayout).startPage);
+  };
 
   const handleTapParaTile = (paraNum: number) => {
-    if (!isNazra && manzilState.dueParas.includes(paraNum) && todayPlan?.manzil?.range) {
+    const isManzilPara =
+      !isNazra &&
+      hasCompletedParas &&
+      (manzilState.dueParas.includes(paraNum) ||
+        Boolean(manzilState.repeatParas[paraNum]) ||
+        planManzilParas.includes(paraNum));
+    const { startPage } = getParaPageRange(paraNum, activeLayout);
+
+    if (isManzilPara) {
       setPreviewParaNum(null);
       setActivePart('manzil');
-      const { startPage } = getParaPageRange(paraNum);
-      setCurrentPage(startPage);
+      setManzilLeadPara(paraNum);
+      setSelectedManzilPara(paraNum);
+      setCurrentPage(
+        hasCustomRangeManzil && todayPlan?.manzil?.range
+          ? todayPlan.manzil.range.start.page
+          : startPage
+      );
     } else {
       setPreviewParaNum(paraNum);
-      const { startPage } = getParaPageRange(paraNum);
       setCurrentPage(startPage);
     }
   };
@@ -181,7 +304,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
   const currentPartPlan = todayPlan ? todayPlan[effectivePart] : null;
 
   const handleIncrementRepeat = () => {
-    if (isPastDate || !currentPartPlan || !activeRange) return;
+    if (isPastDate || !currentPartPlan || !activePlanRange) return;
     onUpdateState(prev => {
       const studentHistory = { ...(prev.dailyPlans[student.id] || {}) };
       const dayPlan = studentHistory[activeDate]
@@ -209,7 +332,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
   };
 
   const handleResetRepeat = () => {
-    if (isPastDate || !currentPartPlan || !activeRange) return;
+    if (isPastDate || !currentPartPlan || !activePlanRange) return;
     onUpdateState(prev => {
       const studentHistory = { ...(prev.dailyPlans[student.id] || {}) };
       const dayPlan = studentHistory[activeDate]
@@ -452,29 +575,56 @@ export const StudentView: React.FC<StudentViewProps> = ({
             }
 
             const displayedSabqiRange = effectiveSabqiRange;
+            const isManzilCardBlocked = partKey === 'manzil' && !hasCompletedParas;
+            const isManzilCardInactive =
+              partKey === 'manzil' &&
+              (!hasCompletedParas || (!hasValidManzilAssignment && manzilSwitchParas.length === 0));
 
             return (
               <button
                 key={partKey}
                 type="button"
+                disabled={isManzilCardInactive}
                 onClick={() => {
+                  if (isManzilCardInactive) return;
                   setPreviewParaNum(null);
                   setActivePart(partKey);
-                  if (partKey === 'sabqi' && displayedSabqiRange) {
-                    setCurrentPage(displayedSabqiRange.start.page);
+                  if (partKey === 'sabqi') {
+                    if (displayedSabqiRange) {
+                      setCurrentPage(displayedSabqiRange.start.page);
+                    } else {
+                      setCurrentPage(getParaPageRange(student.currentJuz || 1, activeLayout).startPage);
+                    }
+                  } else if (partKey === 'manzil') {
+                    if (hasCustomRangeManzil && plan?.range) {
+                      setCurrentPage(plan.range.start.page);
+                    } else {
+                      const firstManzil =
+                        planManzilParas[0] ||
+                        manzilState.dueParas[0] ||
+                        manzilRepeatEntries[0]?.[0] ||
+                        null;
+                      if (firstManzil) {
+                        setManzilLeadPara(firstManzil);
+                        setSelectedManzilPara(firstManzil);
+                        setCurrentPage(getParaPageRange(firstManzil, activeLayout).startPage);
+                      }
+                    }
                   } else if (plan?.range) {
                     setCurrentPage(plan.range.start.page);
-                  } else if (partKey === 'sabaq') {
-                    setCurrentPage(getParaPageRange(student.currentJuz || 1).startPage);
+                  } else {
+                    setCurrentPage(getParaPageRange(student.currentJuz || 1, activeLayout).startPage);
                   }
                 }}
-                className={`p-5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden ${
-                  isSelected
-                    ? 'bg-[#FDFCF9] border-[#C5A059] ring-2 ring-[#C5A059]/40 shadow-md'
-                    : 'bg-[#FCFAF6] border-[#E8DCC4] hover:border-[#C5A059]/60 shadow-xs'
+                className={`p-5 rounded-2xl border text-left transition-all flex flex-col justify-between relative overflow-hidden ${
+                  isManzilCardInactive
+                    ? 'bg-[#F8F4EC]/70 border-[#E8DCC4] cursor-default opacity-90'
+                    : isSelected
+                    ? 'bg-[#FDFCF9] border-[#C5A059] ring-2 ring-[#C5A059]/40 shadow-md cursor-pointer'
+                    : 'bg-[#FCFAF6] border-[#E8DCC4] hover:border-[#C5A059]/60 shadow-xs cursor-pointer'
                 }`}
               >
-                {isSelected && (
+                {isSelected && !isManzilCardInactive && (
                   <div className="absolute top-0 left-0 right-0 h-1 bg-[#C5A059]" />
                 )}
 
@@ -486,7 +636,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
                       {partKey === 'manzil' && <BookmarkCheck className="w-4 h-4 text-[#1F4E3D]" />}
                       <span>{t.parts[partKey]}</span>
                     </span>
-                    {statusBadge}
+                    {!isManzilCardBlocked && !(partKey === 'manzil' && !hasValidManzilAssignment) && statusBadge}
                   </div>
 
                   <div className="text-xs text-[#7A6C60] mb-3">
@@ -569,87 +719,110 @@ export const StudentView: React.FC<StudentViewProps> = ({
 
                       {/* MANZIL */}
                       {partKey === 'manzil' && (
-                        <div className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 text-xs space-y-1.5">
-                          <div className="flex items-center justify-between text-[11px] text-[#7A6C60]">
-                            <span>Total Completed:</span>
-                            <span className="font-bold text-[#241811]">
-                              {student.completedParas?.length || 0} Paras
-                            </span>
+                        !hasCompletedParas ? (
+                          <div className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 text-xs text-[#7A6C60] font-semibold">
+                            {t.noCompletedParasYet}
                           </div>
-
-                          <div className="pt-1.5 border-t border-[#DFCFA8]">
-                            <div className="text-[10px] text-[#7A6C60] uppercase tracking-wide font-semibold">
-                              {status === 'passed'
-                                ? `${t.status.passed}: ${activeDate}`
-                                : status === 'repeat'
-                                ? `${t.repeatPrefix}: ${activeDate}`
-                                : `${t.manzilDuePrefix}: ${activeDate}`}
+                        ) : hasValidManzilAssignment ? (
+                          <div className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 text-xs space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px] text-[#7A6C60]">
+                              <span>Total Completed:</span>
+                              <span className="font-bold text-[#241811]">
+                                {completedParasList.length} Paras
+                              </span>
                             </div>
-                            <div className="text-sm font-bold text-[#1F4E3D] mt-0.5">
-                              {plan.assignedParas && plan.assignedParas.length > 0
-                                ? `Para ${plan.assignedParas.join(', ')}`
-                                : student.completedParas.length === 0
-                                ? 'None (0 Paras completed yet)'
-                                : plan.range
-                                ? `Pages ${plan.range.start.page} - ${plan.range.end.page}`
-                                : 'Not assigned'}
+
+                            <div className="pt-1.5 border-t border-[#DFCFA8]">
+                              <div className="text-[10px] text-[#7A6C60] uppercase tracking-wide font-semibold">
+                                {status === 'passed'
+                                  ? `${t.status.passed}: ${activeDate}`
+                                  : status === 'repeat'
+                                  ? `${t.repeatPrefix}: ${activeDate}`
+                                  : `${t.manzilDuePrefix}: ${activeDate}`}
+                              </div>
+                              <div className="text-sm font-bold text-[#1F4E3D] mt-0.5">
+                                {planManzilParas.length > 0 && isWholeParaManzilPlan(plan)
+                                  ? `Para ${planManzilParas.join(', ')}`
+                                  : plan.range
+                                  ? `Para ${planManzilParas.join(', ')} (Pages ${plan.range.start.page} - ${plan.range.end.page})`
+                                  : 'Not assigned'}
+                              </div>
+                            </div>
+
+                            {plan.paraResults && Object.keys(plan.paraResults).length > 0 && (
+                              <div className="flex flex-wrap gap-1 pt-0.5">
+                                {Object.entries(plan.paraResults)
+                                  .filter(([pKey]) => completedParasList.includes(parseInt(pKey, 10)))
+                                  .sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10))
+                                  .map(([pKey, outcome]) => (
+                                    <span
+                                      key={pKey}
+                                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                        outcome === 'passed'
+                                          ? 'bg-[#E8F0EC] text-[#143429] border-[#2E6A54]/50'
+                                          : 'bg-[#FEE2E2] text-[#7F1D1D] border-[#B91C1C]/50'
+                                      }`}
+                                    >
+                                      {state.language === 'ur' ? `پارہ ${pKey}` : `P${pKey}`}:{' '}
+                                      {outcome === 'passed'
+                                        ? state.language === 'ur'
+                                          ? 'پاس'
+                                          : 'Pass'
+                                        : t.repeatPrefix}
+                                    </span>
+                                  ))}
+                              </div>
+                            )}
+
+                            {plan.range && (
+                              <div className="text-[11px] font-mono text-[#5A4333]">
+                                {planManzilParas.length > 1 && isWholeParaManzilPlan(plan) ? (
+                                  <>
+                                    {planManzilParas.length} Paras ({plan.range.linesCount} lines)
+                                  </>
+                                ) : (
+                                  <>
+                                    Pages {plan.range.start.page} - {plan.range.end.page} (
+                                    {plan.range.linesCount} lines)
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 text-xs space-y-1">
+                            <div className="flex items-center justify-between text-[11px] text-[#7A6C60]">
+                              <span>Total Completed:</span>
+                              <span className="font-bold text-[#241811]">
+                                {completedParasList.length} Paras
+                              </span>
+                            </div>
+                            <div className="text-[#7A6C60] italic">
+                              No Manzil assigned yet
                             </div>
                           </div>
-
-                          {plan.paraResults && Object.keys(plan.paraResults).length > 0 && (
-                            <div className="flex flex-wrap gap-1 pt-0.5">
-                              {Object.entries(plan.paraResults)
-                                .sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10))
-                                .map(([pKey, outcome]) => (
-                                  <span
-                                    key={pKey}
-                                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
-                                      outcome === 'passed'
-                                        ? 'bg-[#E8F0EC] text-[#143429] border-[#2E6A54]/50'
-                                        : 'bg-[#FEE2E2] text-[#7F1D1D] border-[#B91C1C]/50'
-                                    }`}
-                                  >
-                                    {state.language === 'ur' ? `پارہ ${pKey}` : `P${pKey}`}:{' '}
-                                    {outcome === 'passed'
-                                      ? state.language === 'ur'
-                                        ? 'پاس'
-                                        : 'Pass'
-                                      : t.repeatPrefix}
-                                  </span>
-                                ))}
-                            </div>
-                          )}
-
-                          {plan.range && (
-                            <div className="text-[11px] font-mono text-[#5A4333]">
-                              {plan.assignedParas && plan.assignedParas.length > 1 ? (
-                                <>
-                                  {plan.assignedParas.length} Paras ({plan.range.linesCount} lines)
-                                </>
-                              ) : (
-                                <>
-                                  Pages {plan.range.start.page} - {plan.range.end.page} (
-                                  {plan.range.linesCount} lines)
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        )
                       )}
                     </div>
                   ) : partKey === 'sabaq' ? (
                     <div className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 text-xs text-[#78350F] font-semibold">
                       {t.sabaqNotAssignedYet}
                     </div>
+                  ) : partKey === 'manzil' && !hasCompletedParas ? (
+                    <div className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 text-xs text-[#7A6C60] font-semibold">
+                      {t.noCompletedParasYet}
+                    </div>
                   ) : (
                     <div className="text-xs text-[#A69888] italic">No assignment set</div>
                   )}
                 </div>
 
-                <div className="mt-4 pt-2.5 border-t border-[#DFCFA8] flex items-center justify-between text-xs text-[#8F6E2B] font-bold">
-                  <span>{isSelected ? 'Currently Viewing on Mushaf' : 'Tap to Open on Mushaf'}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </div>
+                {!isManzilCardInactive && (
+                  <div className="mt-4 pt-2.5 border-t border-[#DFCFA8] flex items-center justify-between text-xs text-[#8F6E2B] font-bold">
+                    <span>{isSelected ? 'Currently Viewing on Mushaf' : 'Tap to Open on Mushaf'}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </div>
+                )}
               </button>
             );
           })}
@@ -704,9 +877,10 @@ export const StudentView: React.FC<StudentViewProps> = ({
           language={state.language}
           manzilDuePrefix={t.manzilDuePrefix}
           repeatPrefix={t.repeatPrefix}
-          previewParaNum={previewParaNum}
+          previewParaNum={previewParaNum ?? activeManzilPara}
           onTapPara={handleTapParaTile}
           isNazra={isNazra}
+          mushafLayout={activeLayout}
         />
       </div>
 
@@ -716,7 +890,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              disabled={isPastDate || (previewParaNum === null && !activeRange)}
+              disabled={isPastDate || (previewParaNum === null && !activePlanRange)}
               onClick={handleIncrementRepeat}
               className="flex items-center gap-2 px-5 py-3 rounded-xl bg-[#241811] hover:bg-[#38271D] text-[#FCFAF6] text-sm font-bold shadow-xs active:scale-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed min-h-[46px] border border-[#C5A059]"
             >
@@ -726,7 +900,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
 
             <button
               type="button"
-              disabled={isPastDate || (previewParaNum === null && !activeRange)}
+              disabled={isPastDate || (previewParaNum === null && !activePlanRange)}
               onClick={handleResetRepeat}
               className="p-2.5 rounded-xl border border-[#DFCFA8] text-[#7A6C60] hover:text-[#241811] hover:bg-[#F3ECE1] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed min-h-[46px]"
               title={t.resetCounter}
@@ -835,51 +1009,107 @@ export const StudentView: React.FC<StudentViewProps> = ({
                       <>{t.noPassedSabqiYet}</>
                     ))}
                   {effectivePart === 'manzil' &&
-                    (currentPartPlan?.range ? (
+                    (!hasCompletedParas ? (
+                      <>{t.noCompletedParasYet}.</>
+                    ) : hasCustomRangeManzil && currentPartPlan?.range ? (
+                      <>
+                        {t.manzilDuePrefix} ({activeDate}):{' '}
+                        <strong>Para {planManzilParas.join(', ')}</strong>{' '}
+                        (Page {currentPartPlan.range.start.page} L{currentPartPlan.range.start.line} – Page{' '}
+                        {currentPartPlan.range.end.page} L{currentPartPlan.range.end.line}).
+                      </>
+                    ) : manzilSwitchParas.length > 0 ? (
                       <>
                         {t.manzilDuePrefix} ({activeDate}):{' '}
                         <strong>
-                          Para{' '}
-                          {currentPartPlan.assignedParas && currentPartPlan.assignedParas.length > 0
-                            ? currentPartPlan.assignedParas.join(', ')
-                            : currentPartPlan.range.juzNumber}
+                          Para {manzilSwitchParas.join(', ')}
                         </strong>{' '}
-                        {currentPartPlan.assignedParas && currentPartPlan.assignedParas.length > 1
-                          ? `(${currentPartPlan.assignedParas.length} Paras selected).`
-                          : `(Pages ${currentPartPlan.range.start.page} - ${currentPartPlan.range.end.page}).`}
+                        {activeManzilPara &&
+                          `(Viewing Para ${activeManzilPara} · Pages ${getParaPageRange(activeManzilPara, activeLayout).startPage}–${getParaPageRange(activeManzilPara, activeLayout).endPage})`}
                       </>
                     ) : (
                       <>No Manzil assigned yet.</>
                     ))}
                 </span>
               </div>
-              {activeRange && (
+              {activePlanRange && (
                 <span className="text-[#DFCFA8] text-[11px] font-mono">
-                  {activeRange.linesCount} {t.linesCount}
+                  {activePlanRange.linesCount} {t.linesCount}
                 </span>
               )}
             </div>
           )
         )}
 
+        {/* Manzil Multi-Para Switcher Bar (ordered with tapped para first) */}
+        {previewParaNum === null &&
+          effectivePart === 'manzil' &&
+          hasCompletedParas &&
+          !hasCustomRangeManzil &&
+          manzilSwitchParas.length > 0 && (
+            <div className="w-full max-w-4xl bg-[#F8F4EC] border border-[#C5A059] px-3 sm:px-4 py-2 rounded-xl flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="font-bold text-[#241811] mr-1">
+                  {state.language === 'ur' ? 'منزل کے پارے تبدیل کریں:' : 'Switch Manzil Para:'}
+                </span>
+                {manzilSwitchParas.map(pNum => {
+                  const isCurrentSelected = activeManzilPara === pNum;
+                  const pRange = getParaPageRange(pNum, activeLayout);
+                  const isDue = manzilState.dueParas.includes(pNum);
+                  const repDate = manzilState.repeatParas[pNum];
+                  return (
+                    <button
+                      key={pNum}
+                      type="button"
+                      onClick={() => handleSwitchManzilPara(pNum)}
+                      className={`px-2.5 py-1 rounded-lg border text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+                        isCurrentSelected
+                          ? 'bg-[#1F4E3D] text-white border-[#C5A059] shadow-xs ring-1 ring-[#C5A059]'
+                          : repDate
+                          ? 'bg-[#FEE2E2] text-[#7F1D1D] border-[#B91C1C]/50 hover:bg-[#FECACA]'
+                          : isDue
+                          ? 'bg-[#FEF3C7] text-[#78350F] border-[#D97706]/60 hover:bg-[#FDE68A]'
+                          : 'bg-white text-[#241811] border-[#DFCFA8] hover:bg-[#F3ECE1]'
+                      }`}
+                    >
+                      <span>{state.language === 'ur' ? `پارہ ${pNum}` : `Para ${pNum}`}</span>
+                      <span className="font-mono text-[10px] opacity-85">P{pRange.startPage}</span>
+                      {repDate && !isDue && (
+                        <span className="px-1 rounded bg-[#B91C1C] text-white text-[9px] font-extrabold">
+                          {t.repeatPrefix}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {activeManzilPara && (
+                <span className="text-[11px] text-[#5A4333] font-medium">
+                  {getParaSurahName(activeManzilPara)}
+                </span>
+              )}
+            </div>
+          )}
+
         <MushafViewer
           pageNumber={currentPage}
           onPageChange={setCurrentPage}
-          highlightRange={activeRange || undefined}
-          highlightRanges={
-            previewParaNum === null &&
-            effectivePart === 'manzil' &&
-            currentPartPlan?.assignedParas &&
-            currentPartPlan.assignedParas.length > 0
-              ? getManzilParaRanges(currentPartPlan.assignedParas, currentPartPlan.range)
+          highlightRange={mushafHighlightRange || undefined}
+          highlightRanges={undefined}
+          activeParaNumber={
+            previewParaNum !== null
+              ? previewParaNum
+              : effectivePart === 'manzil' && activeManzilPara
+              ? activeManzilPara
               : undefined
           }
+          manzilHeaderPara={manzilHeaderParaBadge}
           interactiveMode="view"
           currentMarks={activePartMarks}
           hideAndRevealActive={hideAndRevealActive}
           targetPulseWordId={pulsingWordId}
           language={state.language}
-          mushafLayout={student.mushafLayout || state.settings.mushafLayout || 'madinah'}
+          mushafLayout={activeLayout}
           onLayoutChange={l => handleUpdateMushafSettings({ mushafLayout: l })}
           mushafScript={state.settings.mushafScript || 'indopak'}
           onScriptChange={s => handleUpdateMushafSettings({ mushafScript: s })}

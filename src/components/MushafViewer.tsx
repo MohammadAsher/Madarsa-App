@@ -40,6 +40,18 @@ interface MushafViewerProps {
   onScriptChange?: (script: 'indopak' | 'uthmani') => void;
   highContrast?: boolean;
   onToggleHighContrast?: () => void;
+  // When opening a specific Para (e.g. Para 4 starting mid-Page 62), disambiguate shared-page Para header
+  activeParaNumber?: number | null;
+  // Whole-para Manzil shows a subtle "Manzil: Para N" badge in the page header instead of highlighting text
+  manzilHeaderPara?: number | null;
+}
+
+function resolvePageJuzList(page: MushafPage, activeParaNumber?: number | null): number[] {
+  const list = page.juzNumbers && page.juzNumbers.length > 0 ? page.juzNumbers : [page.juzNumber];
+  if (activeParaNumber && list.includes(activeParaNumber)) {
+    return [activeParaNumber];
+  }
+  return list;
 }
 
 function toArabicNumerals(num: number): string {
@@ -166,6 +178,8 @@ interface MushafPageSheetProps {
   onToggleRevealLine: (lineNum: number) => void;
   onToggleRevealWord: (wordId: string) => void;
   isOverlay?: boolean;
+  activeParaNumber?: number | null;
+  manzilHeaderPara?: number | null;
 }
 
 const MushafPageSheet: React.FC<MushafPageSheetProps> = ({
@@ -187,6 +201,8 @@ const MushafPageSheet: React.FC<MushafPageSheetProps> = ({
   onToggleRevealLine,
   onToggleRevealWord,
   isOverlay = false,
+  activeParaNumber = null,
+  manzilHeaderPara = null,
 }) => {
   const isOpeningSpread = page.pageNumber === 1 || page.pageNumber === 2;
 
@@ -482,14 +498,28 @@ const MushafPageSheet: React.FC<MushafPageSheetProps> = ({
         <div className="flex items-center justify-between gap-2">
           <div className="font-semibold flex items-center gap-1">
             <span>الجزء</span>
-            <span>{toArabicNumerals(page.juzNumber)}</span>
+            <span>{resolvePageJuzList(page, activeParaNumber).map(toArabicNumerals).join(' / ')}</span>
           </div>
           <div
-            className={`font-semibold text-sm md:text-base flex items-center gap-2 ${
+            className={`font-semibold text-sm md:text-base flex flex-wrap items-center justify-center gap-2 ${
               highContrast ? 'text-black' : 'text-[#111111]'
             }`}
           >
             <span>{page.surahArabicName || page.surahName}</span>
+            {manzilHeaderPara != null && (
+              <span
+                dir={language === 'ur' ? 'rtl' : 'ltr'}
+                className={`px-2 py-0.5 rounded border text-[10px] sm:text-[11px] font-sans font-bold whitespace-nowrap ${
+                  highContrast
+                    ? 'bg-[#0E3B2C] text-white border-[#0E3B2C]'
+                    : 'bg-[#E8F0EC] text-[#143429] border-[#2E6A54]/60'
+                }`}
+              >
+                {language === 'ur'
+                  ? `منزل: پارہ ${manzilHeaderPara}`
+                  : `Manzil: Para ${manzilHeaderPara}`}
+              </span>
+            )}
           </div>
           <div className="font-semibold flex items-center gap-1">
             <span>صفحة</span>
@@ -829,7 +859,7 @@ const MushafPageSheet: React.FC<MushafPageSheetProps> = ({
         }`}
       >
         <div className="font-semibold">
-          الجزء {toArabicNumerals(page.juzNumber)}
+          الجزء {resolvePageJuzList(page, activeParaNumber).map(toArabicNumerals).join(' / ')}
         </div>
         <div
           className={`font-semibold text-sm md:text-base flex items-center gap-1 tabular-nums ${
@@ -918,6 +948,8 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
   onScriptChange,
   highContrast: controlledHighContrast,
   onToggleHighContrast,
+  activeParaNumber = null,
+  manzilHeaderPara = null,
 }) => {
   const [internalLayout, setInternalLayout] = useState<'hafizi' | 'madinah'>('madinah');
   const [internalScript, setInternalScript] = useState<'indopak' | 'uthmani'>('indopak');
@@ -967,6 +999,9 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
   const animTimerRef = useRef<number | null>(null);
   const raf1Ref = useRef<number | null>(null);
   const raf2Ref = useRef<number | null>(null);
+
+  const [pageInput, setPageInput] = useState<string>(String(safePageNumber));
+  const isEditingPageInputRef = useRef<boolean>(false);
 
   const isAnimating = flipSession !== null;
 
@@ -1048,7 +1083,42 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
     [isAnimating, safePageNumber, startFlipAnimation, totalPages]
   );
 
-  // Sync when pageNumber prop changes externally (e.g., Jump to Mistake, Part Tab switch)
+  // Sync page input string when safePageNumber changes externally
+  useEffect(() => {
+    if (!isEditingPageInputRef.current) {
+      setPageInput(String(safePageNumber));
+    }
+  }, [safePageNumber]);
+
+  // Direct jump (used by Page Number input box so multi-page or mid-flip jumps never get blocked)
+  const jumpToPageDirect = useCallback(
+    (targetPage: number) => {
+      const clamped = Math.max(1, Math.min(totalPages, Math.floor(targetPage)));
+      setPageInput(String(clamped));
+      if (clamped === safePageNumber) return;
+      if (!isAnimating && Math.abs(clamped - safePageNumber) === 1) {
+        startFlipAnimation(safePageNumber, clamped, true);
+        return;
+      }
+      clearAnimationTimers();
+      setFlipSession(null);
+      lastTargetRef.current = clamped;
+      setBasePageNumber(clamped);
+      onPageChange(clamped);
+    },
+    [clearAnimationTimers, isAnimating, onPageChange, safePageNumber, startFlipAnimation, totalPages]
+  );
+
+  const commitPageInput = useCallback(() => {
+    const parsed = parseInt(pageInput.trim(), 10);
+    if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= totalPages) {
+      jumpToPageDirect(parsed);
+    } else {
+      setPageInput(String(safePageNumber));
+    }
+  }, [jumpToPageDirect, pageInput, safePageNumber, totalPages]);
+
+  // Sync when pageNumber prop changes externally (e.g., Jump to Mistake, Para Grid Tap, Part Tab switch)
   useEffect(() => {
     if (safePageNumber === lastTargetRef.current) return;
     const prev = lastTargetRef.current;
@@ -1190,8 +1260,26 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
             className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 text-xs md:text-sm min-w-0"
           >
             <span className={`font-bold ${highContrast ? 'text-[#0E3B2C]' : 'text-[#164A3B]'}`}>
-              {language === 'ur' ? `الجزء ${toArabicNumerals(headerPage.juzNumber)}` : `Para ${headerPage.juzNumber}`}
+              {(() => {
+                const displayJuzs = resolvePageJuzList(headerPage, activeParaNumber);
+                return language === 'ur'
+                  ? `الجزء ${displayJuzs.map(toArabicNumerals).join(' / ')}`
+                  : `Para ${displayJuzs.join(' / ')}`;
+              })()}
             </span>
+            {manzilHeaderPara != null && (
+              <span
+                className={`px-2 py-0.5 rounded-md border text-[11px] font-bold whitespace-nowrap ${
+                  highContrast
+                    ? 'bg-[#0E3B2C] text-white border-[#0E3B2C]'
+                    : 'bg-[#E8F0EC] text-[#143429] border-[#2E6A54]/60'
+                }`}
+              >
+                {language === 'ur'
+                  ? `منزل: پارہ ${manzilHeaderPara}`
+                  : `Manzil: Para ${manzilHeaderPara}`}
+              </span>
+            )}
             <span className="text-[#B88A36]" aria-hidden="true">·</span>
             <span className="font-bold text-[#111111] text-xs sm:text-sm md:text-base truncate max-w-[100px] sm:max-w-none">
               {headerPage.surahName}
@@ -1202,24 +1290,49 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
               </span>
             )}
             <span className="text-[#B88A36]" aria-hidden="true">·</span>
-            <div className="flex items-center gap-1">
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                isEditingPageInputRef.current = false;
+                commitPageInput();
+              }}
+              className="flex items-center gap-1"
+            >
               <span className="text-[#4A3D31] hidden sm:inline">{language === 'ur' ? 'صفحہ' : 'Page'}</span>
               <input
-                type="number"
-                min={1}
-                max={totalPages}
-                disabled={isAnimating}
-                value={safePageNumber}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                aria-label={language === 'ur' ? 'صفحہ نمبر' : 'Go to page'}
+                value={pageInput}
+                onFocus={e => {
+                  isEditingPageInputRef.current = true;
+                  e.target.select();
+                }}
                 onChange={e => {
-                  const val = parseInt(e.target.value, 10);
-                  if (!isNaN(val) && val >= 1 && val <= totalPages) {
-                    requestPageTurn(val);
+                  const digitsOnly = e.target.value.replace(/[^\d]/g, '');
+                  setPageInput(digitsOnly);
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    isEditingPageInputRef.current = false;
+                    commitPageInput();
+                    (e.currentTarget as HTMLInputElement).blur();
+                  } else if (e.key === 'Escape') {
+                    isEditingPageInputRef.current = false;
+                    setPageInput(String(safePageNumber));
+                    (e.currentTarget as HTMLInputElement).blur();
                   }
                 }}
-                className="w-12 sm:w-14 text-center py-1 px-1 border border-[#B88A36] rounded-md bg-white font-mono text-xs font-bold text-[#111111] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#164A3B] disabled:opacity-50"
+                onBlur={() => {
+                  isEditingPageInputRef.current = false;
+                  commitPageInput();
+                }}
+                className="w-12 sm:w-14 text-center py-1 px-1 border border-[#B88A36] rounded-md bg-white font-mono text-xs font-bold text-[#111111] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#164A3B]"
               />
               <span className="text-[#4A3D31] font-mono text-xs tabular-nums">/ {totalPages}</span>
-            </div>
+            </form>
           </div>
 
           <button
@@ -1355,6 +1468,8 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
           revealedWords={revealedWords}
           onToggleRevealLine={toggleRevealLine}
           onToggleRevealWord={toggleRevealWord}
+          activeParaNumber={activeParaNumber}
+          manzilHeaderPara={manzilHeaderPara}
         />
 
         {/* Soft moving page-turn cast shadow over the underlying page */}
@@ -1424,6 +1539,8 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
                 onToggleRevealLine={() => {}}
                 onToggleRevealWord={() => {}}
                 isOverlay
+                activeParaNumber={activeParaNumber}
+                manzilHeaderPara={manzilHeaderPara}
               />
               {/* Subtle curl lighting gradient across turning leaf */}
               {!prefersReducedMotion && (

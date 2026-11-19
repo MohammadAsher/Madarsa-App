@@ -5,6 +5,7 @@
 
 import {
   AssignmentRange,
+  DailyPartPlan,
   MadrasaState,
   MistakeMark,
   PartStatus,
@@ -556,8 +557,45 @@ export interface ManzilParaStates {
 }
 
 /**
+ * Returns true if a Manzil plan represents whole-para assignment(s) (via assignedParas checkboxes),
+ * vs a custom from-to sub-range inside completed para(s).
+ */
+export function isWholeParaManzilPlan(manzilPlan?: DailyPartPlan | null): boolean {
+  if (!manzilPlan) return false;
+  return Boolean(manzilPlan.assignedParas && manzilPlan.assignedParas.length > 0);
+}
+
+/**
+ * Resolves valid completed Para numbers referenced by a Manzil assignment for a given student.
+ * Returns [] if the student has 0 completed paras or the assignment points to uncompleted paras.
+ */
+export function getValidatedManzilParasForStudent(
+  student: StudentProfile,
+  manzilPlan?: DailyPartPlan | null
+): number[] {
+  if (!manzilPlan || student.studentType === 'nazra') return [];
+  const completedSet = new Set(student.completedParas || []);
+  if (completedSet.size === 0) return [];
+
+  if (manzilPlan.assignedParas && manzilPlan.assignedParas.length > 0) {
+    return Array.from(new Set(manzilPlan.assignedParas))
+      .filter(p => completedSet.has(p))
+      .sort((a, b) => a - b);
+  }
+
+  if (manzilPlan.range) {
+    const parasInRange = getManzilParasFromPlan([], manzilPlan.range);
+    if (parasInRange.length > 0 && parasInRange.every(p => completedSet.has(p))) {
+      return parasInRange;
+    }
+  }
+  return [];
+}
+
+/**
  * Computes which completed Paras are currently "Manzil due" (Amber) vs "Repeat" (Red)
  * for a given student on a given viewed date.
+ * - Strictly ONLY considers paras in `student.completedParas`! Uncompleted paras can NEVER be Manzil due or Repeat.
  * - While pending/in_progress on targetDate -> due (Amber)
  * - Once graded Pass -> removed from due & repeat -> reverts to Green
  * - Once graded Repeat -> enters repeatParas[para] = date -> turns Red with "Repeat: <date>"
@@ -569,6 +607,11 @@ export function computeManzilParaStates(
   targetDate: string
 ): ManzilParaStates {
   if (student.studentType === 'nazra') {
+    return { dueParas: [], repeatParas: {} };
+  }
+
+  const completedSet = new Set(student.completedParas || []);
+  if (completedSet.size === 0) {
     return { dueParas: [], repeatParas: {} };
   }
 
@@ -586,7 +629,7 @@ export function computeManzilParaStates(
     if (manzil.paraResults && Object.keys(manzil.paraResults).length > 0) {
       for (const [pKey, outcome] of Object.entries(manzil.paraResults)) {
         const pNum = parseInt(pKey, 10);
-        if (Number.isNaN(pNum) || pNum < 1 || pNum > 30) continue;
+        if (Number.isNaN(pNum) || pNum < 1 || pNum > 30 || !completedSet.has(pNum)) continue;
         resolvedDates[pNum] = dp.date;
         if (outcome === 'passed') {
           delete repeatMap[pNum];
@@ -595,7 +638,7 @@ export function computeManzilParaStates(
         }
       }
     } else if (manzil.status === 'passed' || manzil.status === 'repeat') {
-      const paras = getManzilParasFromPlan(manzil.assignedParas, manzil.range);
+      const paras = getValidatedManzilParasForStudent(student, manzil);
       for (const pNum of paras) {
         resolvedDates[pNum] = dp.date;
         if (manzil.status === 'passed') {
@@ -607,27 +650,26 @@ export function computeManzilParaStates(
     }
   }
 
-  // Merge any persisted repeat entries that have not been resolved at a later date
+  // Merge any persisted repeat entries that belong to completed paras and were not resolved later
   if (student.manzilRepeatParas) {
     for (const [pKey, repDate] of Object.entries(student.manzilRepeatParas)) {
       const pNum = parseInt(pKey, 10);
-      if (Number.isNaN(pNum) || !repDate || repDate > targetDate) continue;
+      if (Number.isNaN(pNum) || !repDate || repDate > targetDate || !completedSet.has(pNum)) continue;
       if (!resolvedDates[pNum] || repDate > resolvedDates[pNum]) {
         repeatMap[pNum] = repDate;
       }
     }
   }
 
-  // Active pending/in_progress assignment on targetDate turns those paras AMBER (Manzil due)
+  // Active pending/in_progress assignment on targetDate turns ONLY completed+assigned paras AMBER (Manzil due)
   const targetPlan = state.dailyPlans[student.id]?.[targetDate]?.manzil;
   const dueSet = new Set<number>();
   if (
     targetPlan &&
     (targetPlan.status === 'pending' || targetPlan.status === 'in_progress')
   ) {
-    const assigned = getManzilParasFromPlan(targetPlan.assignedParas, targetPlan.range);
+    const assigned = getValidatedManzilParasForStudent(student, targetPlan);
     for (const pNum of assigned) {
-      // Only show as due if this para hasn't already been individually resolved on this plan
       if (!targetPlan.paraResults?.[pNum]) {
         dueSet.add(pNum);
         delete repeatMap[pNum];
@@ -684,20 +726,21 @@ export function getNewSabaqPauseStatus(
   }
   const sabqiRepeatPending = Boolean(sabqiRepeatDate);
 
-  // 2. Track pending Manzil Repeat (stays pending even while re-assigned as 'pending' until actually marked 'passed')
+  // 2. Track pending Manzil Repeat (ONLY on completed paras; stays pending until actually marked 'passed')
+  const completedSet = new Set(student.completedParas || []);
   const repeatMap: Record<number, string> = {};
   const resolvedDates: Record<number, string> = {};
   let legacyManzilRepeatDate: string | null = null;
 
   for (const dp of studentPlans) {
     const manzil = dp.manzil;
-    if (!manzil) continue;
+    if (!manzil || completedSet.size === 0) continue;
 
     if (manzil.paraResults && Object.keys(manzil.paraResults).length > 0) {
       legacyManzilRepeatDate = null;
       for (const [pKey, outcome] of Object.entries(manzil.paraResults)) {
         const pNum = parseInt(pKey, 10);
-        if (Number.isNaN(pNum) || pNum < 1 || pNum > 30) continue;
+        if (Number.isNaN(pNum) || pNum < 1 || pNum > 30 || !completedSet.has(pNum)) continue;
         resolvedDates[pNum] = dp.date;
         if (outcome === 'passed') {
           delete repeatMap[pNum];
@@ -707,28 +750,24 @@ export function getNewSabaqPauseStatus(
       }
     } else if (manzil.status === 'passed') {
       legacyManzilRepeatDate = null;
-      const paras = getManzilParasFromPlan(manzil.assignedParas, manzil.range);
+      const paras = getValidatedManzilParasForStudent(student, manzil);
       for (const pNum of paras) {
         resolvedDates[pNum] = dp.date;
         delete repeatMap[pNum];
       }
     } else if (manzil.status === 'repeat') {
-      const paras = getManzilParasFromPlan(manzil.assignedParas, manzil.range);
-      if (paras.length > 0) {
-        for (const pNum of paras) {
-          resolvedDates[pNum] = dp.date;
-          repeatMap[pNum] = dp.date;
-        }
-      } else {
-        legacyManzilRepeatDate = dp.date;
+      const paras = getValidatedManzilParasForStudent(student, manzil);
+      for (const pNum of paras) {
+        resolvedDates[pNum] = dp.date;
+        repeatMap[pNum] = dp.date;
       }
     }
   }
 
-  if (student.manzilRepeatParas) {
+  if (student.manzilRepeatParas && completedSet.size > 0) {
     for (const [pKey, repDate] of Object.entries(student.manzilRepeatParas)) {
       const pNum = parseInt(pKey, 10);
-      if (Number.isNaN(pNum) || !repDate || repDate > targetDate) continue;
+      if (Number.isNaN(pNum) || !repDate || repDate > targetDate || !completedSet.has(pNum)) continue;
       if (hifzFreshDate && repDate < hifzFreshDate) continue;
       if (!resolvedDates[pNum] || repDate > resolvedDates[pNum]) {
         repeatMap[pNum] = repDate;

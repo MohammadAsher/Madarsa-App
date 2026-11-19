@@ -50,6 +50,17 @@ export function createEmptySabaqPlan(): DailyPartPlan {
   };
 }
 
+export function createEmptyManzilPlan(): DailyPartPlan {
+  return {
+    part: 'manzil',
+    range: null,
+    status: 'pending',
+    repeatPracticeCount: 0,
+    targetRepeats: 3,
+    assignedParas: [],
+  };
+}
+
 /**
  * Returns a clean DayPlan with empty Sabaq, Sabqi, and Manzil slots for a student with no prior plan on a date.
  */
@@ -65,14 +76,7 @@ export function createEmptyDayPlan(date: string, dayNumber?: number): DayPlan {
       repeatPracticeCount: 0,
       targetRepeats: 5,
     },
-    manzil: {
-      part: 'manzil',
-      range: null,
-      status: 'pending',
-      repeatPracticeCount: 0,
-      targetRepeats: 3,
-      assignedParas: [],
-    },
+    manzil: createEmptyManzilPlan(),
   };
 }
 
@@ -262,14 +266,7 @@ export function createInitialDemoState(timeZone: string = DEFAULT_SCHOOL_TIMEZON
           portionType: 'current_para_passed',
           portionLabel: 'Current Para Passed Sabaq (Page 1 - 2)',
         },
-        manzil: {
-          part: 'manzil',
-          range: makeRange(1, 2, 1, 1, 8, 2),
-          status: 'passed',
-          repeatPracticeCount: 3,
-          targetRepeats: 3,
-          assignedParas: [],
-        },
+        manzil: createEmptyManzilPlan(),
       },
       [today]: {
         date: today,
@@ -284,14 +281,7 @@ export function createInitialDemoState(timeZone: string = DEFAULT_SCHOOL_TIMEZON
           portionType: 'current_para_passed',
           portionLabel: 'Passed Sabaqs in Para 1 (P2:L3 - P2:L8)',
         },
-        manzil: {
-          part: 'manzil',
-          range: makeRange(1, 2, 1, 1, 8, 2),
-          status: 'pending',
-          repeatPracticeCount: 2,
-          targetRepeats: 5,
-          assignedParas: [],
-        },
+        manzil: createEmptyManzilPlan(),
       },
     },
 
@@ -398,14 +388,7 @@ export function createInitialDemoState(timeZone: string = DEFAULT_SCHOOL_TIMEZON
           portionType: 'current_para_passed',
           portionLabel: 'Passed Sabaqs in Para 1 (P2:L3 - P2:L8)',
         },
-        manzil: {
-          part: 'manzil',
-          range: makeRange(1, 2, 1, 1, 8, 2),
-          status: 'pending',
-          repeatPracticeCount: 1,
-          targetRepeats: 3,
-          assignedParas: [],
-        },
+        manzil: createEmptyManzilPlan(),
       },
       [today]: {
         date: today,
@@ -434,14 +417,7 @@ export function createInitialDemoState(timeZone: string = DEFAULT_SCHOOL_TIMEZON
           portionType: 'current_para_passed',
           portionLabel: 'Passed Sabaqs in Para 1 (P2:L3 - P2:L8)',
         },
-        manzil: {
-          part: 'manzil',
-          range: makeRange(1, 2, 1, 1, 8, 2),
-          status: 'pending',
-          repeatPracticeCount: 1,
-          targetRepeats: 3,
-          assignedParas: [],
-        },
+        manzil: createEmptyManzilPlan(),
       },
     },
 
@@ -841,7 +817,6 @@ export function syncStateToRealDate(
     } else {
       const pauseStatus = getNewSabaqPauseStatus(student, currentState, realToday);
       const shouldFreezeNewSabaq = pauseStatus.isPaused;
-      const manzilStatus = priorPlan.manzil?.status;
 
       const nextSabaqPlan: DailyPartPlan =
         !shouldFreezeNewSabaq &&
@@ -870,39 +845,7 @@ export function syncStateToRealDate(
         ? `Passed Sabaqs in Para ${student.currentJuz} (P${computedSabqi.range.start.page}:L${computedSabqi.range.start.line} - P${computedSabqi.range.end.page}:L${computedSabqi.range.end.line})`
         : priorPlan.sabqi?.portionLabel;
 
-      let nextManzilRange: AssignmentRange | null = priorPlan.manzil?.range
-        ? { ...priorPlan.manzil.range }
-        : null;
-      let nextAssignedParas = priorPlan.manzil?.assignedParas
-        ? [...priorPlan.manzil.assignedParas]
-        : [];
-      if (
-        manzilStatus === 'repeat' &&
-        priorPlan.manzil?.paraResults &&
-        Object.keys(priorPlan.manzil.paraResults).length > 0
-      ) {
-        const repeatParas = Object.entries(priorPlan.manzil.paraResults)
-          .filter(([, outcome]) => outcome === 'repeat')
-          .map(([p]) => parseInt(p, 10))
-          .filter(p => !Number.isNaN(p) && p >= 1 && p <= 30)
-          .sort((a, b) => a - b);
-        if (repeatParas.length > 0) {
-          nextAssignedParas = repeatParas;
-          nextManzilRange = buildManzilCombinedRange(repeatParas);
-        }
-      } else if (
-        manzilStatus === 'passed' &&
-        student.completedParas &&
-        student.completedParas.length > 0
-      ) {
-        const sortedCompleted = [...student.completedParas].sort((a, b) => a - b);
-        const currAssigned = nextAssignedParas[0];
-        const currIdx = sortedCompleted.indexOf(currAssigned);
-        const nextPara = sortedCompleted[(currIdx + 1) % sortedCompleted.length];
-        nextAssignedParas = [nextPara];
-        nextManzilRange = getFullParaRange(nextPara);
-      }
-
+      // Never auto-assign Manzil on rollover — Manzil is only due when the Ustaad explicitly assigns completed para(s).
       todayPlan = {
         date: realToday,
         sabaq: nextSabaqPlan,
@@ -923,22 +866,7 @@ export function syncStateToRealDate(
           portionType: computedSabqi ? 'current_para_passed' : priorPlan.sabqi?.portionType,
           portionLabel: nextSabqiLabel,
         },
-        manzil: {
-          part: 'manzil',
-          range: nextManzilRange,
-          status: 'pending',
-          repeatPracticeCount: 0,
-          targetRepeats: 5,
-          surahName: nextManzilRange?.surahName,
-          juzNumber: nextManzilRange?.juzNumber,
-          startPage: nextManzilRange?.startPage,
-          endPage: nextManzilRange?.endPage,
-          startLine: nextManzilRange?.startLine,
-          endLine: nextManzilRange?.endLine,
-          startAyah: nextManzilRange?.startAyah,
-          endAyah: nextManzilRange?.endAyah,
-          assignedParas: nextAssignedParas,
-        },
+        manzil: createEmptyManzilPlan(),
         sabaqFrozenDueToRevisionFail: shouldFreezeNewSabaq,
       };
     }
@@ -971,30 +899,161 @@ export function syncStateToRealDate(
 }
 
 /**
+ * Removes Manzil assignments pointing to paras that are NOT in the student's `completedParas`,
+ * across every student and every date. Leaves all other data untouched.
+ */
+export function cleanInvalidManzilAssignments(
+  currentState: MadrasaState
+): { state: MadrasaState; removedCount: number } {
+  let removedCount = 0;
+  let changed = false;
+  const updatedStudents = { ...currentState.students };
+  const updatedDailyPlans = { ...currentState.dailyPlans };
+
+  for (const [sid, student] of Object.entries(updatedStudents)) {
+    if (!student) continue;
+    const completedSet = new Set(student.completedParas || []);
+
+    // Clean manzilRepeatParas entries pointing to uncompleted paras
+    if (student.manzilRepeatParas && Object.keys(student.manzilRepeatParas).length > 0) {
+      const nextRepeatMap: Record<number, string> = {};
+      let repeatChanged = false;
+      for (const [pKey, dt] of Object.entries(student.manzilRepeatParas)) {
+        const pNum = parseInt(pKey, 10);
+        if (!Number.isNaN(pNum) && completedSet.has(pNum)) {
+          nextRepeatMap[pNum] = dt;
+        } else {
+          repeatChanged = true;
+        }
+      }
+      if (repeatChanged) {
+        updatedStudents[sid] = {
+          ...student,
+          manzilRepeatParas: nextRepeatMap,
+        };
+        changed = true;
+      }
+    }
+
+    const plansMap = updatedDailyPlans[sid];
+    if (!plansMap) continue;
+
+    let studentPlansChanged = false;
+    const nextPlansMap = { ...plansMap };
+
+    for (const [d, dp] of Object.entries(plansMap)) {
+      const m = dp?.manzil;
+      if (!m) continue;
+      const hasAssignment =
+        m.range !== null || (Array.isArray(m.assignedParas) && m.assignedParas.length > 0);
+      if (!hasAssignment) continue;
+
+      const referencedParas = getManzilParasFromPlan(m.assignedParas, m.range);
+      const allCompleted =
+        referencedParas.length > 0 && referencedParas.every(p => completedSet.has(p));
+
+      if (allCompleted) continue;
+
+      removedCount++;
+      studentPlansChanged = true;
+      changed = true;
+
+      if (Array.isArray(m.assignedParas) && m.assignedParas.length > 0) {
+        const validParas = Array.from(new Set(m.assignedParas))
+          .filter(p => completedSet.has(p))
+          .sort((a, b) => a - b);
+
+        if (validParas.length > 0) {
+          const rebuiltRange = buildManzilCombinedRange(validParas);
+          const nextParaResults = m.paraResults
+            ? Object.fromEntries(
+                Object.entries(m.paraResults).filter(([k]) =>
+                  completedSet.has(parseInt(k, 10))
+                )
+              )
+            : undefined;
+          nextPlansMap[d] = {
+            ...dp,
+            manzil: {
+              ...m,
+              range: rebuiltRange,
+              assignedParas: validParas,
+              paraResults:
+                nextParaResults && Object.keys(nextParaResults).length > 0
+                  ? nextParaResults
+                  : undefined,
+              surahName: rebuiltRange?.surahName,
+              juzNumber: rebuiltRange?.juzNumber,
+              startPage: rebuiltRange?.startPage,
+              endPage: rebuiltRange?.endPage,
+              startLine: rebuiltRange?.startLine,
+              endLine: rebuiltRange?.endLine,
+              startAyah: rebuiltRange?.startAyah,
+              endAyah: rebuiltRange?.endAyah,
+              portionLabel: `Para ${validParas.join(', ')}`,
+            },
+          };
+          continue;
+        }
+      }
+
+      // Otherwise entire Manzil assignment pointed to uncompleted para(s) -> clear it cleanly
+      nextPlansMap[d] = {
+        ...dp,
+        manzil: createEmptyManzilPlan(),
+      };
+    }
+
+    if (studentPlansChanged) {
+      updatedDailyPlans[sid] = nextPlansMap;
+    }
+  }
+
+  if (!changed) {
+    return { state: currentState, removedCount: 0 };
+  }
+  return {
+    state: {
+      ...currentState,
+      students: updatedStudents,
+      dailyPlans: updatedDailyPlans,
+    },
+    removedCount,
+  };
+}
+
+/**
  * Migrates any existing persisted students lacking studentType to 'hifz' by default,
  * initializes separate Sabqi/Manzil pause settings (ON by default),
+ * removes any Manzil assignments pointing to uncompleted paras,
  * and clears stale pause flags / resolved manzilRepeatParas entries when results are Passed.
  */
 export function migrateMadrasaState(currentState: MadrasaState): MadrasaState {
   let changed = false;
-  const updatedStudents = { ...currentState.students };
-  const defaultLayout = currentState.settings?.mushafLayout || 'madinah';
+  const { state: afterManzilClean, removedCount } = cleanInvalidManzilAssignments(currentState);
+  if (removedCount > 0 || afterManzilClean !== currentState) {
+    changed = true;
+  }
 
-  const legacyPause = currentState.settings?.freezeSabaqOnSabqiOrManzilFail ?? true;
-  const pauseSabqi = currentState.settings?.pauseNewSabaqOnSabqiRepeat ?? legacyPause;
-  const pauseManzil = currentState.settings?.pauseNewSabaqOnManzilRepeat ?? legacyPause;
+  const workingState = afterManzilClean;
+  const updatedStudents = { ...workingState.students };
+  const defaultLayout = workingState.settings?.mushafLayout || 'madinah';
+
+  const legacyPause = workingState.settings?.freezeSabaqOnSabqiOrManzilFail ?? true;
+  const pauseSabqi = workingState.settings?.pauseNewSabaqOnSabqiRepeat ?? legacyPause;
+  const pauseManzil = workingState.settings?.pauseNewSabaqOnManzilRepeat ?? legacyPause;
   const needsSettingsUpdate =
-    currentState.settings?.pauseNewSabaqOnSabqiRepeat === undefined ||
-    currentState.settings?.pauseNewSabaqOnManzilRepeat === undefined;
+    workingState.settings?.pauseNewSabaqOnSabqiRepeat === undefined ||
+    workingState.settings?.pauseNewSabaqOnManzilRepeat === undefined;
 
   const updatedSettings = needsSettingsUpdate
     ? {
-        ...currentState.settings,
+        ...workingState.settings,
         pauseNewSabaqOnSabqiRepeat: pauseSabqi,
         pauseNewSabaqOnManzilRepeat: pauseManzil,
         freezeSabaqOnSabqiOrManzilFail: pauseSabqi || pauseManzil,
       }
-    : currentState.settings;
+    : workingState.settings;
   if (needsSettingsUpdate) changed = true;
 
   for (const [id, student] of Object.entries(updatedStudents)) {
@@ -1005,7 +1064,7 @@ export function migrateMadrasaState(currentState: MadrasaState): MadrasaState {
     // Clean any stale entries from manzilRepeatParas that were subsequently marked 'passed'
     let cleanedRepeatParas = student.manzilRepeatParas;
     if (student.manzilRepeatParas && Object.keys(student.manzilRepeatParas).length > 0) {
-      const plans = Object.values(currentState.dailyPlans[id] || {}).sort((a, b) =>
+      const plans = Object.values(workingState.dailyPlans[id] || {}).sort((a, b) =>
         a.date.localeCompare(b.date)
       );
       const latestOutcomeByPara: Record<number, { date: string; outcome: 'passed' | 'repeat' }> = {};
@@ -1057,11 +1116,11 @@ export function migrateMadrasaState(currentState: MadrasaState): MadrasaState {
 
   // Reconcile any stale sabaqFrozenDueToRevisionFail flags against live repeat state
   const candidateState: MadrasaState = {
-    ...currentState,
+    ...workingState,
     settings: updatedSettings,
     students: updatedStudents,
   };
-  const updatedDailyPlans = { ...currentState.dailyPlans };
+  const updatedDailyPlans = { ...workingState.dailyPlans };
   for (const [sid, plansMap] of Object.entries(updatedDailyPlans)) {
     const student = updatedStudents[sid];
     if (!student || !plansMap) continue;

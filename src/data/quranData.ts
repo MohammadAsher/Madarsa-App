@@ -43,7 +43,8 @@ export interface MushafLine {
 
 export interface MushafPage {
   pageNumber: number;
-  juzNumber: number; // 1 to 30
+  juzNumber: number; // 1 to 30 (starting Juz of page)
+  juzNumbers?: number[]; // All Juz numbers present on this page (handles shared-page boundaries like P62, P121, P201, P502)
   surahName: string;
   surahArabicName: string;
   surahEnglishName?: string;
@@ -237,9 +238,24 @@ export function getPage(pageNumber: number): MushafPage {
     };
   });
 
+  const juzSeen = new Set<number>();
+  const juzNumbers: number[] = [];
+  for (const ln of lines) {
+    for (const w of ln.words) {
+      if (w.juzNumber >= 1 && w.juzNumber <= 30 && !juzSeen.has(w.juzNumber)) {
+        juzSeen.add(w.juzNumber);
+        juzNumbers.push(w.juzNumber);
+      }
+    }
+  }
+  if (juzNumbers.length === 0 && raw.j >= 1 && raw.j <= 30) {
+    juzNumbers.push(raw.j);
+  }
+
   const page: MushafPage = {
     pageNumber: raw.p,
     juzNumber: raw.j,
+    juzNumbers,
     surahName: raw.sn,
     surahArabicName: raw.sa,
     surahEnglishName: raw.sn,
@@ -433,9 +449,14 @@ export function getJuzMetadata(juzNumber: number): JuzInfo {
 }
 
 /**
- * Returns exact start and end page for a given Para (Juz) 1 to 30 from verified metadata
+ * Returns exact start and end page for a given Para (Juz) 1 to 30 from verified source layout metadata.
+ * Both 'madinah' (604p) and 'hafizi' fallback currently map to the verified 604-page quranMetadata.json source dataset
+ * until 610-page Hafizi layout data is added.
  */
-export function getParaPageRange(paraNumber: number): { startPage: number; endPage: number } {
+export function getParaPageRange(
+  paraNumber: number,
+  _layout: 'hafizi' | 'madinah' = 'madinah'
+): { startPage: number; endPage: number } {
   const info = getJuzMetadata(paraNumber);
   return { startPage: info.startPage, endPage: info.endPage };
 }

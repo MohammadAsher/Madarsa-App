@@ -19,6 +19,7 @@ export interface ParaProgressGridProps {
   onTapPara?: (paraNum: number) => void;
   compact?: boolean;
   isNazra?: boolean;
+  mushafLayout?: 'hafizi' | 'madinah';
 }
 
 export const ParaProgressGrid: React.FC<ParaProgressGridProps> = ({
@@ -34,6 +35,7 @@ export const ParaProgressGrid: React.FC<ParaProgressGridProps> = ({
   onTapPara,
   compact = false,
   isNazra = false,
+  mushafLayout = 'madinah',
 }) => {
   const isUr = language === 'ur';
   const repeatLabel = repeatPrefix || (isUr ? 'دہرائیں' : 'Repeat');
@@ -54,7 +56,7 @@ export const ParaProgressGrid: React.FC<ParaProgressGridProps> = ({
           const repeatDate = !isNazra ? manzilRepeatParas[paraNum] : undefined;
           const isManzilRepeat = !isNazra && !isManzilDue && Boolean(repeatDate);
           const isPreviewing = previewParaNum === paraNum;
-          const { startPage, endPage } = getParaPageRange(paraNum);
+          const { startPage, endPage } = getParaPageRange(paraNum, mushafLayout);
 
           // Color states:
           // 1. Manzil due (Hifz pending) -> solid amber/orange fill (#F59E0B) with dark text (#1C120C)

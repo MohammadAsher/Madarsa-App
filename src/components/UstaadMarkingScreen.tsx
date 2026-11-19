@@ -26,9 +26,10 @@ import { MushafViewer } from './MushafViewer';
 import { StudentTypeBadge } from './StudentTypeBadge';
 import { MushafWord, getParaSurahName, getParaPageRange } from '../data/quranData';
 import {
-  getManzilParaRanges,
   getManzilParasFromPlan,
   getMarkParaNumber,
+  getValidatedManzilParasForStudent,
+  isWholeParaManzilPlan,
 } from '../services/hifzService';
 import { translations } from '../i18n/translations';
 
@@ -66,15 +67,21 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
   const todayPlan = state.dailyPlans[student.id]?.[activeDate];
   const currentPartPlan = todayPlan ? todayPlan[effectivePart] : null;
 
+  const activeLayout = student.mushafLayout || state.settings.mushafLayout || 'madinah';
+
   // Active page state in Mushaf viewer
   const [currentPage, setCurrentPage] = useState<number>(
-    currentPartPlan?.range?.start.page || 1
+    currentPartPlan?.range?.start.page || getParaPageRange(student.currentJuz || 1, activeLayout).startPage
   );
+  const [activeManzilPara, setActiveManzilPara] = useState<number | null>(null);
 
   // Sync current page when active part, student, or date changes
   useEffect(() => {
+    setActiveManzilPara(null);
     if (currentPartPlan?.range) {
       setCurrentPage(currentPartPlan.range.start.page);
+    } else {
+      setCurrentPage(getParaPageRange(student.currentJuz || 1, activeLayout).startPage);
     }
   }, [effectivePart, student.id, activeDate]);
 
@@ -104,12 +111,18 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
   const isLimitReached = ghaltiCount >= ghaltiLimit || atkanCount >= atkanLimit;
   const suggestedResult: 'passed' | 'repeat' = isLimitReached ? 'repeat' : 'passed';
 
-  // Per-para breakdown when grading Manzil
+  // Per-para breakdown when grading Manzil (strictly validated against completedParas)
   const manzilParas =
     effectivePart === 'manzil'
-      ? getManzilParasFromPlan(currentPartPlan?.assignedParas, currentPartPlan?.range)
+      ? getValidatedManzilParasForStudent(student, currentPartPlan)
       : [];
+  const isWholeParaManzil =
+    effectivePart === 'manzil' && isWholeParaManzilPlan(currentPartPlan);
   const isMultiParaManzil = effectivePart === 'manzil' && manzilParas.length > 1;
+  const hasValidCurrentPartRange =
+    effectivePart === 'manzil'
+      ? Boolean(currentPartPlan?.range) && manzilParas.length > 0
+      : Boolean(currentPartPlan?.range);
 
   const getParaStats = (paraNum: number) => {
     const marksInPara = sessionMarks.filter(m => getMarkParaNumber(m) === paraNum);
@@ -393,13 +406,19 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
             </span>
             {manzilParas.map(pNum => {
               const stats = getParaStats(pNum);
-              const { startPage, endPage } = getParaPageRange(pNum);
-              const isInPara = currentPage >= startPage && currentPage <= endPage;
+              const { startPage, endPage } = getParaPageRange(pNum, activeLayout);
+              const isInPara =
+                activeManzilPara !== null
+                  ? activeManzilPara === pNum
+                  : currentPage >= startPage && currentPage <= endPage;
               return (
                 <button
                   key={pNum}
                   type="button"
-                  onClick={() => setCurrentPage(startPage)}
+                  onClick={() => {
+                    setActiveManzilPara(pNum);
+                    setCurrentPage(startPage);
+                  }}
                   className={`px-2 py-0.5 rounded-md border font-mono text-[11px] font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
                     isInPara
                       ? 'bg-[#241811] text-[#FCFAF6] border-[#C5A059]'
@@ -423,24 +442,24 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
 
       {/* Main Mushaf Listening Workspace */}
       <main className="flex-1 w-full max-w-5xl mx-auto px-1.5 sm:px-3 py-2 flex flex-col items-center">
-        {currentPartPlan?.range ? (
+        {currentPartPlan?.range && hasValidCurrentPartRange ? (
           <MushafViewer
             pageNumber={currentPage}
             onPageChange={setCurrentPage}
-            highlightRange={currentPartPlan.range}
-            highlightRanges={
-              effectivePart === 'manzil' &&
-              currentPartPlan.assignedParas &&
-              currentPartPlan.assignedParas.length > 0
-                ? getManzilParaRanges(currentPartPlan.assignedParas, currentPartPlan.range)
-                : undefined
+            highlightRange={isWholeParaManzil ? undefined : currentPartPlan.range}
+            highlightRanges={undefined}
+            manzilHeaderPara={
+              isWholeParaManzil ? activeManzilPara ?? manzilParas[0] ?? null : null
+            }
+            activeParaNumber={
+              effectivePart === 'manzil' ? activeManzilPara ?? manzilParas[0] ?? null : null
             }
             interactiveMode="marking"
             activeMarkTool={activeTool}
             currentMarks={sessionMarks}
             onWordClick={handleWordClick}
             language={state.language}
-            mushafLayout={student.mushafLayout || state.settings.mushafLayout || 'madinah'}
+            mushafLayout={activeLayout}
             onLayoutChange={l => onUpdateMushafSettings?.({ mushafLayout: l })}
             mushafScript={state.settings.mushafScript || 'indopak'}
             onScriptChange={s => onUpdateMushafSettings?.({ mushafScript: s })}
@@ -453,10 +472,14 @@ export const UstaadMarkingScreen: React.FC<UstaadMarkingScreenProps> = ({
           <div className="p-8 text-center text-[#7A6C60] bg-[#FCFAF6] rounded-2xl border border-[#DFCFA8] my-8 shadow-xs">
             <BookOpen className="w-10 h-10 text-[#C5A059] mx-auto mb-2" />
             <p className="text-sm font-semibold text-[#241811]">
-              {effectivePart === 'sabaq' ? t.sabaqNotAssignedYet : 'No assignment set for this part yet.'}
+              {effectivePart === 'sabaq'
+                ? t.sabaqNotAssignedYet
+                : effectivePart === 'manzil' && (student.completedParas?.length || 0) === 0
+                ? t.noCompletedParasYet
+                : 'No assignment set for this part yet.'}
             </p>
             <p className="text-xs text-[#7A6C60] mt-1">
-              Return to the Halqa dashboard to assign words on the Mushaf first.
+              Return to the Halqa dashboard to assign completed work on the Mushaf first.
             </p>
           </div>
         )}

@@ -39,8 +39,10 @@ import {
   computeManzilParaStates,
   getFullParaRange,
   getLatestUnpassedRepeatSabaq,
-  getManzilParaRanges,
+  getManzilParasFromPlan,
   getNewSabaqPauseStatus,
+  getValidatedManzilParasForStudent,
+  isWholeParaManzilPlan,
 } from '../services/hifzService';
 import { translations } from '../i18n/translations';
 
@@ -48,6 +50,7 @@ interface AssignWorkModalProps {
   state: MadrasaState;
   student: StudentProfile;
   initialPart?: PartType;
+  initialParaNum?: number;
   targetDate?: string;
   onClose: () => void;
   onSave: (
@@ -59,7 +62,6 @@ interface AssignWorkModalProps {
       assignedParas?: number[];
       portionType?: 'custom' | 'quarter_para' | 'half_para' | 'full_para' | 'current_para_passed';
       portionLabel?: string;
-      updatedCompletedParas?: number[];
       sabqiCustomOverride?: boolean;
       targetDate?: string;
     }
@@ -75,6 +77,7 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
   state,
   student,
   initialPart = 'sabaq',
+  initialParaNum,
   targetDate,
   onClose,
   onSave,
@@ -83,6 +86,7 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
   const isNazra = student.studentType === 'nazra';
   const [selectedPart, setSelectedPart] = useState<PartType>(isNazra ? 'sabaq' : initialPart);
   const effectivePart: PartType = isNazra ? 'sabaq' : selectedPart;
+  const activeLayout = student.mushafLayout || state.settings.mushafLayout || 'madinah';
   const t = translations[state.language];
   const activeDate = targetDate || state.currentDate;
 
@@ -104,16 +108,80 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
 
   const currentParaSabqi = computeCurrentParaSabqiRange(student, state, activeDate);
 
-  // If no Sabaq is assigned yet (and no prior Repeat Sabaq), open on student's current Para page for browsing ONLY
+  // Manzil strictly allows ONLY completed paras (no auto-default and no uncompleted-para selection)
+  const studentCompletedParas = React.useMemo(
+    () =>
+      Array.from(new Set(student.completedParas || []))
+        .filter(p => p >= 1 && p <= 30)
+        .sort((a, b) => a - b),
+    [student.completedParas]
+  );
+  const completedSet = React.useMemo(
+    () => new Set(studentCompletedParas),
+    [studentCompletedParas]
+  );
+  const hasCompletedParas = studentCompletedParas.length > 0;
+
+  const manzilState = isNazra
+    ? { dueParas: [], repeatParas: {} }
+    : computeManzilParaStates(student, state, activeDate);
+  const repeatParaNums = Object.keys(manzilState.repeatParas)
+    .map(k => parseInt(k, 10))
+    .filter(n => !Number.isNaN(n) && completedSet.has(n))
+    .sort((a, b) => a - b);
+
+  const validSavedManzilParas =
+    !isNazra && todayPlan?.manzil
+      ? getValidatedManzilParasForStudent(student, todayPlan.manzil)
+      : [];
+  const hasExistingCustomManzil =
+    hasCompletedParas &&
+    Boolean(todayPlan?.manzil?.range) &&
+    validSavedManzilParas.length > 0 &&
+    !isWholeParaManzilPlan(todayPlan?.manzil);
+
+  const initialAssignedManzilParas =
+    hasCompletedParas &&
+    todayPlan?.manzil?.assignedParas &&
+    todayPlan.manzil.assignedParas.length > 0
+      ? validSavedManzilParas
+      : [];
+
+  const [assignedManzilParas, setAssignedManzilParas] = useState<number[]>(initialAssignedManzilParas);
+  const [focusedParaNum, setFocusedParaNum] = useState<number | null>(
+    initialParaNum && completedSet.has(initialParaNum)
+      ? initialParaNum
+      : effectivePart === 'manzil'
+      ? initialAssignedManzilParas[0] || (hasCompletedParas ? studentCompletedParas[0] : null)
+      : null
+  );
+
+  // Open on the exact Para start page (initialParaNum, first assigned Manzil para, Sabqi start, Sabaq start, or currentJuz)
   const defaultBrowsePage =
-    initialSabaqRange?.start.page || getParaPageRange(student.currentJuz || 1).startPage;
+    initialParaNum && (effectivePart !== 'manzil' || completedSet.has(initialParaNum))
+      ? getParaPageRange(initialParaNum, activeLayout).startPage
+      : effectivePart === 'manzil' && hasExistingCustomManzil && todayPlan?.manzil?.range
+      ? todayPlan.manzil.range.start.page
+      : effectivePart === 'manzil' && initialAssignedManzilParas.length > 0
+      ? getParaPageRange(initialAssignedManzilParas[0], activeLayout).startPage
+      : effectivePart === 'sabqi' && (currentRange || currentParaSabqi?.range)
+      ? (currentRange || currentParaSabqi!.range).start.page
+      : initialSabaqRange?.start.page || getParaPageRange(student.currentJuz || 1, activeLayout).startPage;
 
   const [pageNumber, setPageNumber] = useState<number>(defaultBrowsePage);
   const [selectionStart, setSelectionStart] = useState<WordLocation | null>(
-    initialSabaqRange ? initialSabaqRange.start : null
+    effectivePart === 'manzil' && !hasExistingCustomManzil
+      ? null
+      : initialSabaqRange
+      ? initialSabaqRange.start
+      : null
   );
   const [selectionEnd, setSelectionEnd] = useState<WordLocation | null>(
-    initialSabaqRange ? initialSabaqRange.end : null
+    effectivePart === 'manzil' && !hasExistingCustomManzil
+      ? null
+      : initialSabaqRange
+      ? initialSabaqRange.end
+      : null
   );
 
   // Sabqi specific state
@@ -124,37 +192,16 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
     currentPlan?.juzNumber || student.currentJuz || 1
   );
 
-  // Manzil specific state (multi-select completed Paras)
-  const [completedParasState, setCompletedParasState] = useState<number[]>(
-    student.completedParas ? [...student.completedParas] : []
-  );
-  const manzilState = isNazra
-    ? { dueParas: [], repeatParas: {} }
-    : computeManzilParaStates(student, state, activeDate);
-  const repeatParaNums = Object.keys(manzilState.repeatParas)
-    .map(k => parseInt(k, 10))
-    .filter(n => !Number.isNaN(n))
-    .sort((a, b) => a - b);
-
-  const savedManzilParas = todayPlan?.manzil?.assignedParas;
-  const isManzilPendingOrActive =
-    todayPlan?.manzil?.status === 'pending' || todayPlan?.manzil?.status === 'in_progress';
-  const [assignedManzilParas, setAssignedManzilParas] = useState<number[]>(
-    isManzilPendingOrActive && savedManzilParas && savedManzilParas.length > 0
-      ? [...savedManzilParas].sort((a, b) => a - b)
-      : repeatParaNums.length > 0
-      ? repeatParaNums
-      : savedManzilParas && savedManzilParas.length > 0
-      ? [...savedManzilParas].sort((a, b) => a - b)
-      : completedParasState.slice(0, 1)
-  );
-  const [isEditingCompletedParas, setIsEditingCompletedParas] = useState<boolean>(false);
-  const [showManzilCustomRange, setShowManzilCustomRange] = useState<boolean>(false);
-  const [manzilUsingCustomRange, setManzilUsingCustomRange] = useState<boolean>(false);
+  const [showManzilCustomRange, setShowManzilCustomRange] = useState<boolean>(hasExistingCustomManzil);
+  const [manzilUsingCustomRange, setManzilUsingCustomRange] = useState<boolean>(hasExistingCustomManzil);
 
   // Tap handler on mushaf words: first tap sets start, second tap sets end!
   const handleWordClick = (word: MushafWord) => {
     if (isSabaqBlocked) return;
+    if (selectedPart === 'manzil') {
+      if (!hasCompletedParas || !showManzilCustomRange) return;
+      if (!completedSet.has(word.juzNumber)) return;
+    }
 
     const loc: WordLocation = {
       page: word.pageNumber,
@@ -212,8 +259,10 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
     setPageNumber(startPage);
   };
 
-  // Multi-select toggle for Manzil Paras: tapping toggles each completed Para on or off
+  // Multi-select toggle for Manzil Paras: ONLY completed paras can be toggled
   const toggleManzilPara = (paraNum: number) => {
+    if (!completedSet.has(paraNum)) return;
+    setShowManzilCustomRange(false);
     setManzilUsingCustomRange(false);
     setSelectionStart(null);
     setSelectionEnd(null);
@@ -222,23 +271,15 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
       const exists = prev.includes(paraNum);
       const next = exists
         ? prev.filter(p => p !== paraNum)
-        : [...prev, paraNum].sort((a, b) => a - b);
+        : [...prev, paraNum].filter(p => completedSet.has(p)).sort((a, b) => a - b);
 
       if (!exists) {
-        setPageNumber(getFullParaRange(paraNum).start.page);
+        setFocusedParaNum(paraNum);
+        setPageNumber(getParaPageRange(paraNum, activeLayout).startPage);
       } else if (next.length > 0) {
-        setPageNumber(getFullParaRange(next[0]).start.page);
+        setFocusedParaNum(next[0]);
+        setPageNumber(getParaPageRange(next[0], activeLayout).startPage);
       }
-      return next;
-    });
-  };
-
-  const toggleStudentCompletedPara = (paraNum: number) => {
-    setCompletedParasState(prev => {
-      const next = prev.includes(paraNum)
-        ? prev.filter(p => p !== paraNum)
-        : [...prev, paraNum].sort((a, b) => a - b);
-      setAssignedManzilParas(curr => curr.filter(p => next.includes(p)));
       return next;
     });
   };
@@ -260,13 +301,28 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
     }
 
     if (partKey === 'manzil') {
+      if (hasExistingCustomManzil && todayPlan?.manzil?.range) {
+        setShowManzilCustomRange(true);
+        setManzilUsingCustomRange(true);
+        setSelectionStart(todayPlan.manzil.range.start);
+        setSelectionEnd(todayPlan.manzil.range.end);
+        setFocusedParaNum(validSavedManzilParas[0] || null);
+        setPageNumber(todayPlan.manzil.range.start.page);
+        return;
+      }
+      setShowManzilCustomRange(false);
       setManzilUsingCustomRange(false);
       setSelectionStart(null);
       setSelectionEnd(null);
       if (assignedManzilParas.length > 0) {
-        setPageNumber(getFullParaRange(assignedManzilParas[0]).start.page);
-      } else if (todayPlan?.manzil?.range) {
-        setPageNumber(todayPlan.manzil.range.start.page);
+        setFocusedParaNum(assignedManzilParas[0]);
+        setPageNumber(getParaPageRange(assignedManzilParas[0], activeLayout).startPage);
+      } else if (hasCompletedParas) {
+        setFocusedParaNum(studentCompletedParas[0]);
+        setPageNumber(getParaPageRange(studentCompletedParas[0], activeLayout).startPage);
+      } else {
+        setFocusedParaNum(null);
+        setPageNumber(getParaPageRange(student.currentJuz || 1, activeLayout).startPage);
       }
       return;
     }
@@ -286,22 +342,49 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
     } else {
       setSelectionStart(null);
       setSelectionEnd(null);
+      setPageNumber(getParaPageRange(student.currentJuz || 1, activeLayout).startPage);
     }
   };
 
+  const validSelectedManzilParas = assignedManzilParas.filter(p => completedSet.has(p));
+
   const manzilCombinedRange =
-    selectedPart === 'manzil' && !manzilUsingCustomRange
-      ? buildManzilCombinedRange(assignedManzilParas)
+    selectedPart === 'manzil' && !manzilUsingCustomRange && hasCompletedParas
+      ? buildManzilCombinedRange(validSelectedManzilParas)
       : null;
 
-  const manzilHighlightRanges =
-    selectedPart === 'manzil' && !manzilUsingCustomRange && assignedManzilParas.length > 0
-      ? getManzilParaRanges(assignedManzilParas)
-      : undefined;
+  const manzilCustomRangeError = React.useMemo(() => {
+    if (selectedPart !== 'manzil' || !manzilUsingCustomRange) return null;
+    if (!hasCompletedParas) {
+      return t.noCompletedParasYet;
+    }
+    if (!selectionStart || !selectionEnd) return null;
+    const parasInRange = getManzilParasFromPlan([], {
+      start: selectionStart,
+      end: selectionEnd,
+      linesCount: 0,
+      surahName: '',
+      juzNumber: 1,
+      startPage: selectionStart.page,
+      endPage: selectionEnd.page,
+      startLine: selectionStart.line,
+      endLine: selectionEnd.line,
+    });
+    const uncompleted = parasInRange.filter(p => !completedSet.has(p));
+    if (uncompleted.length > 0) {
+      return state.language === 'ur'
+        ? `صرف مکمل شدہ پاروں میں منزل مقرر کی جا سکتی ہے (پارہ ${uncompleted.join(', ')} مکمل نہیں ہے)۔`
+        : `Manzil can only include completed paras (Para ${uncompleted.join(', ')} is not completed).`;
+    }
+    return null;
+  }, [selectedPart, manzilUsingCustomRange, hasCompletedParas, selectionStart, selectionEnd, completedSet, state.language, t.noCompletedParasYet]);
 
   const hasValidRange =
-    selectedPart === 'manzil' && !manzilUsingCustomRange
-      ? assignedManzilParas.length > 0 && Boolean(manzilCombinedRange)
+    selectedPart === 'manzil'
+      ? hasCompletedParas &&
+        (!manzilUsingCustomRange
+          ? validSelectedManzilParas.length > 0 && Boolean(manzilCombinedRange)
+          : Boolean(selectionStart && selectionEnd) && !manzilCustomRangeError)
       : Boolean(selectionStart && selectionEnd);
 
   const metadata =
@@ -313,11 +396,14 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
 
   const handleConfirm = (applyToAll: boolean) => {
     if (!hasValidRange || isSabaqBlocked) return;
+    if (selectedPart === 'manzil' && !hasCompletedParas) return;
 
     let range: AssignmentRange | null = null;
     if (selectedPart === 'manzil' && !manzilUsingCustomRange) {
+      if (validSelectedManzilParas.length === 0) return;
       range = manzilCombinedRange;
     } else if (selectionStart && selectionEnd) {
+      if (selectedPart === 'manzil' && manzilCustomRangeError) return;
       const calcMeta = getRangeMetadata(selectionStart, selectionEnd);
       range = {
         start: selectionStart,
@@ -336,6 +422,16 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
 
     if (!range) return;
 
+    // Final guard: every referenced Manzil para MUST be in studentCompletedParas
+    if (selectedPart === 'manzil') {
+      const checkParas = !manzilUsingCustomRange
+        ? validSelectedManzilParas
+        : getManzilParasFromPlan([], range);
+      if (checkParas.length === 0 || checkParas.some(p => !completedSet.has(p))) {
+        return;
+      }
+    }
+
     let portionLabel: string | undefined;
     let sabqiCustomOverride = false;
     if (selectedPart === 'sabqi') {
@@ -352,8 +448,8 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
       }
     } else if (selectedPart === 'manzil') {
       portionLabel =
-        assignedManzilParas.length > 0 && !manzilUsingCustomRange
-          ? `Para ${assignedManzilParas.join(', ')}`
+        validSelectedManzilParas.length > 0 && !manzilUsingCustomRange
+          ? `Para ${validSelectedManzilParas.join(', ')}`
           : `Pages ${range.startPage} - ${range.endPage}`;
     }
 
@@ -362,11 +458,10 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
         selectedPart === 'manzil'
           ? manzilUsingCustomRange
             ? []
-            : assignedManzilParas
+            : validSelectedManzilParas
           : undefined,
       portionType: selectedPart === 'sabqi' ? sabqiMode : undefined,
       portionLabel,
-      updatedCompletedParas: completedParasState,
       sabqiCustomOverride: selectedPart === 'sabqi' ? sabqiCustomOverride : undefined,
       targetDate: activeDate,
     });
@@ -638,224 +733,214 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
           {/* C. MANZIL CONTROLS */}
           {selectedPart === 'manzil' && (
             <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h4 className="text-xs font-bold text-[#241811]">{t.selectParasForManzil}</h4>
-                  <p className="text-[11px] text-[#7A6C60]">
-                    Tap completed Paras to toggle each one on or off ({completedParasState.length}{' '}
-                    completed · {assignedManzilParas.length} selected).
-                  </p>
+              {!hasCompletedParas ? (
+                <div className="p-3.5 rounded-xl bg-[#F8F4EC] border border-[#DFCFA8] text-xs font-bold text-[#7A6C60]">
+                  {t.noCompletedParasYet}
                 </div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-xs font-bold text-[#241811]">{t.selectParasForManzil}</h4>
+                      <p className="text-[11px] text-[#7A6C60]">
+                        Tap completed Paras to toggle each one on or off ({studentCompletedParas.length}{' '}
+                        completed · {validSelectedManzilParas.length} selected).
+                      </p>
+                    </div>
 
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowManzilCustomRange(p => {
-                        const next = !p;
-                        if (!next) {
-                          setManzilUsingCustomRange(false);
-                          setSelectionStart(null);
-                          setSelectionEnd(null);
-                        } else {
-                          setManzilUsingCustomRange(true);
-                          if (!selectionStart || !selectionEnd) {
-                            const seed =
-                              assignedManzilParas.length > 0
-                                ? getFullParaRange(assignedManzilParas[0])
-                                : getFullParaRange(1);
-                            setSelectionStart(seed.start);
-                            setSelectionEnd(seed.end);
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowManzilCustomRange(p => {
+                          const next = !p;
+                          if (!next) {
+                            setManzilUsingCustomRange(false);
+                            setSelectionStart(null);
+                            setSelectionEnd(null);
+                          } else {
+                            setManzilUsingCustomRange(true);
+                            const seedPara = validSelectedManzilParas[0] || studentCompletedParas[0];
+                            if ((!selectionStart || !selectionEnd) && seedPara) {
+                              const seed = getFullParaRange(seedPara);
+                              setSelectionStart(seed.start);
+                              setSelectionEnd(seed.end);
+                              setPageNumber(seed.start.page);
+                            }
                           }
-                        }
-                        return next;
-                      });
-                    }}
-                    className="text-xs text-[#1F4E3D] hover:text-[#241811] font-bold underline cursor-pointer"
-                  >
-                    {showManzilCustomRange ? 'Hide Custom Range' : t.manzilCustomSubRange}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingCompletedParas(prev => !prev)}
-                    className="text-xs text-[#8F6E2B] hover:text-[#241811] font-bold underline cursor-pointer"
-                  >
-                    {isEditingCompletedParas ? 'Done Managing' : t.manageCompletedParas}
-                  </button>
-                </div>
-              </div>
-
-              {isEditingCompletedParas ? (
-                <div className="p-3 bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl space-y-2">
-                  <div className="text-xs font-semibold text-[#42362E]">
-                    Check all Paras that {student.name} has memorized/completed:
+                          return next;
+                        });
+                      }}
+                      className="text-xs text-[#1F4E3D] hover:text-[#241811] font-bold underline cursor-pointer"
+                    >
+                      {showManzilCustomRange ? 'Hide Custom Range' : t.manzilCustomSubRange}
+                    </button>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {Array.from({ length: 30 }, (_, i) => i + 1).map(paraNum => {
-                      const isCompleted = completedParasState.includes(paraNum);
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {studentCompletedParas.map(paraNum => {
+                      const isAssigned =
+                        !manzilUsingCustomRange && validSelectedManzilParas.includes(paraNum);
+                      const repeatDate = manzilState.repeatParas[paraNum];
+                      const isRepeat = Boolean(repeatDate);
+
                       return (
                         <button
                           key={paraNum}
                           type="button"
-                          onClick={() => toggleStudentCompletedPara(paraNum)}
-                          className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-colors cursor-pointer ${
-                            isCompleted
-                              ? 'bg-[#1F4E3D] text-white border border-[#C5A059]'
-                              : 'bg-[#FCFAF6] border border-[#DFCFA8] text-[#5A4333] hover:bg-[#F3ECE1]'
+                          onClick={() => toggleManzilPara(paraNum)}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                            isAssigned
+                              ? 'bg-[#F59E0B] hover:bg-[#D97706] text-[#1C120C] border-2 border-[#B45309] shadow-md'
+                              : isRepeat
+                              ? 'bg-[#B91C1C] hover:bg-[#991B1B] text-white border-2 border-[#7F1D1D] shadow-md'
+                              : 'bg-[#1F4E3D] hover:bg-[#16382C] text-white border border-[#C5A059] shadow-xs'
                           }`}
                         >
-                          Para {paraNum} {isCompleted ? '✓' : ''}
+                          {isAssigned ? (
+                            <CheckSquare className="w-4 h-4 text-[#1C120C]" />
+                          ) : (
+                            <Square className="w-4 h-4 text-[#DFCFA8]" />
+                          )}
+                          <span>Para {paraNum}</span>
+                          <span
+                            className={`text-[10px] font-normal ${
+                              isAssigned
+                                ? 'text-[#451A03]'
+                                : isRepeat
+                                ? 'text-rose-100'
+                                : 'text-[#DFCFA8]'
+                            }`}
+                          >
+                            ({getParaSurahName(paraNum)})
+                          </span>
+                          {isRepeat && repeatDate && (
+                            <span className="ml-0.5 px-1.5 py-0.5 rounded bg-[#FEF2F2] text-[#7F1D1D] border border-[#7F1D1D]/40 text-[9px] font-extrabold">
+                              {t.repeatPrefix}: {repeatDate}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
                   </div>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-2">
-                  {completedParasState.length === 0 && repeatParaNums.length === 0 ? (
-                    <div className="text-xs text-[#7A6C60] italic">
-                      {t.noParasCompleted}. Finish a Para or click "{t.manageCompletedParas}".
-                    </div>
-                  ) : (
-                    Array.from(new Set([...completedParasState, ...repeatParaNums]))
-                      .sort((a, b) => a - b)
-                      .map(paraNum => {
-                        const isAssigned =
-                          !manzilUsingCustomRange && assignedManzilParas.includes(paraNum);
-                        const repeatDate = manzilState.repeatParas[paraNum];
-                        const isRepeat = Boolean(repeatDate);
 
-                        return (
-                          <button
-                            key={paraNum}
-                            type="button"
-                            onClick={() => toggleManzilPara(paraNum)}
-                            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                              isAssigned
-                                ? 'bg-[#F59E0B] hover:bg-[#D97706] text-[#1C120C] border-2 border-[#B45309] shadow-md'
-                                : isRepeat
-                                ? 'bg-[#B91C1C] hover:bg-[#991B1B] text-white border-2 border-[#7F1D1D] shadow-md'
-                                : 'bg-[#1F4E3D] hover:bg-[#16382C] text-white border border-[#C5A059] shadow-xs'
+                  {showManzilCustomRange && (
+                    <div className="space-y-2">
+                      <div className="p-2.5 bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl flex flex-wrap items-center gap-3 text-xs">
+                        <span className="font-bold text-[#241811]">From Page:</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={604}
+                          value={selectionStart?.page || 1}
+                          onChange={e => {
+                            setManzilUsingCustomRange(true);
+                            const p = Math.max(1, Math.min(604, parseInt(e.target.value, 10) || 1));
+                            const loc = getFirstWordOnOrAfter(p, selectionStart?.line || 1);
+                            setSelectionStart(loc);
+                            setPageNumber(p);
+                          }}
+                          className="w-16 px-2 py-1 border border-[#DFCFA8] rounded bg-white font-mono"
+                        />
+                        <span className="font-bold text-[#241811]">Line:</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={15}
+                          value={selectionStart?.line || 1}
+                          onChange={e => {
+                            setManzilUsingCustomRange(true);
+                            const l = Math.max(1, Math.min(15, parseInt(e.target.value, 10) || 1));
+                            const loc = getFirstWordOnOrAfter(selectionStart?.page || 1, l);
+                            setSelectionStart(loc);
+                          }}
+                          className="w-14 px-2 py-1 border border-[#DFCFA8] rounded bg-white font-mono"
+                        />
+                        <span className="text-[#C5A059] font-bold">→</span>
+                        <span className="font-bold text-[#241811]">To Page:</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={604}
+                          value={selectionEnd?.page || 1}
+                          onChange={e => {
+                            setManzilUsingCustomRange(true);
+                            const p = Math.max(1, Math.min(604, parseInt(e.target.value, 10) || 1));
+                            const loc = getLastWordOnOrBefore(p, selectionEnd?.line || 15);
+                            setSelectionEnd(loc);
+                          }}
+                          className="w-16 px-2 py-1 border border-[#DFCFA8] rounded bg-white font-mono"
+                        />
+                        <span className="font-bold text-[#241811]">Line:</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={15}
+                          value={selectionEnd?.line || 15}
+                          onChange={e => {
+                            setManzilUsingCustomRange(true);
+                            const l = Math.max(1, Math.min(15, parseInt(e.target.value, 10) || 15));
+                            const loc = getLastWordOnOrBefore(selectionEnd?.page || 1, l);
+                            setSelectionEnd(loc);
+                          }}
+                          className="w-14 px-2 py-1 border border-[#DFCFA8] rounded bg-white font-mono"
+                        />
+                      </div>
+
+                      {manzilCustomRangeError && (
+                        <div className="p-2.5 bg-[#FEF2F2] border border-[#B91C1C]/60 rounded-xl text-xs font-bold text-[#991B1B] flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-[#B91C1C] shrink-0" />
+                          <span>{manzilCustomRangeError}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {!manzilUsingCustomRange && validSelectedManzilParas.length > 0 && metadata ? (
+                    <div className="text-xs font-mono bg-[#EBF3EE] border border-[#2E6A54] p-2.5 rounded-lg text-[#143429] flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <strong>Manzil Target (tap to view / × to remove):</strong>
+                        {validSelectedManzilParas.map(p => (
+                          <span
+                            key={p}
+                            className={`inline-flex items-center rounded border font-bold overflow-hidden ${
+                              focusedParaNum === p
+                                ? 'bg-[#1F4E3D] text-white border-[#143429]'
+                                : 'bg-white border-[#2E6A54]/50 text-[#143429]'
                             }`}
                           >
-                            {isAssigned ? (
-                              <CheckSquare className="w-4 h-4 text-[#1C120C]" />
-                            ) : (
-                              <Square className="w-4 h-4 text-[#DFCFA8]" />
-                            )}
-                            <span>Para {paraNum}</span>
-                            <span
-                              className={`text-[10px] font-normal ${
-                                isAssigned
-                                  ? 'text-[#451A03]'
-                                  : isRepeat
-                                  ? 'text-rose-100'
-                                  : 'text-[#DFCFA8]'
-                              }`}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFocusedParaNum(p);
+                                setPageNumber(getParaPageRange(p, activeLayout).startPage);
+                              }}
+                              className="px-2 py-0.5 hover:underline cursor-pointer"
+                              title={`View Para ${p} on Mushaf`}
                             >
-                              ({getParaSurahName(paraNum)})
-                            </span>
-                            {isRepeat && repeatDate && (
-                              <span className="ml-0.5 px-1.5 py-0.5 rounded bg-[#FEF2F2] text-[#7F1D1D] border border-[#7F1D1D]/40 text-[9px] font-extrabold">
-                                {t.repeatPrefix}: {repeatDate}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })
+                              Para {p} (P{getParaPageRange(p, activeLayout).startPage})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleManzilPara(p)}
+                              className="px-1 py-0.5 hover:bg-rose-600 hover:text-white cursor-pointer transition-colors"
+                              title={`Remove Para ${p} from selection`}
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      <span className="font-bold text-[#1F4E3D]">{metadata.linesCount} lines total</span>
+                    </div>
+                  ) : (
+                    !manzilUsingCustomRange &&
+                    repeatParaNums.length > 0 && (
+                      <div className="text-xs text-[#78350F] bg-[#FEF3C7] border border-[#F59E0B]/50 px-3 py-1.5 rounded-lg font-semibold">
+                        Repeat pending on Para {repeatParaNums.join(', ')} — tap above to assign Manzil.
+                      </div>
+                    )
                   )}
-                </div>
-              )}
-
-              {showManzilCustomRange && (
-                <div className="p-2.5 bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl flex flex-wrap items-center gap-3 text-xs">
-                  <span className="font-bold text-[#241811]">From Page:</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={604}
-                    value={selectionStart?.page || 1}
-                    onChange={e => {
-                      setManzilUsingCustomRange(true);
-                      const p = Math.max(1, Math.min(604, parseInt(e.target.value, 10) || 1));
-                      const loc = getFirstWordOnOrAfter(p, selectionStart?.line || 1);
-                      setSelectionStart(loc);
-                      setPageNumber(p);
-                    }}
-                    className="w-16 px-2 py-1 border border-[#DFCFA8] rounded bg-white font-mono"
-                  />
-                  <span className="font-bold text-[#241811]">Line:</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={15}
-                    value={selectionStart?.line || 1}
-                    onChange={e => {
-                      setManzilUsingCustomRange(true);
-                      const l = Math.max(1, Math.min(15, parseInt(e.target.value, 10) || 1));
-                      const loc = getFirstWordOnOrAfter(selectionStart?.page || 1, l);
-                      setSelectionStart(loc);
-                    }}
-                    className="w-14 px-2 py-1 border border-[#DFCFA8] rounded bg-white font-mono"
-                  />
-                  <span className="text-[#C5A059] font-bold">→</span>
-                  <span className="font-bold text-[#241811]">To Page:</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={604}
-                    value={selectionEnd?.page || 1}
-                    onChange={e => {
-                      setManzilUsingCustomRange(true);
-                      const p = Math.max(1, Math.min(604, parseInt(e.target.value, 10) || 1));
-                      const loc = getLastWordOnOrBefore(p, selectionEnd?.line || 15);
-                      setSelectionEnd(loc);
-                    }}
-                    className="w-16 px-2 py-1 border border-[#DFCFA8] rounded bg-white font-mono"
-                  />
-                  <span className="font-bold text-[#241811]">Line:</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={15}
-                    value={selectionEnd?.line || 15}
-                    onChange={e => {
-                      setManzilUsingCustomRange(true);
-                      const l = Math.max(1, Math.min(15, parseInt(e.target.value, 10) || 15));
-                      const loc = getLastWordOnOrBefore(selectionEnd?.page || 1, l);
-                      setSelectionEnd(loc);
-                    }}
-                    className="w-14 px-2 py-1 border border-[#DFCFA8] rounded bg-white font-mono"
-                  />
-                </div>
-              )}
-
-              {!manzilUsingCustomRange && assignedManzilParas.length > 0 && metadata ? (
-                <div className="text-xs font-mono bg-[#EBF3EE] border border-[#2E6A54] p-2.5 rounded-lg text-[#143429] flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <strong>Manzil Target:</strong>
-                    {assignedManzilParas.map(p => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => toggleManzilPara(p)}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white border border-[#2E6A54]/50 text-[#143429] hover:bg-rose-50 hover:border-rose-400 hover:text-rose-800 font-bold cursor-pointer transition-colors"
-                        title={`Remove Para ${p} from selection`}
-                      >
-                        <span>Para {p}</span>
-                        <X className="w-3 h-3" />
-                      </button>
-                    ))}
-                  </div>
-                  <span className="font-bold text-[#1F4E3D]">{metadata.linesCount} lines total</span>
-                </div>
-              ) : (
-                !manzilUsingCustomRange &&
-                completedParasState.length > 0 && (
-                  <div className="text-xs text-[#78350F] bg-[#FEF3C7] border border-[#F59E0B]/50 px-3 py-1.5 rounded-lg font-semibold">
-                    No Para selected yet — tap one or more completed Paras above to assign Manzil.
-                  </div>
-                )
+                </>
               )}
             </div>
           )}
@@ -870,14 +955,35 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
             pageNumber={pageNumber}
             onPageChange={setPageNumber}
             selectionStart={
-              isSabaqBlocked ? null : manzilHighlightRanges ? null : selectionStart
+              isSabaqBlocked || (selectedPart === 'manzil' && !showManzilCustomRange)
+                ? null
+                : selectionStart
             }
-            selectionEnd={isSabaqBlocked ? null : manzilHighlightRanges ? null : selectionEnd}
-            highlightRanges={manzilHighlightRanges}
-            interactiveMode={isSabaqBlocked ? 'view' : 'assigning'}
+            selectionEnd={
+              isSabaqBlocked || (selectedPart === 'manzil' && !showManzilCustomRange)
+                ? null
+                : selectionEnd
+            }
+            highlightRanges={undefined}
+            manzilHeaderPara={
+              selectedPart === 'manzil' &&
+              !manzilUsingCustomRange &&
+              validSelectedManzilParas.length > 0
+                ? focusedParaNum && validSelectedManzilParas.includes(focusedParaNum)
+                  ? focusedParaNum
+                  : validSelectedManzilParas[0]
+                : null
+            }
+            activeParaNumber={focusedParaNum}
+            interactiveMode={
+              isSabaqBlocked ||
+              (selectedPart === 'manzil' && (!hasCompletedParas || !showManzilCustomRange))
+                ? 'view'
+                : 'assigning'
+            }
             onWordClick={handleWordClick}
             language={state.language}
-            mushafLayout={student.mushafLayout || state.settings.mushafLayout || 'madinah'}
+            mushafLayout={activeLayout}
             onLayoutChange={l => onUpdateMushafSettings?.({ mushafLayout: l })}
             mushafScript={state.settings.mushafScript || 'indopak'}
             onScriptChange={s => onUpdateMushafSettings?.({ mushafScript: s })}

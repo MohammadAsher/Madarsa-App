@@ -49,12 +49,15 @@ import { ChangeStudentTypeModal } from './ChangeStudentTypeModal';
 import { StudentTypeBadge } from './StudentTypeBadge';
 import { ParaProgressGrid } from './ParaProgressGrid';
 import { DateNavigator } from './DateNavigator';
+import { UstaadParaMushafModal } from './UstaadParaMushafModal';
 import {
   getParaCompletionStatus,
   computeCurrentParaSabqiRange,
   computeManzilParaStates,
   getManzilParasFromPlan,
   getNewSabaqPauseStatus,
+  getValidatedManzilParasForStudent,
+  isWholeParaManzilPlan,
 } from '../services/hifzService';
 import {
   createEmptyDayPlan,
@@ -122,7 +125,13 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
   const [assignModalTarget, setAssignModalTarget] = useState<{
     student: StudentProfile;
     initialPart: PartType;
+    initialParaNum?: number;
     targetDate?: string;
+  } | null>(null);
+  const [paraViewerTarget, setParaViewerTarget] = useState<{
+    student: StudentProfile;
+    initialPara: number;
+    targetDate: string;
   } | null>(null);
   const [showAssignByLinesModal, setShowAssignByLinesModal] = useState<boolean>(false);
   const [limitsStudent, setLimitsStudent] = useState<StudentProfile | null>(null);
@@ -597,7 +606,6 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
       assignedParas?: number[];
       portionType?: 'custom' | 'quarter_para' | 'half_para' | 'full_para' | 'current_para_passed';
       portionLabel?: string;
-      updatedCompletedParas?: number[];
       sabqiCustomOverride?: boolean;
       targetDate?: string;
     }
@@ -609,12 +617,26 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
             sid => part === 'sabaq' || prev.students[sid]?.studentType !== 'nazra'
           )
         : [targetStudentId];
-      // Enforce pause rule: never allow assigning a new Sabaq if Sabqi or Manzil Repeat is blocking
+
+      const referencedManzilParas =
+        part === 'manzil'
+          ? extraMetadata?.assignedParas && extraMetadata.assignedParas.length > 0
+            ? extraMetadata.assignedParas
+            : getManzilParasFromPlan([], range)
+          : [];
+
+      // Enforce pause rule + Manzil completed-paras validation
       const studentIdsToUpdate = candidateIds.filter(sid => {
         const st = prev.students[sid];
         if (!st) return false;
         if (part === 'sabaq' && getNewSabaqPauseStatus(st, prev, saveDate).isPaused) {
           return false;
+        }
+        if (part === 'manzil') {
+          if (st.studentType === 'nazra') return false;
+          const completedSet = new Set(st.completedParas || []);
+          if (completedSet.size === 0 || referencedManzilParas.length === 0) return false;
+          if (!referencedManzilParas.every(p => completedSet.has(p))) return false;
         }
         return true;
       });
@@ -657,17 +679,6 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
           },
         };
         newDailyPlans[sid] = studentHistory;
-
-        if (
-          extraMetadata?.updatedCompletedParas &&
-          newStudents[sid] &&
-          sid === targetStudentId
-        ) {
-          newStudents[sid] = {
-            ...newStudents[sid],
-            completedParas: extraMetadata.updatedCompletedParas,
-          };
-        }
       });
 
       return {
@@ -1141,7 +1152,19 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                   >
                     {visibleParts.map(partKey => {
                       const plan = viewedPlan ? viewedPlan[partKey] : null;
-                      const range = plan?.range || null;
+                      const rawRange = plan?.range || null;
+                      const hasCompletedParasForManzil = (student.completedParas?.length || 0) > 0;
+                      const validatedManzilParas =
+                        partKey === 'manzil' && plan
+                          ? getValidatedManzilParasForStudent(student, plan)
+                          : [];
+                      const isManzilNoCompleted =
+                        partKey === 'manzil' && !hasCompletedParasForManzil;
+                      const range =
+                        partKey === 'manzil' &&
+                        (!hasCompletedParasForManzil || validatedManzilParas.length === 0)
+                          ? null
+                          : rawRange;
                       const status = plan?.status || 'pending';
                       const daySessionResult = state.sessionResults.find(
                         r =>
@@ -1162,14 +1185,16 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                         daySessionResult?.atkanCount ??
                         dayMarksForPart.filter(m => m.type === 'atkan').length;
 
-                      let statusBadge = (
+                      let statusBadge: React.ReactNode = (
                         <span className="text-[11px] font-medium text-[#7A6C60] flex items-center gap-1">
                           <Clock className="w-3 h-3 text-[#7A6C60]" />
                           {t.status.pending}
                         </span>
                       );
 
-                      if (partKey === 'sabaq' && !range) {
+                      if (partKey === 'manzil' && !range) {
+                        statusBadge = null;
+                      } else if (partKey === 'sabaq' && !range) {
                         statusBadge = (
                           <span className="text-[10px] font-semibold text-[#78350F] bg-[#FEF3C7] px-1.5 py-0.5 rounded">
                             Empty
@@ -1207,10 +1232,9 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                             plan.portionLabel ||
                             `P${range.start.page} - P${range.end.page} (${range.linesCount}L)`;
                         } else if (partKey === 'manzil') {
-                          subtitle =
-                            plan.assignedParas && plan.assignedParas.length > 0
-                              ? `Assigned: Para ${plan.assignedParas.join(', ')}`
-                              : `P${range.start.page} - P${range.end.page}`;
+                          subtitle = isWholeParaManzilPlan(plan)
+                            ? `Assigned: Para ${validatedManzilParas.join(', ')}`
+                            : `Para ${validatedManzilParas.join(', ')} (P${range.start.page} - P${range.end.page})`;
                         }
                       }
 
@@ -1234,6 +1258,10 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                           {partKey === 'sabaq' && !range ? (
                             <div className="text-[11px] text-[#7A6C60] italic mt-1">
                               {t.sabaqNotAssignedYet}
+                            </div>
+                          ) : isManzilNoCompleted ? (
+                            <div className="text-[11px] text-[#7A6C60] font-medium mt-1">
+                              {t.noCompletedParasYet}
                             </div>
                           ) : range ? (
                             <div className="text-[11px] font-mono text-[#42362E] truncate font-medium mt-1">
@@ -1441,15 +1469,13 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                     manzilDuePrefix={t.manzilDuePrefix}
                     repeatPrefix={t.repeatPrefix}
                     isNazra={isNazra}
-                    onTapPara={
-                      isNazra
-                        ? undefined
-                        : () =>
-                            setAssignModalTarget({
-                              student,
-                              initialPart: 'manzil',
-                              targetDate: viewedDate,
-                            })
+                    mushafLayout={student.mushafLayout || state.settings.mushafLayout || 'madinah'}
+                    onTapPara={paraNum =>
+                      setParaViewerTarget({
+                        student,
+                        initialPara: paraNum,
+                        targetDate: viewedDate,
+                      })
                     }
                     compact
                   />
@@ -1556,12 +1582,34 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
         />
       )}
 
+      {/* Ustaad Para / Manzil Mushaf Viewer Modal (from 30-Para Grid tap) */}
+      {paraViewerTarget && (
+        <UstaadParaMushafModal
+          state={state}
+          student={state.students[paraViewerTarget.student.id] || paraViewerTarget.student}
+          initialPara={paraViewerTarget.initialPara}
+          targetDate={paraViewerTarget.targetDate}
+          onClose={() => setParaViewerTarget(null)}
+          onListenManzil={(st, dt) => handleStartMarkingStudent(st, 'manzil', dt)}
+          onAssignManzil={(st, pNum, dt) =>
+            setAssignModalTarget({
+              student: st,
+              initialPart: 'manzil',
+              initialParaNum: pNum,
+              targetDate: dt,
+            })
+          }
+          onUpdateMushafSettings={handleUpdateMushafSettings}
+        />
+      )}
+
       {/* Assign Work Modal */}
       {assignModalTarget && (
         <AssignWorkModal
           state={state}
           student={assignModalTarget.student}
           initialPart={assignModalTarget.initialPart}
+          initialParaNum={assignModalTarget.initialParaNum}
           targetDate={assignModalTarget.targetDate}
           onClose={() => setAssignModalTarget(null)}
           onSave={handleSaveAssignment}
