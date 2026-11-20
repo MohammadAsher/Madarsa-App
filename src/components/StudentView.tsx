@@ -22,6 +22,8 @@ import {
   BookmarkCheck,
   History,
   Grid,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   MadrasaState,
@@ -98,6 +100,8 @@ export const StudentView: React.FC<StudentViewProps> = ({
   // Active Manzil para switcher state when viewing Manzil (keeps tapped para first when multiple assigned)
   const [selectedManzilPara, setSelectedManzilPara] = useState<number | null>(null);
   const [manzilLeadPara, setManzilLeadPara] = useState<number | null>(null);
+  // Student portal keeps Completed Paras expanded by default
+  const [isStudentParaGridExpanded, setIsStudentParaGridExpanded] = useState<boolean>(true);
 
   const currentParaSabqi = isNazra ? null : computeCurrentParaSabqiRange(student, state, activeDate);
 
@@ -829,59 +833,103 @@ export const StudentView: React.FC<StudentViewProps> = ({
         </div>
       </div>
 
-      {/* Requirement D: 30-Tile Para Grid */}
-      <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-3.5 sm:p-5 shadow-xs space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-base font-bold text-[#241811] flex items-center gap-2">
-              <Grid className={`w-4 h-4 ${isNazra ? 'text-[#16365D]' : 'text-[#1F4E3D]'}`} />
-              <span>{isNazra ? t.parasReadInNazra : t.myCompletedParasTitle}</span>
-              <span
-                className={`text-xs font-mono px-2 py-0.5 rounded font-bold ${
-                  isNazra ? 'bg-[#E8EEF6] text-[#16365D]' : 'bg-[#E8F0EC] text-[#1F4E3D]'
-                }`}
-              >
-                {displayedParasCount} / 30
+      {/* 30-Para Compact Chip Grid (Expanded by default on Student Portal) */}
+      <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] shadow-xs">
+        <button
+          type="button"
+          aria-expanded={isStudentParaGridExpanded}
+          onClick={() => setIsStudentParaGridExpanded(prev => !prev)}
+          className="w-full px-3.5 sm:px-4 py-2.5 flex items-center justify-between gap-2 text-left cursor-pointer hover:bg-[#F8F4EC]/70 transition-colors rounded-2xl min-h-[40px]"
+        >
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 min-w-0">
+            <span className="text-sm font-bold text-[#241811] flex items-center gap-2 tabular-nums">
+              <Grid className={`w-4 h-4 shrink-0 ${isNazra ? 'text-[#16365D]' : 'text-[#1F4E3D]'}`} />
+              <span>
+                {isNazra ? t.parasReadInNazra : t.myCompletedParasTitle}{' '}
+                <span className={isNazra ? 'text-[#16365D]' : 'text-[#1F4E3D]'}>
+                  {displayedParasCount} / 30
+                </span>
               </span>
-            </h2>
-            <p className="text-xs text-[#7A6C60] mt-0.5">
-              {isNazra
-                ? state.language === 'ur'
-                  ? '۳۰ پارے · ناظرہ میں پڑھے گئے پارے نیلے رنگ میں ہیں۔ مصحف میں کھولنے کے لیے کلک کریں۔'
-                  : 'All 30 Paras · Paras read in Nazra are filled in blue. Tap any Para to open it in the Mushaf.'
-                : t.myCompletedParasHelp}
-            </p>
+            </span>
+
+            <span
+              aria-hidden="true"
+              className="w-20 sm:w-28 h-1.5 rounded-full bg-[#E5DEC9] overflow-hidden inline-block shrink-0"
+            >
+              <span
+                className={`block h-full rounded-full transition-all ${
+                  isNazra ? 'bg-[#16365D]' : 'bg-[#1F4E3D]'
+                }`}
+                style={{ width: `${Math.min(100, Math.round((displayedParasCount / 30) * 100))}%` }}
+              />
+            </span>
+
+            {!isNazra && (manzilState.dueParas.length > 0 || manzilRepeatEntries.length > 0) && (
+              <span className="text-xs font-bold text-[#92400E] tabular-nums">
+                {[
+                  manzilState.dueParas.length > 0
+                    ? state.language === 'ur'
+                      ? `${manzilState.dueParas.length} ${t.manzilDuePrefix}`
+                      : `${manzilState.dueParas.length} Manzil due`
+                    : '',
+                  manzilRepeatEntries.length > 0
+                    ? state.language === 'ur'
+                      ? `${manzilRepeatEntries.length} ${t.repeatPrefix}`
+                      : `${manzilRepeatEntries.length} Repeat`
+                    : '',
+                ]
+                  .filter(Boolean)
+                  .join(', ')}
+              </span>
+            )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            {!isNazra && manzilState.dueParas.length > 0 && (
-              <div className="px-3 py-1 rounded-lg bg-[#FEF3C7] border border-[#D97706] text-[#78350F] text-xs font-bold">
-                {t.manzilDuePrefix}: {activeDate} — Para {manzilState.dueParas.join(', ')}
-              </div>
+          <span className="text-[#7A6C60] shrink-0 flex items-center">
+            {isStudentParaGridExpanded ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
             )}
-            {!isNazra && manzilRepeatEntries.length > 0 && (
-              <div className="px-3 py-1 rounded-lg bg-[#B91C1C] border border-[#7F1D1D] text-white text-xs font-bold">
-                {t.repeatPrefix}:{' '}
-                {manzilRepeatEntries.map(([p, dt]) => `Para ${p} (${dt})`).join(', ')}
-              </div>
-            )}
-          </div>
-        </div>
+          </span>
+        </button>
 
-        <ParaProgressGrid
-          completedParas={isNazra ? student.nazraCompletedParas || [] : student.completedParas || []}
-          currentJuz={student.currentJuz}
-          manzilAssignedParas={manzilState.dueParas}
-          manzilRepeatParas={manzilState.repeatParas}
-          currentDate={activeDate}
-          language={state.language}
-          manzilDuePrefix={t.manzilDuePrefix}
-          repeatPrefix={t.repeatPrefix}
-          previewParaNum={previewParaNum ?? activeManzilPara}
-          onTapPara={handleTapParaTile}
-          isNazra={isNazra}
-          mushafLayout={activeLayout}
-        />
+        {isStudentParaGridExpanded && (
+          <div className="px-3.5 sm:px-4 pb-3.5 pt-2 border-t border-[#E8DCC4]/70 space-y-2">
+            {!isNazra && (manzilState.dueParas.length > 0 || manzilRepeatEntries.length > 0) && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+                {manzilState.dueParas.length > 0 && (
+                  <span className="font-bold text-[#92400E]">
+                    {t.manzilDuePrefix}: {activeDate} — Para {manzilState.dueParas.join(', ')}
+                  </span>
+                )}
+                {manzilRepeatEntries.length > 0 && (
+                  <span className="font-bold text-[#991B1B]">
+                    {t.repeatPrefix}:{' '}
+                    {manzilRepeatEntries.map(([p, dt]) => `Para ${p} (${dt})`).join(', ')}
+                  </span>
+                )}
+              </div>
+            )}
+
+            <ParaProgressGrid
+              completedParas={
+                isNazra ? student.nazraCompletedParas || [] : student.completedParas || []
+              }
+              currentJuz={student.currentJuz}
+              manzilAssignedParas={manzilState.dueParas}
+              manzilRepeatParas={manzilState.repeatParas}
+              currentDate={activeDate}
+              language={state.language}
+              manzilDuePrefix={t.manzilDuePrefix}
+              repeatPrefix={t.repeatPrefix}
+              previewParaNum={previewParaNum ?? activeManzilPara}
+              onTapPara={handleTapParaTile}
+              isNazra={isNazra}
+              mushafLayout={activeLayout}
+              compact
+            />
+          </div>
+        )}
       </div>
 
       {/* 2. Practice Toolbar: Repeat Counter & Hide-and-Reveal Mode */}

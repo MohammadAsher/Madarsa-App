@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   X,
   Sparkles,
@@ -12,8 +12,6 @@ import {
   Check,
   Layers,
   BookmarkCheck,
-  CheckSquare,
-  Square,
   AlertTriangle,
 } from 'lucide-react';
 import {
@@ -194,6 +192,26 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
 
   const [showManzilCustomRange, setShowManzilCustomRange] = useState<boolean>(hasExistingCustomManzil);
   const [manzilUsingCustomRange, setManzilUsingCustomRange] = useState<boolean>(hasExistingCustomManzil);
+
+  const [manzilChipTooltip, setManzilChipTooltip] = useState<number | null>(null);
+  const chipPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chipPressFiredRef = useRef<boolean>(false);
+  const chipAutoHideRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearChipTimers = () => {
+    if (chipPressTimerRef.current) {
+      clearTimeout(chipPressTimerRef.current);
+      chipPressTimerRef.current = null;
+    }
+    if (chipAutoHideRef.current) {
+      clearTimeout(chipAutoHideRef.current);
+      chipAutoHideRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => clearChipTimers();
+  }, []);
 
   // Tap handler on mushaf words: first tap sets start, second tap sets end!
   const handleWordClick = (word: MushafWord) => {
@@ -776,49 +794,150 @@ export const AssignWorkModal: React.FC<AssignWorkModalProps> = ({
                     </button>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    {studentCompletedParas.map(paraNum => {
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {studentCompletedParas.map((paraNum, idx) => {
                       const isAssigned =
                         !manzilUsingCustomRange && validSelectedManzilParas.includes(paraNum);
                       const repeatDate = manzilState.repeatParas[paraNum];
                       const isRepeat = Boolean(repeatDate);
+                      const { startPage, endPage } = getParaPageRange(paraNum, activeLayout);
+                      const surahName = getParaSurahName(paraNum);
+                      const isUr = state.language === 'ur';
+                      const statusLine = isAssigned
+                        ? isUr
+                          ? 'منزل کے لیے منتخب'
+                          : 'Selected for Manzil'
+                        : isRepeat && repeatDate
+                        ? `${t.repeatPrefix}: ${repeatDate}`
+                        : isUr
+                        ? 'مکمل شدہ'
+                        : 'Completed';
+                      const chipTitle = `${isUr ? `پارہ ${paraNum}` : `Para ${paraNum}`} (${surahName}) · ${
+                        isUr ? `صفحات ${startPage}–${endPage}` : `Pages ${startPage}–${endPage}`
+                      } · ${statusLine}`;
+                      const isTooltipOpen = manzilChipTooltip === paraNum;
 
                       return (
-                        <button
-                          key={paraNum}
-                          type="button"
-                          onClick={() => toggleManzilPara(paraNum)}
-                          className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                            isAssigned
-                              ? 'bg-[#F59E0B] hover:bg-[#D97706] text-[#1C120C] border-2 border-[#B45309] shadow-md'
-                              : isRepeat
-                              ? 'bg-[#B91C1C] hover:bg-[#991B1B] text-white border-2 border-[#7F1D1D] shadow-md'
-                              : 'bg-[#1F4E3D] hover:bg-[#16382C] text-white border border-[#C5A059] shadow-xs'
-                          }`}
-                        >
-                          {isAssigned ? (
-                            <CheckSquare className="w-4 h-4 text-[#1C120C]" />
-                          ) : (
-                            <Square className="w-4 h-4 text-[#DFCFA8]" />
-                          )}
-                          <span>Para {paraNum}</span>
-                          <span
-                            className={`text-[10px] font-normal ${
+                        <div key={paraNum} className="relative">
+                          <button
+                            type="button"
+                            aria-pressed={isAssigned}
+                            aria-label={chipTitle}
+                            title={chipTitle}
+                            onClick={e => {
+                              if (chipPressFiredRef.current) {
+                                e.preventDefault();
+                                chipPressFiredRef.current = false;
+                                return;
+                              }
+                              setManzilChipTooltip(null);
+                              toggleManzilPara(paraNum);
+                            }}
+                            onPointerEnter={e => {
+                              if (e.pointerType !== 'touch') {
+                                setManzilChipTooltip(paraNum);
+                              }
+                            }}
+                            onPointerLeave={e => {
+                              if (e.pointerType !== 'touch') {
+                                setManzilChipTooltip(curr => (curr === paraNum ? null : curr));
+                              }
+                            }}
+                            onFocus={() => setManzilChipTooltip(paraNum)}
+                            onBlur={() =>
+                              setManzilChipTooltip(curr => (curr === paraNum ? null : curr))
+                            }
+                            onTouchStart={() => {
+                              clearChipTimers();
+                              chipPressFiredRef.current = false;
+                              chipPressTimerRef.current = setTimeout(() => {
+                                chipPressFiredRef.current = true;
+                                setManzilChipTooltip(paraNum);
+                                chipAutoHideRef.current = setTimeout(() => {
+                                  setManzilChipTooltip(curr => (curr === paraNum ? null : curr));
+                                }, 2800);
+                              }, 400);
+                            }}
+                            onTouchMove={() => {
+                              if (chipPressTimerRef.current) {
+                                clearTimeout(chipPressTimerRef.current);
+                                chipPressTimerRef.current = null;
+                              }
+                            }}
+                            onTouchCancel={() => {
+                              if (chipPressTimerRef.current) {
+                                clearTimeout(chipPressTimerRef.current);
+                                chipPressTimerRef.current = null;
+                              }
+                            }}
+                            onTouchEnd={() => {
+                              if (chipPressTimerRef.current) {
+                                clearTimeout(chipPressTimerRef.current);
+                                chipPressTimerRef.current = null;
+                              }
+                            }}
+                            className={`min-w-[40px] min-h-[40px] sm:min-w-[36px] sm:min-h-[36px] sm:h-9 px-2 rounded-lg text-xs font-bold tabular-nums transition-all cursor-pointer flex items-center justify-center relative select-none ${
                               isAssigned
-                                ? 'text-[#451A03]'
+                                ? 'bg-[#F59E0B] hover:bg-[#D97706] text-[#1C120C] border-2 border-[#B45309] shadow-sm ring-2 ring-[#B45309]/30'
                                 : isRepeat
-                                ? 'text-rose-100'
-                                : 'text-[#DFCFA8]'
+                                ? 'bg-[#B91C1C] hover:bg-[#991B1B] text-white border-2 border-[#7F1D1D] shadow-xs'
+                                : 'bg-[#1F4E3D] hover:bg-[#16382C] text-white border border-[#C5A059] shadow-2xs'
                             }`}
                           >
-                            ({getParaSurahName(paraNum)})
-                          </span>
-                          {isRepeat && repeatDate && (
-                            <span className="ml-0.5 px-1.5 py-0.5 rounded bg-[#FEF2F2] text-[#7F1D1D] border border-[#7F1D1D]/40 text-[9px] font-extrabold">
-                              {t.repeatPrefix}: {repeatDate}
-                            </span>
+                            <span>{paraNum}</span>
+
+                            {isAssigned && (
+                              <span
+                                aria-hidden="true"
+                                className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#1C120C] text-[#FDE68A] border border-[#F59E0B] text-[8px] font-black leading-none flex items-center justify-center"
+                              >
+                                {isUr ? 'م' : 'M'}
+                              </span>
+                            )}
+
+                            {!isAssigned && isRepeat && (
+                              <span
+                                aria-hidden="true"
+                                className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#FEF2F2] text-[#7F1D1D] border border-[#7F1D1D] text-[8px] font-black leading-none flex items-center justify-center"
+                              >
+                                {isUr ? 'د' : 'R'}
+                              </span>
+                            )}
+                          </button>
+
+                          {isTooltipOpen && (
+                            <div
+                              role="tooltip"
+                              className={`pointer-events-none absolute z-50 top-full mt-1.5 ${
+                                idx === 0
+                                  ? 'left-0'
+                                  : idx >= studentCompletedParas.length - 2
+                                  ? 'right-0'
+                                  : 'left-1/2 -translate-x-1/2'
+                              } px-2.5 py-1.5 rounded-lg bg-[#241811] text-[#FCFAF6] border border-[#C5A059] shadow-lg text-[10px] leading-snug whitespace-nowrap`}
+                            >
+                              <div className="font-bold text-[#DFCFA8]">
+                                {isUr ? `پارہ ${paraNum}` : `Para ${paraNum}`} · {surahName}
+                              </div>
+                              <div className="font-mono text-[#FCFAF6]/90">
+                                {isUr
+                                  ? `صفحات ${startPage}–${endPage}`
+                                  : `Pages ${startPage}–${endPage}`}
+                              </div>
+                              <div
+                                className={`font-bold mt-0.5 ${
+                                  isAssigned
+                                    ? 'text-[#FCD34D]'
+                                    : isRepeat
+                                    ? 'text-[#FCA5A5]'
+                                    : 'text-[#86EFAC]'
+                                }`}
+                              >
+                                {statusLine}
+                              </div>
+                            </div>
                           )}
-                        </button>
+                        </div>
                       );
                     })}
                   </div>

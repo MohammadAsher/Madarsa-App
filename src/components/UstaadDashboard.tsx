@@ -23,6 +23,8 @@ import {
   Grid,
   UserPlus,
   ArrowLeftRight,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   MadrasaState,
@@ -141,6 +143,16 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
   const [changingTypeStudent, setChangingTypeStudent] = useState<StudentProfile | null>(null);
   const [typeFilter, setTypeFilter] = useState<'all' | StudentType>('all');
   const [pastDateByStudent, setPastDateByStudent] = useState<Record<string, string | undefined>>({});
+  const [expandedParaGridByStudent, setExpandedParaGridByStudent] = useState<
+    Record<string, boolean>
+  >({});
+
+  const toggleStudentParaGrid = (studentId: string) => {
+    setExpandedParaGridByStudent(prev => ({
+      ...prev,
+      [studentId]: !prev[studentId],
+    }));
+  };
 
   const getStudentViewedDate = (studentId: string): string => {
     const picked = pastDateByStudent[studentId];
@@ -998,7 +1010,7 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 gap-2.5 sm:gap-3">
           {filteredHalqaStudents.length === 0 && (
             <div className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] p-6 text-center text-xs text-[#7A6C60]">
               {state.language === 'ur'
@@ -1038,459 +1050,508 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
             const displayedParaList = isNazra
               ? student.nazraCompletedParas || []
               : student.completedParas || [];
+            const isParaGridExpanded = Boolean(expandedParaGridByStudent[student.id]);
+            const progressPct = Math.min(100, Math.round((displayedParaList.length / 30) * 100));
+
+            const dueCount = !isNazra ? manzilState.dueParas.length : 0;
+            const repeatCount = !isNazra ? manzilRepeatEntries.length : 0;
+            const barSummaryParts: string[] = [];
+            if (dueCount > 0) {
+              barSummaryParts.push(
+                state.language === 'ur'
+                  ? `${dueCount} ${t.manzilDuePrefix}`
+                  : `${dueCount} Manzil due`
+              );
+            }
+            if (repeatCount > 0) {
+              barSummaryParts.push(
+                state.language === 'ur' ? `${repeatCount} ${t.repeatPrefix}` : `${repeatCount} Repeat`
+              );
+            }
+            const barSummaryText = barSummaryParts.join(', ');
 
             return (
               <div
                 key={student.id}
-                className="bg-[#FCFAF6] rounded-2xl border border-[#E8DCC4] shadow-xs hover:shadow-md hover:border-[#C5A059]/60 transition-all p-3.5 sm:p-5 flex flex-col gap-3.5 sm:gap-4 relative overflow-hidden"
+                className="bg-[#FCFAF6] rounded-xl border border-[#E8DCC4] shadow-2xs hover:shadow-sm hover:border-[#C5A059]/60 transition-all p-2.5 sm:p-3.5 flex flex-col gap-2 relative"
               >
-                <div className="absolute top-0 left-6 right-6 h-0.5 bg-gradient-to-r from-transparent via-[#C5A059]/30 to-transparent" />
+                <div className="pointer-events-none absolute top-0 left-4 right-4 h-0.5 bg-gradient-to-r from-transparent via-[#C5A059]/30 to-transparent rounded-t-xl" />
 
-                {/* Card Date Bar: defaults to today; supports navigating to past dates cleanly */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[#E8DCC4]/70">
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[#7A6C60]">
-                    <span>
-                      {viewedDate === state.currentDate
-                        ? state.language === 'ur'
-                          ? 'آج کا ریکارڈ'
-                          : "Today's record"
-                        : state.language === 'ur'
-                        ? `سابقہ ریکارڈ: ${viewedDate}`
-                        : `Viewing record: ${viewedDate}`}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setChangingTypeStudent(student)}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-[#DFCFA8] bg-[#F8F4EC] hover:bg-[#F3ECE1] hover:border-[#C5A059] text-[#3E2B20] text-[10px] font-bold transition-colors cursor-pointer"
-                      title={t.changeTypeButton}
-                    >
-                      <ArrowLeftRight className="w-3 h-3 text-[#8F6E2B]" />
-                      <span>
-                        {t.changeTypeButton} ({isNazra ? t.studentTypeHifz : t.studentTypeNazra})
-                      </span>
-                    </button>
-                  </div>
-                  <DateNavigator
-                    selectedDate={viewedDate}
-                    todayDate={state.currentDate}
-                    onChangeDate={d => setStudentViewedDate(student.id, d)}
-                    language={state.language}
-                    compact
-                  />
-                </div>
-
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
-                  {/* Student Info */}
-                  <div className="md:w-1/4">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#2A1D15] text-[#DFCFA8] font-bold flex items-center justify-center text-sm shrink-0 border border-[#C5A059] shadow-2xs">
-                        {student.name.charAt(0)}
+                {/* Compact Student Header: Identity + Record Date + Quick Actions */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2 pb-1.5 border-b border-[#E8DCC4]/70">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-[#2A1D15] text-[#DFCFA8] font-bold flex items-center justify-center text-xs shrink-0 border border-[#C5A059] mt-0.5">
+                      {student.name.charAt(0)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <h3 className="font-bold text-[#241811] text-sm leading-tight">
+                          {state.language === 'ur' ? student.urduName : student.name}
+                        </h3>
+                        <StudentTypeBadge type={studentType} language={state.language} size="xs" />
+                        <span className="text-[11px] font-medium text-[#3E2B20] tabular-nums">
+                          ·{' '}
+                          {state.language === 'ur'
+                            ? `پارہ ${student.currentJuz}`
+                            : `Para ${student.currentJuz}`}
+                        </span>
+                        <span
+                          className={`text-[11px] font-bold tabular-nums ${
+                            isNazra ? 'text-[#16365D]' : 'text-[#1F4E3D]'
+                          }`}
+                        >
+                          · {displayedParaList.length}/30{' '}
+                          {isNazra
+                            ? state.language === 'ur'
+                              ? 'ناظرہ'
+                              : 'Nazra'
+                            : state.language === 'ur'
+                            ? 'مکمل'
+                            : 'Done'}
+                        </span>
+                        {hasOverriddenLimits && (
+                          <span className="text-[10px] text-[#8F6E2B] font-semibold">
+                            · Custom Limits
+                          </span>
+                        )}
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <h3 className="font-bold text-[#241811] text-sm md:text-base">
-                            {state.language === 'ur' ? student.urduName : student.name}
-                          </h3>
-                          <StudentTypeBadge type={studentType} language={state.language} />
-                        </div>
-                        <div className="text-xs text-[#7A6C60] flex flex-wrap items-center gap-1.5 mt-0.5">
-                          <span className="text-[#3E2B20] font-medium">
-                            {state.language === 'ur'
-                              ? `پارہ ${student.currentJuz}`
-                              : `Current: Para ${student.currentJuz}`}
-                          </span>
-                          <span className="text-[#C5A059]">·</span>
-                          <span
-                            className={`font-bold px-1.5 py-0.5 rounded text-[11px] ${
-                              isNazra
-                                ? 'text-[#16365D] bg-[#E8EEF6]'
-                                : 'text-[#1F4E3D] bg-[#E8F0EC]'
-                            }`}
-                          >
-                            {displayedParaList.length}{' '}
-                            {isNazra
-                              ? state.language === 'ur'
-                                ? 'ناظرہ پارے'
-                                : 'Nazra Read'
-                              : state.language === 'ur'
-                              ? 'پارے مکمل'
-                              : 'Paras Done'}
-                          </span>
-                          {hasOverriddenLimits && (
-                            <span className="text-[10px] text-[#8F6E2B] font-semibold bg-[#F5EFEB] px-1.5 py-0.5 rounded">
-                              Custom Limits
+
+                      {((!isNazra && currentParaSabqi) || lastTypeChange) && (
+                        <div className="text-[10px] text-[#5A4333] flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
+                          {!isNazra && currentParaSabqi && (
+                            <span className="font-mono">
+                              Sabqi: P{currentParaSabqi.range.start.page}:L
+                              {currentParaSabqi.range.start.line}–P
+                              {currentParaSabqi.range.end.page}:L
+                              {currentParaSabqi.range.end.line} ({currentParaSabqi.passedCount}{' '}
+                              passed)
+                            </span>
+                          )}
+                          {lastTypeChange && (
+                            <span className="text-[#7A6C60]">
+                              {!isNazra && currentParaSabqi ? '· ' : ''}
+                              {state.language === 'ur'
+                                ? `تبدیلی (${lastTypeChange.fromType === 'hifz' ? 'حفظ' : 'ناظرہ'} ← ${
+                                    lastTypeChange.toType === 'hifz' ? 'حفظ' : 'ناظرہ'
+                                  }): ${lastTypeChange.changedByUrdu || lastTypeChange.changedBy} · ${lastTypeChange.changedAt.slice(0, 10)}`
+                                : `Changed ${lastTypeChange.fromType}→${lastTypeChange.toType} by ${lastTypeChange.changedBy} (${lastTypeChange.changedAt.slice(0, 10)})`}
                             </span>
                           )}
                         </div>
-                        {!isNazra && currentParaSabqi && (
-                          <div className="text-[10px] text-[#5A4333] font-mono mt-1">
-                            Sabqi: P{currentParaSabqi.range.start.page}:L
-                            {currentParaSabqi.range.start.line}–P
-                            {currentParaSabqi.range.end.page}:L
-                            {currentParaSabqi.range.end.line} ({currentParaSabqi.passedCount}{' '}
-                            passed)
-                          </div>
-                        )}
-                        {lastTypeChange && (
-                          <div className="text-[10px] text-[#7A6C60] mt-1">
-                            {state.language === 'ur'
-                              ? `تبدیلی (${lastTypeChange.fromType === 'hifz' ? 'حفظ' : 'ناظرہ'} ← ${
-                                  lastTypeChange.toType === 'hifz' ? 'حفظ' : 'ناظرہ'
-                                }): ${lastTypeChange.changedByUrdu || lastTypeChange.changedBy} · ${lastTypeChange.changedAt.slice(0, 10)}`
-                              : `Changed ${lastTypeChange.fromType}→${lastTypeChange.toType} by ${lastTypeChange.changedBy} (${lastTypeChange.changedAt.slice(0, 10)})`}
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Daily Work Status: Sabaq, Sabqi, Manzil (Hifz) or Sabaq only (Nazra) */}
-                  <div
-                    className={`flex-1 grid grid-cols-1 gap-2.5 ${
-                      isNazra ? 'sm:grid-cols-1' : 'sm:grid-cols-3'
-                    }`}
-                  >
-                    {visibleParts.map(partKey => {
-                      const plan = viewedPlan ? viewedPlan[partKey] : null;
-                      const rawRange = plan?.range || null;
-                      const hasCompletedParasForManzil = (student.completedParas?.length || 0) > 0;
-                      const validatedManzilParas =
-                        partKey === 'manzil' && plan
-                          ? getValidatedManzilParasForStudent(student, plan)
-                          : [];
-                      const isManzilNoCompleted =
-                        partKey === 'manzil' && !hasCompletedParasForManzil;
-                      const range =
-                        partKey === 'manzil' &&
-                        (!hasCompletedParasForManzil || validatedManzilParas.length === 0)
-                          ? null
-                          : rawRange;
-                      const status = plan?.status || 'pending';
-                      const daySessionResult = state.sessionResults.find(
-                        r =>
-                          r.studentId === student.id &&
-                          r.date === viewedDate &&
-                          r.part === partKey
-                      );
-                      const dayMarksForPart = state.marksHistory.filter(
-                        m =>
-                          m.studentId === student.id &&
-                          m.date === viewedDate &&
-                          m.part === partKey
-                      );
-                      const ghaltiShown =
-                        daySessionResult?.ghaltiCount ??
-                        dayMarksForPart.filter(m => m.type === 'ghalti').length;
-                      const atkanShown =
-                        daySessionResult?.atkanCount ??
-                        dayMarksForPart.filter(m => m.type === 'atkan').length;
+                  {/* Date Navigator, Change Type & Action Buttons */}
+                  <div className="flex flex-wrap items-center justify-between lg:justify-end gap-1.5 shrink-0">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <DateNavigator
+                        selectedDate={viewedDate}
+                        todayDate={state.currentDate}
+                        onChangeDate={d => setStudentViewedDate(student.id, d)}
+                        language={state.language}
+                        compact
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setChangingTypeStudent(student)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-[#DFCFA8] bg-[#F8F4EC] hover:bg-[#F3ECE1] hover:border-[#C5A059] text-[#3E2B20] text-[10px] font-bold transition-colors cursor-pointer min-h-[30px]"
+                        title={t.changeTypeButton}
+                      >
+                        <ArrowLeftRight className="w-3 h-3 text-[#8F6E2B]" />
+                        <span>{isNazra ? t.studentTypeHifz : t.studentTypeNazra}</span>
+                      </button>
+                    </div>
 
-                      let statusBadge: React.ReactNode = (
-                        <span className="text-[11px] font-medium text-[#7A6C60] flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-[#7A6C60]" />
-                          {t.status.pending}
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAssignModalTarget({
+                            student,
+                            initialPart: 'sabaq',
+                            targetDate: viewedDate,
+                          })
+                        }
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#C5A059]/80 bg-[#2A1D15] hover:bg-[#38271D] text-[#FCFAF6] text-[11px] font-semibold transition-colors cursor-pointer min-h-[32px]"
+                        title={t.assignWork}
+                      >
+                        <BookOpen className="w-3 h-3 text-[#DFCFA8]" />
+                        <span>{t.assignWork}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setLimitsStudent(student)}
+                        className="p-1.5 rounded-lg border border-[#DFCFA8] bg-[#FAF6EF] hover:bg-[#F3ECE1] text-[#42362E] transition-colors cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center"
+                        title={t.limitsSettings}
+                      >
+                        <Sliders className="w-3.5 h-3.5 text-[#8F6E2B]" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setHistoryStudent(student)}
+                        className="p-1.5 rounded-lg border border-[#DFCFA8] bg-[#FAF6EF] hover:bg-[#F3ECE1] text-[#42362E] transition-colors cursor-pointer min-h-[32px] min-w-[32px] flex items-center justify-center"
+                        title={t.studentHistory}
+                      >
+                        <History className="w-3.5 h-3.5 text-[#8F6E2B]" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Compact Daily Work Status: Sabaq, Sabqi, Manzil (Hifz) or Sabaq only (Nazra) */}
+                <div
+                  className={`grid grid-cols-1 gap-2 ${
+                    isNazra ? 'sm:grid-cols-1' : 'sm:grid-cols-3'
+                  }`}
+                >
+                  {visibleParts.map(partKey => {
+                    const plan = viewedPlan ? viewedPlan[partKey] : null;
+                    const rawRange = plan?.range || null;
+                    const hasCompletedParasForManzil = (student.completedParas?.length || 0) > 0;
+                    const validatedManzilParas =
+                      partKey === 'manzil' && plan
+                        ? getValidatedManzilParasForStudent(student, plan)
+                        : [];
+                    const isManzilNoCompleted =
+                      partKey === 'manzil' && !hasCompletedParasForManzil;
+                    const range =
+                      partKey === 'manzil' &&
+                      (!hasCompletedParasForManzil || validatedManzilParas.length === 0)
+                        ? null
+                        : rawRange;
+                    const status = plan?.status || 'pending';
+                    const daySessionResult = state.sessionResults.find(
+                      r =>
+                        r.studentId === student.id &&
+                        r.date === viewedDate &&
+                        r.part === partKey
+                    );
+                    const dayMarksForPart = state.marksHistory.filter(
+                      m =>
+                        m.studentId === student.id &&
+                        m.date === viewedDate &&
+                        m.part === partKey
+                    );
+                    const ghaltiShown =
+                      daySessionResult?.ghaltiCount ??
+                      dayMarksForPart.filter(m => m.type === 'ghalti').length;
+                    const atkanShown =
+                      daySessionResult?.atkanCount ??
+                      dayMarksForPart.filter(m => m.type === 'atkan').length;
+
+                    let statusBadge: React.ReactNode = (
+                      <span className="text-[10px] font-medium text-[#7A6C60] flex items-center gap-0.5">
+                        <Clock className="w-2.5 h-2.5 text-[#7A6C60]" />
+                        {t.status.pending}
+                      </span>
+                    );
+
+                    if (partKey === 'manzil' && !range) {
+                      statusBadge = null;
+                    } else if (partKey === 'sabaq' && !range) {
+                      statusBadge = (
+                        <span className="text-[10px] font-semibold text-[#78350F] bg-[#FEF3C7] px-1.5 py-0.2 rounded">
+                          Empty
                         </span>
                       );
+                    } else if (status === 'passed') {
+                      statusBadge = (
+                        <span className="text-[10px] font-bold text-[#1F4E3D] flex items-center gap-0.5 bg-[#E8F0EC] px-1.5 py-0.2 rounded">
+                          <CheckCircle2 className="w-2.5 h-2.5 text-[#1F4E3D]" />
+                          {t.status.passed}
+                        </span>
+                      );
+                    } else if (status === 'repeat') {
+                      statusBadge = (
+                        <span className="text-[10px] font-bold text-[#991B1B] flex items-center gap-0.5 bg-[#FEE2E2] px-1.5 py-0.2 rounded">
+                          <XCircle className="w-2.5 h-2.5 text-[#991B1B]" />
+                          {t.status.repeat}
+                        </span>
+                      );
+                    } else if (status === 'in_progress') {
+                      statusBadge = (
+                        <span className="text-[10px] font-bold text-[#B45309] flex items-center gap-0.5 bg-[#FEF3C7] px-1.5 py-0.2 rounded">
+                          <Clock className="w-2.5 h-2.5 text-[#B45309]" />
+                          {t.status.in_progress}
+                        </span>
+                      );
+                    }
 
-                      if (partKey === 'manzil' && !range) {
-                        statusBadge = null;
-                      } else if (partKey === 'sabaq' && !range) {
-                        statusBadge = (
-                          <span className="text-[10px] font-semibold text-[#78350F] bg-[#FEF3C7] px-1.5 py-0.5 rounded">
-                            Empty
-                          </span>
-                        );
-                      } else if (status === 'passed') {
-                        statusBadge = (
-                          <span className="text-[11px] font-bold text-[#1F4E3D] flex items-center gap-1 bg-[#E8F0EC] px-1.5 py-0.5 rounded">
-                            <CheckCircle2 className="w-3 h-3 text-[#1F4E3D]" />
-                            {t.status.passed}
-                          </span>
-                        );
-                      } else if (status === 'repeat') {
-                        statusBadge = (
-                          <span className="text-[11px] font-bold text-[#991B1B] flex items-center gap-1 bg-[#FEE2E2] px-1.5 py-0.5 rounded">
-                            <XCircle className="w-3 h-3 text-[#991B1B]" />
-                            {t.status.repeat}
-                          </span>
-                        );
-                      } else if (status === 'in_progress') {
-                        statusBadge = (
-                          <span className="text-[11px] font-bold text-[#B45309] flex items-center gap-1 bg-[#FEF3C7] px-1.5 py-0.5 rounded">
-                            <Clock className="w-3 h-3 text-[#B45309]" />
-                            {t.status.in_progress}
-                          </span>
-                        );
+                    let subtitle = '';
+                    if (plan && range) {
+                      if (partKey === 'sabaq') {
+                        subtitle = `P${range.start.page}:L${range.start.line}–P${range.end.page}:L${range.end.line} (${range.linesCount}L)`;
+                      } else if (partKey === 'sabqi') {
+                        subtitle =
+                          plan.portionLabel ||
+                          `P${range.start.page}–P${range.end.page} (${range.linesCount}L)`;
+                      } else if (partKey === 'manzil') {
+                        subtitle = isWholeParaManzilPlan(plan)
+                          ? `Assigned: Para ${validatedManzilParas.join(', ')}`
+                          : `Para ${validatedManzilParas.join(', ')} (P${range.start.page}–P${range.end.page})`;
                       }
+                    }
 
-                      let subtitle = '';
-                      if (plan && range) {
-                        if (partKey === 'sabaq') {
-                          subtitle = `P${range.start.page}:L${range.start.line} - P${range.end.page}:L${range.end.line} (${range.linesCount}L)`;
-                        } else if (partKey === 'sabqi') {
-                          subtitle =
-                            plan.portionLabel ||
-                            `P${range.start.page} - P${range.end.page} (${range.linesCount}L)`;
-                        } else if (partKey === 'manzil') {
-                          subtitle = isWholeParaManzilPlan(plan)
-                            ? `Assigned: Para ${validatedManzilParas.join(', ')}`
-                            : `Para ${validatedManzilParas.join(', ')} (P${range.start.page} - P${range.end.page})`;
-                        }
-                      }
+                    return (
+                      <div
+                        key={partKey}
+                        className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-lg px-2.5 py-2 flex flex-col justify-between hover:bg-[#F3ECE1] transition-colors"
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-[11px] font-bold text-[#241811] capitalize flex items-center gap-1">
+                            {partKey === 'sabaq' && <Sparkles className="w-3 h-3 text-[#C5A059]" />}
+                            {partKey === 'sabqi' && <Layers className="w-3 h-3 text-[#8F6E2B]" />}
+                            {partKey === 'manzil' && (
+                              <BookmarkCheck className="w-3 h-3 text-[#1F4E3D]" />
+                            )}
+                            <span>{t.parts[partKey]}</span>
+                          </span>
+                          {statusBadge}
+                        </div>
 
-                      return (
-                        <div
-                          key={partKey}
-                          className="bg-[#F8F4EC] border border-[#DFCFA8] rounded-xl p-3 flex flex-col justify-between hover:bg-[#F3ECE1] transition-colors"
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-bold text-[#241811] capitalize flex items-center gap-1">
-                              {partKey === 'sabaq' && <Sparkles className="w-3 h-3 text-[#C5A059]" />}
-                              {partKey === 'sabqi' && <Layers className="w-3 h-3 text-[#8F6E2B]" />}
-                              {partKey === 'manzil' && (
-                                <BookmarkCheck className="w-3 h-3 text-[#1F4E3D]" />
-                              )}
-                              <span>{t.parts[partKey]}</span>
-                            </span>
-                            {statusBadge}
-                          </div>
-
+                        <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
                           {partKey === 'sabaq' && !range ? (
-                            <div className="text-[11px] text-[#7A6C60] italic mt-1">
+                            <span className="text-[11px] text-[#7A6C60] italic">
                               {t.sabaqNotAssignedYet}
-                            </div>
+                            </span>
                           ) : isManzilNoCompleted ? (
-                            <div className="text-[11px] text-[#7A6C60] font-medium mt-1">
+                            <span className="text-[11px] text-[#7A6C60] font-medium">
                               {t.noCompletedParasYet}
-                            </div>
+                            </span>
                           ) : range ? (
-                            <div className="text-[11px] font-mono text-[#42362E] truncate font-medium mt-1">
+                            <span className="text-[11px] font-mono text-[#42362E] truncate font-medium">
                               {subtitle}
-                            </div>
+                            </span>
                           ) : (
-                            <div className="text-[11px] text-[#A69888] italic mt-1">Not set</div>
+                            <span className="text-[11px] text-[#A69888] italic">Not set</span>
                           )}
 
                           {(daySessionResult || dayMarksForPart.length > 0) && (
-                            <div className="text-[10px] font-mono text-[#5A4333] mt-1">
+                            <span className="text-[10px] font-mono text-[#5A4333] shrink-0">
                               {t.ghaltiShort}: {ghaltiShown} · {t.atkanShort}: {atkanShown}
-                            </div>
-                          )}
-
-                          {partKey === 'manzil' &&
-                            plan?.paraResults &&
-                            Object.keys(plan.paraResults).length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1.5">
-                                {Object.entries(plan.paraResults)
-                                  .sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10))
-                                  .map(([pKey, outcome]) => (
-                                    <span
-                                      key={pKey}
-                                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
-                                        outcome === 'passed'
-                                          ? 'bg-[#E8F0EC] text-[#143429] border-[#2E6A54]/50'
-                                          : 'bg-[#FEE2E2] text-[#7F1D1D] border-[#B91C1C]/50'
-                                      }`}
-                                    >
-                                      {state.language === 'ur' ? `پارہ ${pKey}` : `P${pKey}`}:{' '}
-                                      {outcome === 'passed'
-                                        ? state.language === 'ur'
-                                          ? 'پاس'
-                                          : 'Pass'
-                                        : t.repeatPrefix}
-                                    </span>
-                                  ))}
-                              </div>
-                            )}
-
-                          {partKey === 'sabaq' && !range ? (
-                            hasRevisionFailFreeze && pauseStatus ? (
-                              <div className="mt-2.5 pt-1.5 border-t border-[#DFCFA8]/80 space-y-1">
-                                <button
-                                  type="button"
-                                  disabled
-                                  className="text-xs font-bold text-[#9A8B7A] flex items-center gap-1 cursor-not-allowed opacity-70"
-                                  title={pauseStatus.detailedReasons.join(' ')}
-                                >
-                                  <BookOpen className="w-3 h-3" />
-                                  <span>{t.assignSabaqButton}</span>
-                                </button>
-                                <div className="text-[10px] font-bold text-[#92400E] leading-snug">
-                                  {pauseStatus.detailedReasons.join(' ')}
-                                </div>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setAssignModalTarget({
-                                    student,
-                                    initialPart: 'sabaq',
-                                    targetDate: viewedDate,
-                                  })
-                                }
-                                className="mt-2.5 text-xs font-bold text-[#1F4E3D] hover:text-[#241811] flex items-center gap-1 cursor-pointer pt-1.5 border-t border-[#DFCFA8]/80 transition-colors"
-                              >
-                                <BookOpen className="w-3 h-3 text-[#1F4E3D]" />
-                                <span>{t.assignSabaqButton}</span>
-                              </button>
-                            )
-                          ) : (
-                            <div className="mt-2.5 pt-1.5 border-t border-[#DFCFA8]/80 flex items-center justify-between gap-2">
-                              <button
-                                type="button"
-                                disabled={!range}
-                                onClick={() =>
-                                  handleStartMarkingStudent(student, partKey, viewedDate)
-                                }
-                                className="text-xs font-bold text-[#241811] hover:text-[#8F6E2B] disabled:opacity-40 flex items-center gap-1 cursor-pointer transition-colors"
-                              >
-                                <Play className="w-3 h-3 fill-current text-[#C5A059]" />
-                                <span>{t.listenAndMark}</span>
-                              </button>
-                              <button
-                                type="button"
-                                disabled={partKey === 'sabaq' && hasRevisionFailFreeze}
-                                onClick={() =>
-                                  setAssignModalTarget({
-                                    student,
-                                    initialPart: partKey,
-                                    targetDate: viewedDate,
-                                  })
-                                }
-                                title={
-                                  partKey === 'sabaq' && hasRevisionFailFreeze && pauseStatus
-                                    ? pauseStatus.detailedReasons.join(' ')
-                                    : undefined
-                                }
-                                className="text-[11px] font-semibold text-[#8F6E2B] hover:text-[#241811] underline cursor-pointer disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
-                              >
-                                {range ? 'Change' : 'Assign'}
-                              </button>
-                            </div>
+                            </span>
                           )}
                         </div>
-                      );
-                    })}
-                  </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-2 md:w-auto shrink-0 justify-end pt-2 md:pt-0 border-t md:border-t-0 border-[#E8DCC4]">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setAssignModalTarget({
-                          student,
-                          initialPart: 'sabaq',
-                          targetDate: viewedDate,
-                        })
-                      }
-                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[#C5A059]/80 bg-[#2A1D15] hover:bg-[#38271D] text-[#FCFAF6] text-xs font-semibold transition-colors cursor-pointer shadow-xs min-h-[38px]"
-                      title={t.assignWork}
-                    >
-                      <BookOpen className="w-3.5 h-3.5 text-[#DFCFA8]" />
-                      <span>{t.assignWork}</span>
-                    </button>
+                        {partKey === 'manzil' &&
+                          plan?.paraResults &&
+                          Object.keys(plan.paraResults).length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {Object.entries(plan.paraResults)
+                                .sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10))
+                                .map(([pKey, outcome]) => (
+                                  <span
+                                    key={pKey}
+                                    className={`px-1.5 py-0.2 rounded text-[10px] font-bold border ${
+                                      outcome === 'passed'
+                                        ? 'bg-[#E8F0EC] text-[#143429] border-[#2E6A54]/50'
+                                        : 'bg-[#FEE2E2] text-[#7F1D1D] border-[#B91C1C]/50'
+                                    }`}
+                                  >
+                                    {state.language === 'ur' ? `پارہ ${pKey}` : `P${pKey}`}:{' '}
+                                    {outcome === 'passed'
+                                      ? state.language === 'ur'
+                                        ? 'پاس'
+                                        : 'Pass'
+                                      : t.repeatPrefix}
+                                  </span>
+                                ))}
+                            </div>
+                          )}
 
-                    <button
-                      type="button"
-                      onClick={() => setLimitsStudent(student)}
-                      className="p-2 rounded-xl border border-[#DFCFA8] bg-[#FAF6EF] hover:bg-[#F3ECE1] text-[#42362E] transition-colors cursor-pointer shadow-2xs min-h-[38px]"
-                      title={t.limitsSettings}
-                    >
-                      <Sliders className="w-4 h-4 text-[#8F6E2B]" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setHistoryStudent(student)}
-                      className="p-2 rounded-xl border border-[#DFCFA8] bg-[#FAF6EF] hover:bg-[#F3ECE1] text-[#42362E] transition-colors cursor-pointer shadow-2xs min-h-[38px]"
-                      title={t.studentHistory}
-                    >
-                      <History className="w-4 h-4 text-[#8F6E2B]" />
-                    </button>
-                  </div>
+                        {partKey === 'sabaq' && !range ? (
+                          hasRevisionFailFreeze && pauseStatus ? (
+                            <div className="mt-1.5 pt-1 border-t border-[#DFCFA8]/80 space-y-0.5">
+                              <button
+                                type="button"
+                                disabled
+                                className="text-[11px] font-bold text-[#9A8B7A] flex items-center gap-1 cursor-not-allowed opacity-70"
+                                title={pauseStatus.detailedReasons.join(' ')}
+                              >
+                                <BookOpen className="w-3 h-3" />
+                                <span>{t.assignSabaqButton}</span>
+                              </button>
+                              <div className="text-[10px] font-bold text-[#92400E] leading-snug">
+                                {pauseStatus.detailedReasons.join(' ')}
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAssignModalTarget({
+                                  student,
+                                  initialPart: 'sabaq',
+                                  targetDate: viewedDate,
+                                })
+                              }
+                              className="mt-1.5 pt-1 border-t border-[#DFCFA8]/80 text-[11px] font-bold text-[#1F4E3D] hover:text-[#241811] flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <BookOpen className="w-3 h-3 text-[#1F4E3D]" />
+                              <span>{t.assignSabaqButton}</span>
+                            </button>
+                          )
+                        ) : (
+                          <div className="mt-1.5 pt-1 border-t border-[#DFCFA8]/80 flex items-center justify-between gap-2">
+                            <button
+                              type="button"
+                              disabled={!range}
+                              onClick={() =>
+                                handleStartMarkingStudent(student, partKey, viewedDate)
+                              }
+                              className="text-[11px] font-bold text-[#241811] hover:text-[#8F6E2B] disabled:opacity-40 flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <Play className="w-2.5 h-2.5 fill-current text-[#C5A059]" />
+                              <span>{t.listenAndMark}</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={partKey === 'sabaq' && hasRevisionFailFreeze}
+                              onClick={() =>
+                                setAssignModalTarget({
+                                  student,
+                                  initialPart: partKey,
+                                  targetDate: viewedDate,
+                                })
+                              }
+                              title={
+                                partKey === 'sabaq' && hasRevisionFailFreeze && pauseStatus
+                                  ? pauseStatus.detailedReasons.join(' ')
+                                  : undefined
+                              }
+                              className="text-[11px] font-semibold text-[#8F6E2B] hover:text-[#241811] underline cursor-pointer disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
+                            >
+                              {range ? 'Change' : 'Assign'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
-                {/* Student 30-Para Progress Grid (Hifz shows Completed Paras & Manzil; Nazra hides Manzil and shows Nazra-read Paras) */}
-                <div className="bg-[#F8F4EC]/75 border border-[#E2D4B7] rounded-xl p-3 sm:p-3.5 space-y-2.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-xs font-bold text-[#241811] flex items-center gap-1.5">
-                      <Grid className={`w-3.5 h-3.5 ${isNazra ? 'text-[#16365D]' : 'text-[#1F4E3D]'}`} />
-                      <span>
-                        {isNazra
-                          ? t.parasReadInNazra
-                          : state.language === 'ur'
-                          ? 'مکمل شدہ پارے اور منزل'
-                          : 'Completed Paras & Manzil'}
+                {/* Thin Collapsible Completed Paras & Manzil Bar (Collapsed by default) */}
+                <div className="bg-[#F8F4EC]/75 border border-[#E2D4B7] rounded-lg">
+                  <button
+                    type="button"
+                    aria-expanded={isParaGridExpanded}
+                    onClick={() => toggleStudentParaGrid(student.id)}
+                    className="w-full px-2.5 py-1.5 flex items-center justify-between gap-2 text-left cursor-pointer hover:bg-[#F3ECE1]/70 transition-colors rounded-lg min-h-[34px]"
+                  >
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 min-w-0">
+                      <span className="text-[11px] sm:text-xs font-bold text-[#241811] flex items-center gap-1.5 tabular-nums">
+                        <Grid
+                          className={`w-3.5 h-3.5 shrink-0 ${
+                            isNazra ? 'text-[#16365D]' : 'text-[#1F4E3D]'
+                          }`}
+                        />
+                        <span>
+                          {isNazra
+                            ? t.parasReadInNazra
+                            : state.language === 'ur'
+                            ? 'مکمل شدہ پارے اور منزل'
+                            : 'Completed Paras & Manzil'}{' '}
+                          <span className={isNazra ? 'text-[#16365D]' : 'text-[#1F4E3D]'}>
+                            {displayedParaList.length} / 30
+                          </span>
+                        </span>
                       </span>
-                      <span
-                        className={`text-[11px] font-mono px-1.5 py-0.5 rounded font-bold ${
-                          isNazra
-                            ? 'bg-[#E8EEF6] text-[#16365D]'
-                            : 'bg-[#E8F0EC] text-[#1F4E3D]'
-                        }`}
-                      >
-                        {displayedParaList.length} / 30
-                      </span>
-                    </div>
 
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {!isNazra && manzilState.dueParas.length > 0 && (
-                        <span className="px-2.5 py-0.5 rounded-md bg-[#F59E0B] border border-[#B45309] text-[#1C120C] text-[11px] font-bold">
-                          {t.manzilDuePrefix}: {viewedDate} — Para{' '}
-                          {manzilState.dueParas.join(', ')}
+                      {/* Small progress line */}
+                      <span
+                        aria-hidden="true"
+                        className="w-16 sm:w-24 h-1.5 rounded-full bg-[#E5DEC9] overflow-hidden inline-block shrink-0"
+                      >
+                        <span
+                          className={`block h-full rounded-full transition-all ${
+                            isNazra ? 'bg-[#16365D]' : 'bg-[#1F4E3D]'
+                          }`}
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </span>
+
+                      {barSummaryText && (
+                        <span className="text-[11px] font-bold text-[#92400E] tabular-nums">
+                          {barSummaryText}
                         </span>
                       )}
-                      {!isNazra && manzilRepeatEntries.length > 0 && (
-                        <span className="px-2.5 py-0.5 rounded-md bg-[#B91C1C] border border-[#7F1D1D] text-white text-[11px] font-bold">
-                          {t.repeatPrefix}:{' '}
-                          {manzilRepeatEntries
-                            .map(([p, dt]) => `Para ${p} (${dt})`)
-                            .join(', ')}
-                        </span>
-                      )}
+
                       {hasRevisionFailFreeze && pauseStatus && (
-                        <span className="px-2.5 py-0.5 rounded-md bg-[#FEF3C7] border border-[#D97706] text-[#78350F] text-[11px] font-bold flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3 text-[#B45309]" />
+                        <span className="text-[10px] font-bold text-[#991B1B] inline-flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3 shrink-0" />
                           <span>{pauseStatus.reasons.join(' · ')}</span>
                         </span>
                       )}
                     </div>
-                  </div>
 
-                  <ParaProgressGrid
-                    completedParas={displayedParaList}
-                    currentJuz={student.currentJuz}
-                    manzilAssignedParas={manzilState.dueParas}
-                    manzilRepeatParas={manzilState.repeatParas}
-                    currentDate={viewedDate}
-                    language={state.language}
-                    manzilDuePrefix={t.manzilDuePrefix}
-                    repeatPrefix={t.repeatPrefix}
-                    isNazra={isNazra}
-                    mushafLayout={student.mushafLayout || state.settings.mushafLayout || 'madinah'}
-                    onTapPara={paraNum =>
-                      setParaViewerTarget({
-                        student,
-                        initialPara: paraNum,
-                        targetDate: viewedDate,
-                      })
-                    }
-                    compact
-                  />
+                    <span className="text-[#7A6C60] shrink-0 flex items-center">
+                      {isParaGridExpanded ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
+                    </span>
+                  </button>
+
+                  {isParaGridExpanded && (
+                    <div className="px-2.5 pb-2.5 pt-2 border-t border-[#E2D4B7]/70 space-y-2">
+                      {(manzilState.dueParas.length > 0 || manzilRepeatEntries.length > 0) &&
+                        !isNazra && (
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]">
+                            {manzilState.dueParas.length > 0 && (
+                              <span className="font-bold text-[#92400E]">
+                                {t.manzilDuePrefix}: {viewedDate} — Para{' '}
+                                {manzilState.dueParas.join(', ')}
+                              </span>
+                            )}
+                            {manzilRepeatEntries.length > 0 && (
+                              <span className="font-bold text-[#991B1B]">
+                                {t.repeatPrefix}:{' '}
+                                {manzilRepeatEntries
+                                  .map(([p, dt]) => `Para ${p} (${dt})`)
+                                  .join(', ')}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                      <ParaProgressGrid
+                        completedParas={displayedParaList}
+                        currentJuz={student.currentJuz}
+                        manzilAssignedParas={manzilState.dueParas}
+                        manzilRepeatParas={manzilState.repeatParas}
+                        currentDate={viewedDate}
+                        language={state.language}
+                        manzilDuePrefix={t.manzilDuePrefix}
+                        repeatPrefix={t.repeatPrefix}
+                        isNazra={isNazra}
+                        mushafLayout={student.mushafLayout || state.settings.mushafLayout || 'madinah'}
+                        onTapPara={paraNum =>
+                          setParaViewerTarget({
+                            student,
+                            initialPara: paraNum,
+                            targetDate: viewedDate,
+                          })
+                        }
+                        compact
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Para Completion & "Start New Para" Section */}
                 {paraStatus.isParaFinished && (
                   <div
-                    className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                    className={`p-2.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
                       paraStatus.canStartNewPara
                         ? 'bg-[#EBF3EE] border-[#2E6A54]'
                         : 'bg-[#FEF3C7] border-[#D97706]'
                     }`}
                   >
-                    <div className="flex items-start gap-2.5 text-xs">
+                    <div className="flex items-start gap-2 text-xs">
                       {paraStatus.canStartNewPara ? (
                         <Award className="w-4 h-4 text-[#1F4E3D] shrink-0 mt-0.5" />
                       ) : (
@@ -1543,13 +1604,13 @@ export const UstaadDashboard: React.FC<UstaadDashboardProps> = ({
                       type="button"
                       disabled={!paraStatus.canStartNewPara}
                       onClick={() => setStartingParaStudent(student)}
-                      className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
+                      className={`shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all border ${
                         paraStatus.canStartNewPara
                           ? 'bg-[#1F4E3D] hover:bg-[#16382C] text-white border-[#C5A059] shadow-xs cursor-pointer'
                           : 'bg-stone-200 text-stone-500 border-stone-300 cursor-not-allowed opacity-70'
                       }`}
                     >
-                      <Award className="w-4 h-4" />
+                      <Award className="w-3.5 h-3.5" />
                       <span>{t.startNewParaButton}</span>
                     </button>
                   </div>

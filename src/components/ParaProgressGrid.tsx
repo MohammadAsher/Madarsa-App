@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getParaPageRange, getParaSurahName } from '../data/quranData';
 
 export interface ParaProgressGridProps {
@@ -40,14 +40,51 @@ export const ParaProgressGrid: React.FC<ParaProgressGridProps> = ({
   const isUr = language === 'ur';
   const repeatLabel = repeatPrefix || (isUr ? 'دہرائیں' : 'Repeat');
 
+  const [activeTooltipPara, setActiveTooltipPara] = useState<number | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggeredRef = useRef<boolean>(false);
+  const autoHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTimers = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    if (autoHideTimerRef.current) {
+      clearTimeout(autoHideTimerRef.current);
+      autoHideTimerRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => clearTimers();
+  }, []);
+
+  const handleTouchStart = (paraNum: number) => {
+    clearTimers();
+    longPressTriggeredRef.current = false;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      setActiveTooltipPara(paraNum);
+      autoHideTimerRef.current = setTimeout(() => {
+        setActiveTooltipPara(curr => (curr === paraNum ? null : curr));
+      }, 2800);
+    }, 400);
+  };
+
+  const handleTouchEndOrCancel = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div
-        className={
-          compact
-            ? 'grid grid-cols-3 sm:grid-cols-6 md:grid-cols-10 gap-1.5'
-            : 'grid grid-cols-3 sm:grid-cols-5 md:grid-cols-10 gap-2'
-        }
+        className={`grid grid-cols-6 min-[420px]:grid-cols-7 sm:grid-cols-8 lg:grid-cols-15 gap-1.5 ${
+          compact ? 'max-w-[660px]' : 'max-w-[680px]'
+        }`}
       >
         {Array.from({ length: 30 }, (_, i) => i + 1).map(paraNum => {
           const isCompleted = completedParas.includes(paraNum);
@@ -57,79 +94,166 @@ export const ParaProgressGrid: React.FC<ParaProgressGridProps> = ({
           const isManzilRepeat = !isNazra && !isManzilDue && Boolean(repeatDate);
           const isPreviewing = previewParaNum === paraNum;
           const { startPage, endPage } = getParaPageRange(paraNum, mushafLayout);
+          const surahName = getParaSurahName(paraNum);
 
-          // Color states:
-          // 1. Manzil due (Hifz pending) -> solid amber/orange fill (#F59E0B) with dark text (#1C120C)
-          // 2. Repeat (failed Manzil, awaiting re-pass) -> solid crimson red (#B91C1C) with white text
-          // 3. Completed -> dark green (#1F4E3D) (or deep blue #16365D in Nazra) with white text
-          // 4. Current para -> white (#FFFFFF) with dark brown text (#241811)
-          // 5. Not started -> grey (#E5E7EB) with charcoal text (#4B5563)
+          // Color states (unchanged):
+          // 1. Manzil due -> Amber (#F59E0B)
+          // 2. Repeat -> Red (#B91C1C)
+          // 3. Completed -> Green (#1F4E3D) or Nazra Blue (#16365D)
+          // 4. Current para -> White (#FFFFFF)
+          // 5. Not started -> Grey (#E5E7EB)
           let tileColorClasses =
-            'bg-[#E5E7EB] text-[#4B5563] border-[#D1D5DB] hover:bg-[#D1D5DB]/80';
+            'bg-[#E5E7EB] text-[#374151] border-[#D1D5DB] hover:bg-[#D1D5DB]/80';
           if (isManzilDue) {
             tileColorClasses =
-              'bg-[#F59E0B] text-[#1C120C] border-2 border-[#B45309] hover:bg-[#D97706] shadow-md';
+              'bg-[#F59E0B] text-[#1C120C] border-2 border-[#B45309] hover:bg-[#D97706] shadow-xs';
           } else if (isManzilRepeat) {
             tileColorClasses =
-              'bg-[#B91C1C] text-white border-2 border-[#7F1D1D] hover:bg-[#991B1B] shadow-md';
+              'bg-[#B91C1C] text-white border-2 border-[#7F1D1D] hover:bg-[#991B1B] shadow-xs';
           } else if (isCompleted) {
             tileColorClasses = isNazra
-              ? 'bg-[#16365D] text-white border-[#C5A059] hover:bg-[#102946] shadow-xs'
-              : 'bg-[#1F4E3D] text-white border-[#C5A059] hover:bg-[#16382C] shadow-xs';
+              ? 'bg-[#16365D] text-white border-[#C5A059] hover:bg-[#102946] shadow-2xs'
+              : 'bg-[#1F4E3D] text-white border-[#C5A059] hover:bg-[#16382C] shadow-2xs';
           } else if (isCurrent) {
             tileColorClasses =
               'bg-white text-[#241811] border-2 border-[#C5A059] hover:bg-[#FAF6EF] shadow-2xs';
           }
 
-          return (
-            <button
-              key={paraNum}
-              type="button"
-              onClick={() => onTapPara?.(paraNum)}
-              disabled={!onTapPara}
-              className={`rounded-xl border text-center transition-all flex flex-col items-center justify-center relative ${
-                compact ? 'p-1.5 min-h-[58px]' : 'p-2 min-h-[70px]'
-              } ${onTapPara ? 'cursor-pointer' : 'cursor-default'} ${tileColorClasses} ${
-                isPreviewing ? 'scale-[1.03] ring-2 ring-[#241811]' : ''
-              }`}
-              title={`Para ${paraNum} (${getParaSurahName(paraNum)}, Pages ${startPage}–${endPage})`}
-            >
-              <span className={compact ? 'text-[11px] font-bold leading-tight' : 'text-xs font-bold leading-tight'}>
-                {isUr ? `پارہ ${paraNum}` : `Para ${paraNum}`}
-              </span>
-              <span
-                className={`font-mono leading-tight mt-0.5 ${
-                  compact ? 'text-[9px]' : 'text-[10px]'
-                } ${isManzilDue ? 'text-[#241811] font-semibold' : 'opacity-85'}`}
-              >
-                P{startPage}–{endPage}
-              </span>
+          let statusText = isUr ? 'شروع نہیں ہوا' : 'Not started';
+          let tooltipStatusColor = 'text-[#D1D5DB]';
+          if (isManzilDue) {
+            statusText = `${manzilDuePrefix}: ${currentDate}`;
+            tooltipStatusColor = 'text-[#FCD34D]';
+          } else if (isManzilRepeat && repeatDate) {
+            statusText = `${repeatLabel}: ${repeatDate}`;
+            tooltipStatusColor = 'text-[#FCA5A5]';
+          } else if (isCompleted) {
+            statusText = isNazra
+              ? isUr
+                ? 'ناظرہ مکمل'
+                : 'Read in Nazra'
+              : isUr
+              ? 'مکمل شدہ'
+              : 'Completed';
+            tooltipStatusColor = 'text-[#86EFAC]';
+          } else if (isCurrent) {
+            statusText = isUr ? 'موجودہ پارہ' : 'Current para';
+            tooltipStatusColor = 'text-[#FDE68A]';
+          }
 
-              {isManzilDue && (
-                <span className="mt-1 px-1.5 py-0.5 rounded bg-[#FFFBEB] border border-[#B45309]/50 text-[#78350F] text-[9px] font-extrabold leading-tight break-words max-w-full">
-                  {manzilDuePrefix}: {currentDate}
+          const nativeTitle = `${
+            isUr ? `پارہ ${paraNum}` : `Para ${paraNum}`
+          } (${surahName}) · ${
+            isUr ? `صفحات ${startPage}–${endPage}` : `Pages ${startPage}–${endPage}`
+          } · ${statusText}`;
+
+          const isTooltipOpen = activeTooltipPara === paraNum;
+          const placeBelow = paraNum <= 15;
+          const alignClass =
+            paraNum % 6 === 1 || paraNum % 15 === 1
+              ? 'left-0'
+              : paraNum % 6 === 0 || paraNum % 15 === 0 || paraNum % 6 === 5
+              ? 'right-0'
+              : 'left-1/2 -translate-x-1/2';
+
+          return (
+            <div key={paraNum} className="relative">
+              <button
+                type="button"
+                aria-label={nativeTitle}
+                title={nativeTitle}
+                onClick={e => {
+                  if (longPressTriggeredRef.current) {
+                    e.preventDefault();
+                    longPressTriggeredRef.current = false;
+                    return;
+                  }
+                  setActiveTooltipPara(null);
+                  onTapPara?.(paraNum);
+                }}
+                onPointerEnter={e => {
+                  if (e.pointerType !== 'touch') {
+                    setActiveTooltipPara(paraNum);
+                  }
+                }}
+                onPointerLeave={e => {
+                  if (e.pointerType !== 'touch') {
+                    setActiveTooltipPara(curr => (curr === paraNum ? null : curr));
+                  }
+                }}
+                onFocus={() => setActiveTooltipPara(paraNum)}
+                onBlur={() => setActiveTooltipPara(curr => (curr === paraNum ? null : curr))}
+                onTouchStart={() => handleTouchStart(paraNum)}
+                onTouchMove={handleTouchEndOrCancel}
+                onTouchCancel={handleTouchEndOrCancel}
+                onTouchEnd={handleTouchEndOrCancel}
+                onContextMenu={e => {
+                  if (longPressTriggeredRef.current) {
+                    e.preventDefault();
+                  }
+                }}
+                disabled={!onTapPara}
+                className={`w-full min-w-[40px] min-h-[40px] sm:min-w-[36px] sm:min-h-[36px] sm:h-9 rounded-lg border text-center transition-all flex flex-col items-center justify-center relative select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#241811] ${
+                  onTapPara ? 'cursor-pointer' : 'cursor-default'
+                } ${tileColorClasses} ${
+                  isPreviewing ? 'scale-[1.04] ring-2 ring-[#241811]' : ''
+                }`}
+              >
+                <span className="text-xs font-bold tabular-nums leading-none">
+                  {paraNum}
                 </span>
+
+                {!isManzilDue && !isManzilRepeat && isCurrent && (
+                  <span className="text-[7px] font-extrabold tracking-tight leading-none text-[#8F6E2B] mt-0.5">
+                    {isUr ? 'موجودہ' : 'Current'}
+                  </span>
+                )}
+
+                {isManzilDue && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#1C120C] text-[#FDE68A] border border-[#F59E0B] text-[8px] font-black leading-none flex items-center justify-center shadow-2xs"
+                  >
+                    {isUr ? 'م' : 'M'}
+                  </span>
+                )}
+
+                {isManzilRepeat && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#FEF2F2] text-[#7F1D1D] border border-[#7F1D1D] text-[8px] font-black leading-none flex items-center justify-center shadow-2xs"
+                  >
+                    {isUr ? 'د' : 'R'}
+                  </span>
+                )}
+              </button>
+
+              {isTooltipOpen && (
+                <div
+                  role="tooltip"
+                  className={`pointer-events-none absolute z-40 ${
+                    placeBelow ? 'top-full mt-1.5' : 'bottom-full mb-1.5'
+                  } ${alignClass} px-2.5 py-1.5 rounded-lg bg-[#241811] text-[#FCFAF6] border border-[#C5A059] shadow-lg text-[10px] leading-snug whitespace-nowrap`}
+                >
+                  <div className="font-bold text-[#DFCFA8]">
+                    {isUr ? `پارہ ${paraNum}` : `Para ${paraNum}`} · {surahName}
+                  </div>
+                  <div className="font-mono text-[#FCFAF6]/90">
+                    {isUr ? `صفحات ${startPage}–${endPage}` : `Pages ${startPage}–${endPage}`}
+                  </div>
+                  <div className={`font-bold mt-0.5 ${tooltipStatusColor}`}>{statusText}</div>
+                </div>
               )}
-              {isManzilRepeat && repeatDate && (
-                <span className="mt-1 px-1.5 py-0.5 rounded bg-[#FEF2F2] border border-[#7F1D1D]/50 text-[#7F1D1D] text-[9px] font-extrabold leading-tight break-words max-w-full">
-                  {repeatLabel}: {repeatDate}
-                </span>
-              )}
-              {!isManzilDue && !isManzilRepeat && isCurrent && (
-                <span className="mt-1 px-1.5 py-0.5 rounded bg-[#F3ECE1] border border-[#C5A059]/60 text-[#241811] text-[9px] font-bold leading-tight">
-                  {isUr ? 'موجودہ' : 'Current'}
-                </span>
-              )}
-            </button>
+            </div>
           );
         })}
       </div>
 
-      {/* Colour Legend */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1 text-xs text-[#42362E]">
-        <div className="flex items-center gap-1.5">
+      {/* Single-line Compact Colour Legend */}
+      <div className="flex items-center gap-x-2.5 sm:gap-x-3.5 pt-0.5 text-[10px] sm:text-[11px] text-[#42362E] overflow-x-auto whitespace-nowrap">
+        <div className="flex items-center gap-1 shrink-0">
           <span
-            className={`w-3.5 h-3.5 rounded border border-[#C5A059] inline-block shrink-0 ${
+            className={`w-2.5 h-2.5 rounded-xs border border-[#C5A059] inline-block shrink-0 ${
               isNazra ? 'bg-[#16365D]' : 'bg-[#1F4E3D]'
             }`}
           />
@@ -139,33 +263,33 @@ export const ParaProgressGrid: React.FC<ParaProgressGridProps> = ({
                 ? 'نیلا = ناظرہ مکمل'
                 : 'Blue = Read in Nazra'
               : isUr
-              ? 'سبز = مکمل شدہ'
+              ? 'سبز = مکمل'
               : 'Green = Completed'}
           </span>
         </div>
         {!isNazra && (
           <>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded bg-[#F59E0B] border border-[#B45309] inline-block shrink-0" />
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="w-2.5 h-2.5 rounded-xs bg-[#F59E0B] border border-[#B45309] inline-block shrink-0" />
               <span className="font-semibold text-[#78350F]">
-                {isUr ? 'عنبری = منزل مقرر' : 'Amber = Manzil due'}
+                {isUr ? 'عنبری (م) = منزل' : 'Amber (M) = Manzil due'}
               </span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded bg-[#B91C1C] border border-[#7F1D1D] inline-block shrink-0" />
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="w-2.5 h-2.5 rounded-xs bg-[#B91C1C] border border-[#7F1D1D] inline-block shrink-0" />
               <span className="font-semibold text-[#991B1B]">
-                {isUr ? 'سرخ = دہرائیں' : 'Red = Repeat'}
+                {isUr ? 'سرخ (د) = دہرائیں' : 'Red (R) = Repeat'}
               </span>
             </div>
           </>
         )}
-        <div className="flex items-center gap-1.5">
-          <span className="w-3.5 h-3.5 rounded bg-white border border-[#C5A059] inline-block shrink-0" />
-          <span className="font-medium">{isUr ? 'سفید = موجودہ پارہ' : 'White = Current para'}</span>
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="w-2.5 h-2.5 rounded-xs bg-white border border-[#C5A059] inline-block shrink-0" />
+          <span className="font-medium">{isUr ? 'سفید = موجودہ' : 'White = Current para'}</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3.5 h-3.5 rounded bg-[#E5E7EB] border border-[#9CA3AF] inline-block shrink-0" />
-          <span className="font-medium">{isUr ? 'سرمئی = شروع نہیں ہوا' : 'Grey = Not started'}</span>
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="w-2.5 h-2.5 rounded-xs bg-[#E5E7EB] border border-[#9CA3AF] inline-block shrink-0" />
+          <span className="font-medium">{isUr ? 'سرمئی = باقی' : 'Grey = Not started'}</span>
         </div>
       </div>
     </div>

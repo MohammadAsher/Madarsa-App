@@ -995,10 +995,12 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
   // Page-turn animation state
   const [basePageNumber, setBasePageNumber] = useState<number>(safePageNumber);
   const [flipSession, setFlipSession] = useState<FlipSession | null>(null);
+  const viewerRootRef = useRef<HTMLDivElement | null>(null);
   const lastTargetRef = useRef<number>(safePageNumber);
   const animTimerRef = useRef<number | null>(null);
   const raf1Ref = useRef<number | null>(null);
   const raf2Ref = useRef<number | null>(null);
+  const scrollRafRef = useRef<number | null>(null);
 
   const [pageInput, setPageInput] = useState<string>(String(safePageNumber));
   const isEditingPageInputRef = useRef<boolean>(false);
@@ -1026,9 +1028,105 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
     }
   }, []);
 
+  const clearPendingScroll = useCallback(() => {
+    if (scrollRafRef.current !== null) {
+      cancelAnimationFrame(scrollRafRef.current);
+      scrollRafRef.current = null;
+    }
+  }, []);
+
+  // Scroll smoothly (or instantly when reduced motion is enabled) to the top of the Mushaf page,
+  // leaving clearance under sticky app headers or inside scrollable modal containers.
+  const scrollToMushafTop = useCallback(() => {
+    const root = viewerRootRef.current;
+    if (!root || typeof window === 'undefined') return;
+
+    const behavior: ScrollBehavior = prefersReducedMotion ? 'auto' : 'smooth';
+    const padding = 8;
+
+    // 1. Check if MushafViewer sits inside a dedicated scrollable container (e.g. modal body)
+    let scrollContainer: HTMLElement | null = null;
+    let ancestor = root.parentElement;
+    while (ancestor && ancestor !== document.body && ancestor !== document.documentElement) {
+      const style = window.getComputedStyle(ancestor);
+      const overflowY = style.overflowY;
+      if (
+        (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') &&
+        ancestor.scrollHeight > ancestor.clientHeight + 2
+      ) {
+        scrollContainer = ancestor;
+        break;
+      }
+      ancestor = ancestor.parentElement;
+    }
+
+    const rootRect = root.getBoundingClientRect();
+
+    if (scrollContainer) {
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const targetTop = Math.max(
+        0,
+        scrollContainer.scrollTop + (rootRect.top - containerRect.top) - padding
+      );
+      if (Math.abs(scrollContainer.scrollTop - targetTop) > 1) {
+        if (typeof scrollContainer.scrollTo === 'function') {
+          scrollContainer.scrollTo({ top: targetTop, behavior });
+        } else {
+          scrollContainer.scrollTop = targetTop;
+        }
+      }
+      return;
+    }
+
+    // 2. Window scrolling: measure sticky/fixed top headers so the Mushaf page header is never covered
+    let stickyTopClearance = 0;
+    const stickyCandidates = document.querySelectorAll<HTMLElement>(
+      'header, [data-sticky-top="true"]'
+    );
+    stickyCandidates.forEach(el => {
+      if (root.contains(el)) return;
+      const style = window.getComputedStyle(el);
+      if (style.position !== 'sticky' && style.position !== 'fixed') return;
+      const rect = el.getBoundingClientRect();
+      if (rect.height <= 0 || rect.width <= 0) return;
+      if (rect.height > window.innerHeight * 0.45) return;
+
+      if (style.position === 'fixed') {
+        if (rect.top <= 4 && rect.bottom > 0 && rect.bottom < window.innerHeight * 0.5) {
+          stickyTopClearance = Math.max(stickyTopClearance, rect.bottom);
+        }
+      } else {
+        const topOffset = Number.parseFloat(style.top);
+        const precedesRoot = Boolean(
+          el.compareDocumentPosition(root) & Node.DOCUMENT_POSITION_FOLLOWING
+        );
+        if (!Number.isNaN(topOffset) && topOffset >= 0 && topOffset <= 120 && precedesRoot) {
+          stickyTopClearance = Math.max(stickyTopClearance, topOffset + rect.height);
+        }
+      }
+    });
+
+    const targetY = Math.max(0, window.scrollY + rootRect.top - stickyTopClearance - padding);
+    if (Math.abs(window.scrollY - targetY) > 1) {
+      window.scrollTo({ top: targetY, behavior });
+    }
+  }, [prefersReducedMotion]);
+
+  const scheduleScrollToMushafTop = useCallback(() => {
+    clearPendingScroll();
+    if (typeof window === 'undefined') return;
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      scrollToMushafTop();
+    });
+  }, [clearPendingScroll, scrollToMushafTop]);
+
   useEffect(() => {
-    return () => clearAnimationTimers();
-  }, [clearAnimationTimers]);
+    return () => {
+      clearAnimationTimers();
+      clearPendingScroll();
+    };
+  }, [clearAnimationTimers, clearPendingScroll]);
 
   const startFlipAnimation = useCallback(
     (fromPage: number, toPage: number, notifyParent: boolean) => {
@@ -1059,7 +1157,10 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
       const durationMs = prefersReducedMotion ? FADE_DURATION_MS : FLIP_DURATION_MS;
 
       // Double rAF ensures the pre-loaded destination page has laid out & painted before transform starts
+      // Start scrolling to the Mushaf top right as the committed page begins its flip animation
+      clearPendingScroll();
       raf1Ref.current = requestAnimationFrame(() => {
+        scrollToMushafTop();
         raf2Ref.current = requestAnimationFrame(() => {
           setFlipSession(prev => (prev ? { ...prev, phase: 'animating' } : null));
           animTimerRef.current = window.setTimeout(() => {
@@ -1070,7 +1171,14 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
         });
       });
     },
-    [clearAnimationTimers, onPageChange, prefersReducedMotion, totalPages]
+    [
+      clearAnimationTimers,
+      clearPendingScroll,
+      onPageChange,
+      prefersReducedMotion,
+      scrollToMushafTop,
+      totalPages,
+    ]
   );
 
   // Unified page turn request (blocks double taps during animation)
@@ -1105,8 +1213,17 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
       lastTargetRef.current = clamped;
       setBasePageNumber(clamped);
       onPageChange(clamped);
+      scheduleScrollToMushafTop();
     },
-    [clearAnimationTimers, isAnimating, onPageChange, safePageNumber, startFlipAnimation, totalPages]
+    [
+      clearAnimationTimers,
+      isAnimating,
+      onPageChange,
+      safePageNumber,
+      scheduleScrollToMushafTop,
+      startFlipAnimation,
+      totalPages,
+    ]
   );
 
   const commitPageInput = useCallback(() => {
@@ -1130,8 +1247,15 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
       clearAnimationTimers();
       setFlipSession(null);
       setBasePageNumber(safePageNumber);
+      scheduleScrollToMushafTop();
     }
-  }, [safePageNumber, isAnimating, startFlipAnimation, clearAnimationTimers]);
+  }, [
+    safePageNumber,
+    isAnimating,
+    startFlipAnimation,
+    clearAnimationTimers,
+    scheduleScrollToMushafTop,
+  ]);
 
   // Keyboard arrow navigation (Arabic book reading order: ArrowLeft = Next, ArrowRight = Previous)
   useEffect(() => {
@@ -1223,6 +1347,7 @@ export const MushafViewer: React.FC<MushafViewerProps> = ({
 
   return (
     <div
+      ref={viewerRootRef}
       onTouchStart={handleTouchStartSwipe}
       onTouchEnd={handleTouchEndSwipe}
       className="flex flex-col items-center w-full min-w-0 shrink-0 select-none relative overflow-x-clip"
